@@ -6,6 +6,10 @@ import type { CameraSettings } from "./types";
 import { BoundedWorkerSink } from "../vision/workerProtocol";
 import { FrameDiagnostics, type DiagnosticSample } from "../diagnostics/FrameDiagnostics";
 import { DiagnosticsPanel } from "../diagnostics/DiagnosticsPanel";
+import { WasmTagDetector } from "../calibration/WasmTagDetector";
+import { solveCalibration } from "../calibration/homography";
+import { CalibrationFlow } from "../calibration/CalibrationFlow";
+import type { CalibrationResult, PointCorrespondence } from "../calibration/types";
 
 function cameraErrorMessage(error: unknown): string {
   if (error instanceof DOMException) {
@@ -31,6 +35,7 @@ export function CameraSetup() {
   const diagnosticsRef = useRef(new FrameDiagnostics());
   const wakeLockRef = useRef<{ release(): Promise<void> } | null>(null);
   const previewCallbackRef = useRef<number | null>(null);
+  const detectorRef = useRef<WasmTagDetector | null>(null);
   const [settings, setSettings] = useState<CameraSettings | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [active, setActive] = useState(false);
@@ -38,6 +43,8 @@ export function CameraSetup() {
   const [sample, setSample] = useState<DiagnosticSample>(() =>
     diagnosticsRef.current.snapshot(0),
   );
+  const [calibration, setCalibration] = useState<CalibrationResult | null>(null);
+  const [calibrating, setCalibrating] = useState(false);
 
   if (!controllerRef.current) {
     controllerRef.current = new CameraController();
@@ -61,6 +68,7 @@ export function CameraSetup() {
       stopFramePipeline();
       controller?.stop();
       void wakeLockRef.current?.release();
+      detectorRef.current?.dispose();
     };
   }, []);
 
@@ -89,6 +97,7 @@ export function CameraSetup() {
     if (videoRef.current) videoRef.current.srcObject = null;
     setActive(false);
     setSettings(null);
+    setCalibration(null);
     setInterrupted(false);
     void wakeLockRef.current?.release();
     wakeLockRef.current = null;
@@ -176,6 +185,58 @@ export function CameraSetup() {
     URL.revokeObjectURL(url);
   }
 
+  async function runCalibration(): Promise<void> {
+    const video = videoRef.current;
+    if (!video || !settings) return;
+    setCalibrating(true);
+    setError(null);
+    try {
+      const width = video.videoWidth || settings.width || 640;
+      const height = video.videoHeight || settings.height || 360;
+      const canvas = document.createElement("canvas");
+      canvas.width = width;
+      canvas.height = height;
+      const context = canvas.getContext("2d", { willReadFrequently: true });
+      if (!context) throw new Error("Canvas capture is unavailable");
+      context.drawImage(video, 0, 0, width, height);
+      const detector = detectorRef.current ?? new WasmTagDetector();
+      detectorRef.current = detector;
+      const detections = await detector.detect(context.getImageData(0, 0, width, height));
+      const correspondences = detections.flatMap((detection) => {
+        const boardCorners = boardTagCorners(detection.id);
+        return boardCorners
+          ? detection.corners.map((image, index) => ({ image, boardMm: boardCorners[index]! }))
+          : [];
+      }) as PointCorrespondence[];
+      const solved = solveCalibration(
+        correspondences,
+        {
+          revision: "board-v1",
+          supportedRevision: "board-v1",
+          wheelBaseline: [{ x: 45, y: 120 }, { x: 165, y: 120 }],
+          wheelCenterlineXmm: 105,
+          markerPlaneOffsetToleranceMm: 30,
+        },
+        {
+          width,
+          height,
+          roi: { x: 0, y: 0, width, height },
+          poseYawDeg: null,
+          posePitchDeg: null,
+          blurScore: 1,
+          contrastScore: 1,
+        },
+      );
+      setCalibration(solved);
+    } catch (calibrationError) {
+      setError(calibrationError instanceof Error
+        ? `Calibration failed: ${calibrationError.message}`
+        : "Calibration failed. Keep all four tags visible and retry.");
+    } finally {
+      setCalibrating(false);
+    }
+  }
+
   return (
     <section className="camera-setup" aria-labelledby="camera-title">
       <p className="eyebrow">Private setup</p>
@@ -202,6 +263,21 @@ export function CameraSetup() {
       )}
 
       {active && <DiagnosticsPanel sample={sample} />}
+      {active && (
+        <div className="calibration-actions">
+          <a href="/calibration/board-v1.svg" target="_blank" rel="noreferrer">Open printable calibration board</a>
+          <button type="button" className="secondary" disabled={calibrating} onClick={runCalibration}>
+            {calibrating ? "Detecting board…" : "Calibrate printed board"}
+          </button>
+        </div>
+      )}
+      {calibration && (
+        <CalibrationFlow
+          result={calibration}
+          onAccepted={setCalibration}
+          onRecalibrate={() => setCalibration(null)}
+        />
+      )}
 
       <div className="actions">
         {!active ? (
@@ -238,4 +314,24 @@ async function readBatteryLevel(diagnostics: FrameDiagnostics): Promise<void> {
   } catch {
     diagnostics.setBatteryLevel(null);
   }
+}
+
+function boardTagCorners(id: number): CalibrationResult["wheelBaseline"] | [
+  { x: number; y: number }, { x: number; y: number },
+  { x: number; y: number }, { x: number; y: number },
+] | null {
+  const origins: Record<number, { x: number; y: number }> = {
+    0: { x: 10, y: 10 },
+    1: { x: 174, y: 10 },
+    2: { x: 10, y: 112 },
+    3: { x: 174, y: 112 },
+  };
+  const origin = origins[id];
+  if (!origin) return null;
+  return [
+    origin,
+    { x: origin.x + 26, y: origin.y },
+    { x: origin.x + 26, y: origin.y + 26 },
+    { x: origin.x, y: origin.y + 26 },
+  ];
 }
