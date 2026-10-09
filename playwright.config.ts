@@ -32,5 +32,12 @@ export default defineConfig({
         launchOptions: { args: ["--use-fake-device-for-media-stream", "--use-fake-ui-for-media-stream"] },
       },
     },
+    {
+      name: "mobile-webkit",
+      use: {
+        ...devices["iPhone 15"],
+        permissions: ["camera"],
+      },
+    },
   ],
 });
