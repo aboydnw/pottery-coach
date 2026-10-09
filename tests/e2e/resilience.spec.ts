@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+import { expect, test } from "./fixtures/playwright";
 
 test("camera interruption is explicit and requires user resume", async ({ page }) => {
   await page.goto("/");

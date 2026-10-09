@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+import { expect, test } from "./fixtures/playwright";
 import { beginDemoSession } from "./fixtures/session-streams";
 
 test("target flow exposes wet/fired assumptions before confirmation", async ({ page }) => {
