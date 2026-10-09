@@ -1,0 +1,20 @@
+import "fake-indexeddb/auto";
+import { afterEach, expect, it } from "vitest";
+import { DeletionService } from "./DeletionService";
+import { SessionRepository } from "../session/SessionRepository";
+import type { SessionRecord } from "../session/types";
+
+let repository: SessionRepository;
+afterEach(async () => repository?.destroy());
+
+it("is idempotent and inventories unavailable provider deletion honestly", async () => {
+  repository = new SessionRepository(`test-${crypto.randomUUID()}`);
+  await repository.create({ id: "s", schemaVersion: 1, startedAtMs: 0, endedAtMs: 1, goal: null,
+    deviceClass: "phone", calibrationId: null, outcome: "completed",
+    consent: { cameraLocal: true, cloudAudio: false, transcriptRetention: false, snapshotUpload: false,
+      researchMedia: false, policyRevision: "1", grantedAtMs: 0 } } as SessionRecord);
+  const service = new DeletionService(repository, { now: () => 10 });
+  const receipt = await service.deleteSession("s");
+  expect(receipt.stores).toContainEqual({ name: "provider-exception", status: "provider-exception" });
+  expect((await service.deleteSession("s")).stores[0]?.status).toBe("not-present");
+});
