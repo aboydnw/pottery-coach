@@ -19,3 +19,7 @@ Scale: probability/impact/detectability 1–5; RPN=P×I×D. 60+ critical, 30–5
 | Fiducial wet/moved/wrong scale | 3/4/2;24 | print ruler/checksum, board-motion invalidation | manual calibration/wider bound | abuse fixture set |
 
 Each plan records inherent and residual scores. A mitigation is accepted only after its named validation produces an artifact linked from Benchmark Results.
+
+## Current ownership and gate posture
+
+Vision owns A–D and fiducial risks; performance owns F/G; trust and the two instructor reviewers own E/H; security/privacy own bystander and provider-retention risks; product owns J and study stop decisions. Automated mitigations are implemented, but residual scores remain unchanged until their physical or human validation artifact is signed. The release manifest therefore keeps numeric production mode, proactive wobble, cloud voice, and mobile support disabled.

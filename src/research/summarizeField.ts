@@ -24,10 +24,10 @@ function bootstrapInterval(rows: FieldResult[], predicate: (row: FieldResult) =>
   if (!rows.length) return [];
   let state = (options.seed ?? 20261009) >>> 0;
   const random = () => ((state = (1664525 * state + 1013904223) >>> 0) / 2 ** 32);
+  const clusters = [...Map.groupBy(rows, (row) => row.participantPseudonym).values()];
   const values = Array.from({ length: options.bootstrapIterations ?? 10_000 }, () => {
-    let successes = 0;
-    for (let index = 0; index < rows.length; index++) if (predicate(rows[Math.floor(random() * rows.length)]!)) successes++;
-    return successes / rows.length;
+    const sampled = Array.from({ length: clusters.length }, () => clusters[Math.floor(random() * clusters.length)]!).flat();
+    return sampled.filter(predicate).length / sampled.length;
   }).sort((a, b) => a - b);
   return [values[Math.floor(values.length * 0.025)]!, values[Math.min(values.length - 1, Math.ceil(values.length * 0.975))]!];
 }

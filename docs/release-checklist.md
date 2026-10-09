@@ -1,5 +1,7 @@
 # Controlled prototype release checklist
 
+Plan-to-evidence detail is maintained in [`implementation-audit.md`](implementation-audit.md).
+
 - [x] Unit tests cover camera, calibration, measurement, targets, wobble, voice, coaching, recording, review, and lifecycle.
 - [x] Raw media is absent from session storage and default network paths.
 - [x] Numeric, wobble, provider voice, storage, and mobile support can be disabled independently.

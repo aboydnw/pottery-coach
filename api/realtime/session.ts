@@ -1,4 +1,6 @@
 import { realtimeSessionRequestSchema } from "../../src/voice/sessionSchema";
+import { COACH_INSTRUCTIONS } from "../../src/voice/instructions";
+import { REALTIME_TOOL_DEFINITIONS } from "../../src/voice/tools/definitions";
 
 const MODEL = "gpt-realtime-2.1-mini";
 const VOICE = "marin";
@@ -17,6 +19,7 @@ export async function handleRealtimeSession(request: Request, dependencies: Depe
   if (request.method !== "POST") return error("VOICE_PROVIDER_ERROR", 405);
   if (!await dependencies.authenticate(request)) return error("VOICE_PROVIDER_ERROR", 401);
   if (!dependencies.verifyCsrf(request)) return error("VOICE_PROVIDER_ERROR", 403);
+  if (!request.headers.get("content-type")?.toLowerCase().startsWith("application/json")) return error("VOICE_PROVIDER_ERROR", 415);
   let parsed: ReturnType<typeof realtimeSessionRequestSchema.safeParse>;
   try { parsed = realtimeSessionRequestSchema.safeParse(await request.json()); }
   catch { return error("VOICE_PROVIDER_ERROR", 400); }
@@ -27,7 +30,8 @@ export async function handleRealtimeSession(request: Request, dependencies: Depe
   try {
     const form = new FormData();
     form.set("sdp", parsed.data.sdp);
-    form.set("session", JSON.stringify({ type: "realtime", model: MODEL, audio: { output: { voice: VOICE }, input: { turn_detection: { type: "server_vad" } } }, instructions: "Use tools for every measurement. Never guess a number.", tools: [] }));
+    form.set("session", JSON.stringify({ type: "realtime", model: MODEL, audio: { output: { voice: VOICE }, input: { turn_detection: { type: "server_vad" } } },
+      instructions: COACH_INSTRUCTIONS, tools: REALTIME_TOOL_DEFINITIONS }));
     const provider = await dependencies.fetch("https://api.openai.com/v1/realtime/calls", {
       method: "POST", headers: { Authorization: `Bearer ${dependencies.apiKey}` }, body: form, signal: controller.signal,
     });

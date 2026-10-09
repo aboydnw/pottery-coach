@@ -1,6 +1,7 @@
 import { detectCapabilities } from "./platform/capabilities";
 import { ErrorBoundary } from "./app/ErrorBoundary";
 import { AppRoutes } from "./app/routes";
+import { BrowserRouter } from "react-router";
 
 export function App() {
   const capabilities = detectCapabilities();
@@ -22,7 +23,7 @@ export function App() {
 
   return (
     <main className="app-shell">
-      <ErrorBoundary><AppRoutes /></ErrorBoundary>
+      <ErrorBoundary><BrowserRouter><AppRoutes /></BrowserRouter></ErrorBoundary>
     </main>
   );
 }

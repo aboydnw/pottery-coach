@@ -92,4 +92,13 @@ describe("CameraController", () => {
       expect.objectContaining({ type: "interrupted", reason: "document-hidden" }),
     );
   });
+
+  it("reports a camera-ended event and maps revoked permission", async () => {
+    const controller = new CameraController(); const listener = vi.fn(); controller.subscribe(listener);
+    await controller.start(); track.dispatchEvent(new Event("ended"));
+    expect(listener).toHaveBeenCalledWith(expect.objectContaining({ type: "ended", reason: "track-ended" }));
+    getUserMedia.mockRejectedValueOnce(new DOMException("revoked", "NotAllowedError"));
+    await expect(controller.start()).rejects.toThrow();
+    expect(listener).toHaveBeenCalledWith(expect.objectContaining({ type: "error", reason: "permission-denied" }));
+  });
 });

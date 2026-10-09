@@ -6,5 +6,6 @@
   "backdropsRequired": 3,
   "occlusions": ["hands", "tools", "sponge", "clutter"],
   "wheelDirections": ["clockwise", "counterclockwise"],
+  "consentRevisions": ["product-2026-10-09", "media-optional-2026-10-09"],
   "completed": []
 }

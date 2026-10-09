@@ -11,4 +11,5 @@ it("exposes an accessible table and preserves null/low-confidence gaps", () => {
   ]} />);
   expect(screen.getByRole("table", { name: /measurement data/i })).toHaveTextContent("Not measured reliably");
   expect(screen.getByRole("img").querySelectorAll("path")).toHaveLength(2);
+  expect(screen.getByRole("table", { name: /measurement data/i })).toHaveTextContent("a");
 });

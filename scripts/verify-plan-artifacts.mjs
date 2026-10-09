@@ -1,7 +1,8 @@
-import { access, readFile } from "node:fs/promises";
+import { access, readFile, readdir } from "node:fs/promises";
 import { resolve } from "node:path";
 
 const required = [
+  "benchmarks/shared/result.schema.json",
   "benchmarks/dimensions/manifest.schema.json", "benchmarks/dimensions/run.ts", "benchmarks/dimensions/summarize.ts",
   "benchmarks/segmentation/manifest.schema.json", "benchmarks/segmentation/run.ts", "benchmarks/segmentation/summarize.ts",
   "benchmarks/profile/generate.ts", "benchmarks/profile/summarize.ts", "benchmarks/wobble/manifest.schema.json",
@@ -14,6 +15,9 @@ const required = [
   "tests/e2e/network-boundary.spec.ts", "tests/e2e/memory-soak.spec.ts", "tests/e2e/privacy-field.spec.ts",
   "docs/calibration-fixture-protocol.md", "docs/wobble-rig-protocol.md", "docs/voice-test-protocol.md",
   "docs/integrated-test-protocol.md", "docs/release-checklist.md", "docs/privacy-notice.md",
+  "docs/implementation-audit.md", "public/health.json",
+  "docs/session-data.md",
+  "docs/coaching-policy.md",
   "research/field/protocol.md", "research/field/manifest.schema.json", "research/field/device-matrix.json",
 ];
 
@@ -28,4 +32,22 @@ for (const document of linkedDocuments) {
     await access(target).catch(() => { throw new Error(`${document} has an unresolved link: ${match[1]}`); });
   }
 }
-console.log(`Verified ${required.length} required plan artifacts and local evidence links.`);
+const artifactDirectories = ["dimensions", "segmentation", "wobble", "voice", "coaching", "integrated"];
+let artifactCount = 0;
+for (const name of artifactDirectories) {
+  const directory = resolve("benchmarks", name, "artifacts");
+  const files = await readdir(directory);
+  if (!files.length) throw new Error(`${name} has no benchmark artifact`);
+  for (const file of files) {
+    const content = await readFile(resolve(directory, file), "utf8");
+    const rows = file.endsWith(".jsonl") ? content.trim().split("\n").map(JSON.parse) : [JSON.parse(content)];
+    for (const row of rows) {
+      for (const field of ["benchmarkVersion", "commit", "fixtureId", "startedAt", "device", "os", "browser", "configHash", "metrics", "exclusions", "unmeasurableCount", "artifactChecksums"])
+        if (!(field in row)) throw new Error(`${name}/${file} lacks ${field}`);
+      if (!String(row.configHash).startsWith("sha256:") || !row.artifactChecksums.every((value) => String(value).startsWith("sha256:")))
+        throw new Error(`${name}/${file} has invalid checksums`);
+      artifactCount++;
+    }
+  }
+}
+console.log(`Verified ${required.length} required plan artifacts, local evidence links, and ${artifactCount} benchmark records.`);

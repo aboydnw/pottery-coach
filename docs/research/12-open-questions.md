@@ -1,6 +1,6 @@
 # Open questions and closure tests
 
-These are not implementation blockers for Plan 1; each has an owner and a closure test.
+These are not blockers for completing the web implementation; each remains a consolidated physical/provider/domain gate with an owner and closure test.
 
 | Question | Owner/plan | Closure test |
 |---|---|---|

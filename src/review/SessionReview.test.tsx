@@ -1,5 +1,5 @@
 import "@testing-library/jest-dom/vitest";
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, expect, it } from "vitest";
 import { SessionReview } from "./SessionReview";
 import type { SessionBundle } from "../session/types";
@@ -24,7 +24,7 @@ it("shows honest chart gaps, an accessible table, and suppression events", () =>
   render(<SessionReview bundle={bundle} />);
   expect(screen.getByRole("table", { name: /measurement data/i })).toBeInTheDocument();
   expect(screen.getByText(/not measured reliably/i)).toBeInTheDocument();
-  expect(screen.getByText(/cue suppressed/i)).toBeInTheDocument();
+  expect(within(screen.getByRole("list")).getByText(/cue suppressed/i)).toBeInTheDocument();
   expect(screen.queryByText(/caused/i)).not.toBeInTheDocument();
   expect(screen.getByLabelText(/reliable height measurements/i).querySelectorAll("path")).toHaveLength(2);
 });

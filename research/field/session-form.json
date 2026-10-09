@@ -4,12 +4,17 @@
   "studio": { "light": "", "backdrop": "", "clay": "", "wetness": "" },
   "mountGeometry": "",
   "completion": "incomplete",
+  "failureReason": null,
   "setupTimeSeconds": 0,
   "calibrationRetries": 0,
   "metricIds": [],
+  "spokenQuerySuccess": false,
+  "bargeInSuccess": false,
   "distraction": 1,
   "understanding": false,
   "bystanderNotice": false,
+  "privacyTrustIncident": null,
+  "deletionSuccess": false,
   "consentRevisions": [],
   "deletionDate": null
 }

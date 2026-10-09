@@ -1,5 +1,6 @@
 {
   "status": "pending-consolidated-physical-test",
   "requiredClasses": ["recent iPhone class A", "recent iPhone class B", "recent Android class A", "recent Android class B", "desktop control"],
+  "consentRevisions": ["product-2026-10-09", "media-optional-2026-10-09"],
   "completed": []
 }

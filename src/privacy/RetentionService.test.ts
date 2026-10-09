@@ -6,7 +6,7 @@ import type { SessionRecord } from "../session/types";
 
 let repository: SessionRepository;
 function session(id: string, startedAtMs: number, active = false): SessionRecord {
-  return { id, schemaVersion: 1, startedAtMs, endedAtMs: active ? null : startedAtMs + 1,
+  return { id, schemaVersion: 1, startedAtMs, endedAtMs: active ? null : startedAtMs,
     goal: null, deviceClass: "phone", calibrationId: null, outcome: active ? null : "completed",
     consent: { cameraLocal: true, cloudAudio: false, transcriptRetention: false, snapshotUpload: false,
       researchMedia: false, policyRevision: "1", grantedAtMs: startedAtMs } };

@@ -1,4 +1,5 @@
 import { useEffect, useReducer, useRef, useState } from "react";
+import { useNavigate } from "react-router";
 import { CameraSetup } from "../camera/CameraSetup";
 import type { StableDimensionReading } from "../measurement/types";
 import { DeleteSessionDialog } from "../privacy/DeleteSessionDialog";
@@ -19,6 +20,7 @@ import type { AdaptiveMode } from "../performance/AdaptiveRateController";
 const repository = new SessionRepository();
 
 export function AppRoutes() {
+  const navigate = useNavigate();
   const flags = deriveSignedFeatureFlags(releaseManifest);
   const demoMode = new URLSearchParams(window.location.search).get("mode") === "demo";
   const [state, dispatchBase] = useReducer(transition, undefined, () =>
@@ -33,8 +35,8 @@ export function AppRoutes() {
   useEffect(() => {
     sessionStorage.setItem("pottery-coach-session-shell", serializeSessionShell(state));
     const path = state.step === "notice" ? "/" : `/session/${state.step}`;
-    if (window.location.pathname !== path) window.history.replaceState(null, "", `${path}${window.location.search}`);
-  }, [state]);
+    if (window.location.pathname !== path) void navigate(`${path}${window.location.search}`, { replace: true });
+  }, [state, navigate]);
 
   async function cameraReady() {
     dispatch({ type: "CAMERA_READY" });
@@ -108,12 +110,13 @@ export function AppRoutes() {
       sessionStorage.removeItem("pottery-coach-session-shell"); return receipt;
     }} onFinish={() => dispatch({ type: "DELETE_SESSION" })} /></section>;
 
-  return <CameraSetup onCameraReady={() => void cameraReady()} onCameraDenied={() => dispatch({ type: "CAMERA_DENIED" })}
+  return <>{!state.modes.storage && <div className="stale-banner" role="alert">Session storage is unavailable. Live coaching can continue ephemerally, but this session cannot be reviewed later.</div>}
+    <CameraSetup onCameraReady={() => void cameraReady()} onCameraDenied={() => dispatch({ type: "CAMERA_DENIED" })}
     onCalibrated={() => dispatch({ type: "CALIBRATED" })} onAudioDecided={() => dispatch({ type: "AUDIO_DECIDED" })}
     onGoalSet={(goal) => void goalSet(goal)} onReading={recordReading} onWobble={recordWobble} onMilestone={recordMilestone}
     onProcessingModeChange={recordProcessingMode}
     onMarkMoment={() => void markMoment()} onEnded={() => void endSession()}
-    numericEnabled={flags.numericMeasurement || demoMode} />;
+    numericEnabled={flags.numericMeasurement || demoMode} /></>;
 }
 
 function emptyBundle(id: string, now: number): SessionBundle {

@@ -21,3 +21,5 @@ Sources: [getUserMedia](https://developer.mozilla.org/en-US/docs/Web/API/MediaDe
 ## Device acceptance matrix
 
 Plan 1 records hardware model, OS/browser, requested/delivered constraints, preview/acquisition/processed/UI rates, frame-age p50/p95, dropped frames, memory proxy, battery delta, thermal warnings, audio on/off, visibility interruptions, orientation events, focus/exposure changes, and 20-minute completion. Support is granted to a device class only after two clean repeated integrated runs.
+
+Automated coverage currently includes desktop Chromium and Pixel-class Chromium emulation at narrow width, 200% text, orientation changes, offline/background interruption, camera teardown, evidence-linked review/deletion, mock voice controls, and raw-media network boundaries. This validates responsive behavior only; iPhone Safari, Android hardware, VoiceOver, TalkBack, thermals, focus/exposure, and audio routing remain pending the consolidated physical matrix.

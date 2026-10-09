@@ -36,3 +36,12 @@ it("cleans cache and sync queue and reports a backend failure for retry", async 
     { name: "backend", status: "provider-exception" },
   ]));
 });
+
+it("retries provider deletion idempotently after a partial failure", async () => {
+  repository = new SessionRepository(`test-${crypto.randomUUID()}`);
+  let attempts = 0;
+  const service = new DeletionService(repository, { backend: { deleteSession: async () => { attempts++; if (attempts === 1) throw new Error("offline"); } } });
+  expect((await service.deleteSession("missing")).stores).toContainEqual({ name: "backend", status: "provider-exception" });
+  expect((await service.deleteSession("missing")).stores).toContainEqual({ name: "backend", status: "deleted" });
+  expect(attempts).toBe(2);
+});

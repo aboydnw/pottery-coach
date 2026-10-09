@@ -435,7 +435,7 @@ export function CameraSetup(props: CameraSetupProps = {}) {
         <p>{wobbleReading.classification.replaceAll("-", " ")} · confidence {Math.round(wobbleReading.confidence * 100)}%</p>
         <p>This describes visible motion only and does not infer clay pressure, thickness, moisture, or cause.</p>
       </section>}
-      {voiceTransport && <VoiceControls transport={voiceTransport} />}
+      {voiceTransport && <VoiceControls transport={voiceTransport} connectionLabel="local mock (no provider audio)" />}
       {demoMode && goal && stableReading && <section aria-label="Demo evidence question">
         <button type="button" className="secondary" onClick={() => setDemoAnswer(`Height is ${stableReading.heightMm} mm · evidence ${stableReading.id}`)}>Ask “How tall is it?”</button>
         {demoAnswer && <p role="status">{demoAnswer}</p>}

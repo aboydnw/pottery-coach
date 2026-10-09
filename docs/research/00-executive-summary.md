@@ -4,6 +4,8 @@
 
 The concept is technically plausible, but none of the physical feasibility gates has been executed in this workspace. Current browser and API documentation supports camera/microphone capture, worker-based processing, WebRTC speech-to-speech, function calling, and local storage. That is enough to justify a gated prototype, not enough to promise accurate dimensions or proactive wobble coaching.
 
+As of 2026-10-09, Plans 1–9 have a working responsive web implementation, deterministic benchmark harnesses, and automated desktop/mobile-emulation journeys. Numeric production mode, proactive wobble, cloud voice, and mobile support fail closed in the unsigned release manifest. Synthetic/demo success is not a physical gate pass.
+
 V1 is deliberately narrow: a mounted rear camera, prescribed landscape side view, printed planar fiducial beside the vessel plane, contrasting backdrop, good lighting, one straight-cylinder exercise, curated rotational templates, local geometric measurements, and conservative speech. Arbitrary reference photos, learned phase recognition, hand-technique judgment, collapse prediction, wall/floor thickness, internal centering, and proactive wobble advice are excluded until their gates pass.
 
 ## Selected architecture
@@ -62,7 +64,7 @@ Budget **$0.15–$1.50 per session** until measured. This is a planning envelope
 | Trustworthiness | Specified, not run | Adversarial scripted sessions with zero violations |
 | Domain review | Not run | Signed instructor review of cues and terminology |
 
-Begin with `01-foundation-and-camera-plan.md`. Do not expose proactive wobble coaching, arbitrary-photo targets, or confident phase advice unless their gates pass.
+Continue with the consolidated protocols in `docs/integrated-test-protocol.md` and `research/field/protocol.md`. Do not expose proactive wobble coaching, arbitrary-photo targets, or confident phase advice unless their gates pass.
 
 ## Native-app triggers
 

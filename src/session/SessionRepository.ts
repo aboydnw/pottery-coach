@@ -96,7 +96,7 @@ export class SessionRepository {
     await this.db.sessions.update(id, structuredClone(patch));
   }
   async expire(now = Date.now(), retentionMs = 30 * 86_400_000) {
-    const expired = (await this.list()).filter((session) => session.endedAtMs !== null && now - session.startedAtMs >= retentionMs);
+    const expired = (await this.list()).filter((session) => session.endedAtMs !== null && now - session.endedAtMs >= retentionMs);
     await Promise.all(expired.map((session) => this.delete(session.id)));
     return expired.map((session) => session.id);
   }

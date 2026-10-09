@@ -24,7 +24,8 @@
     "lint": "tsc --noEmit --pretty false",
     "e2e": "playwright test",
     "test": "vitest run",
-    "typecheck": "tsc --noEmit --pretty false"
+    "typecheck": "tsc --noEmit --pretty false",
+    "verify": "pnpm test && pnpm typecheck && pnpm build && pnpm e2e && pnpm benchmark:verify-manifests"
   },
   "dependencies": {
     "dexie": "~4.2.1",

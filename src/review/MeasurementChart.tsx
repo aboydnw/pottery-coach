@@ -17,9 +17,9 @@ export function MeasurementChart({ readings }: { readings: RecordedReading[] }) 
         d={group.map((reading, index) => `${index ? "L" : "M"} ${(reading.timestampMs / lastTime) * 300} ${100 - ((reading.values.heightMm ?? 0) / max) * 90}`).join(" ")}
         fill="none" stroke="currentColor" strokeWidth="3" />)}
     </svg>
-    <table aria-label="Measurement data"><thead><tr><th>Time</th><th>Height</th><th>Status</th></tr></thead>
-      <tbody>{readings.map((reading) => { const measurable = reading.confidence >= 0.7 && reading.values.heightMm != null; return <tr key={reading.id}><td>{(reading.timestampMs / 1000).toFixed(1)}s</td>
+    <table aria-label="Measurement data"><thead><tr><th>Time</th><th>Height</th><th>Status</th><th>Evidence</th></tr></thead>
+      <tbody>{readings.map((reading) => { const measurable = reading.confidence >= 0.7 && reading.values.heightMm != null; return <tr key={reading.id} data-evidence-id={reading.id}><td>{(reading.timestampMs / 1000).toFixed(1)}s</td>
         <td>{measurable ? `${reading.values.heightMm} mm` : "—"}</td>
-        <td>{measurable ? "Measured" : "Not measured reliably"}</td></tr>; })}</tbody></table>
+        <td>{measurable ? "Measured" : "Not measured reliably"}</td><td><code>{reading.id}</code></td></tr>; })}</tbody></table>
   </section>;
 }

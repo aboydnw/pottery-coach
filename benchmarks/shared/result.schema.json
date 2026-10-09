@@ -1,0 +1,13 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "required": ["benchmarkVersion", "commit", "fixtureId", "startedAt", "device", "os", "browser", "configHash", "metrics", "exclusions", "unmeasurableCount", "artifactChecksums"],
+  "properties": {
+    "benchmarkVersion": {"type":"string"}, "commit": {"type":"string"}, "fixtureId": {"type":"string"},
+    "startedAt": {"type":"string","format":"date-time"}, "device": {"type":"string"}, "os": {"type":"string"},
+    "browser": {"type":"string"}, "configHash": {"type":"string","pattern":"^sha256:"},
+    "metrics": {"type":"object","additionalProperties":{"type":["number","null"]}},
+    "exclusions": {"type":"array","items":{"type":"string"}}, "unmeasurableCount": {"type":"integer","minimum":0},
+    "artifactChecksums": {"type":"array","items":{"type":"string","pattern":"^sha256:"}}
+  }
+}
