@@ -237,6 +237,11 @@ export function CameraSetup() {
     }
   }
 
+  function acceptCalibration(accepted: CalibrationResult): void {
+    setCalibration(accepted);
+    workerRef.current?.postMessage({ type: "configure", calibration: accepted });
+  }
+
   return (
     <section className="camera-setup" aria-labelledby="camera-title">
       <p className="eyebrow">Private setup</p>
@@ -274,7 +279,7 @@ export function CameraSetup() {
       {calibration && (
         <CalibrationFlow
           result={calibration}
-          onAccepted={setCalibration}
+          onAccepted={acceptCalibration}
           onRecalibrate={() => setCalibration(null)}
         />
       )}

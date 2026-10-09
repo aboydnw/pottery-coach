@@ -1,4 +1,6 @@
 import type { AcquiredFrame } from "../camera/FrameSource";
+import type { CalibrationResult } from "../calibration/types";
+import type { DimensionReading, StableDimensionReading } from "../measurement/types";
 
 export type FrameRequest = {
   type: "frame";
@@ -14,6 +16,16 @@ export type DiagnosticResponse = {
   processingMs: number;
   droppedBefore: number;
 };
+
+export type MeasurementWorkerRequest =
+  | { type: "configure"; calibration: CalibrationResult }
+  | FrameRequest
+  | { type: "reset"; reason: string };
+
+export type MeasurementWorkerEvent =
+  | { type: "reading"; instantaneous: DimensionReading; stable: StableDimensionReading | null }
+  | DiagnosticResponse
+  | { type: "invalidated"; reason: string };
 
 export class BoundedWorkerSink {
   private pending = false;
