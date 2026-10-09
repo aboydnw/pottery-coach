@@ -12,6 +12,9 @@ export const test = base.extend({
             canvas.height = 720;
             const context = canvas.getContext("2d");
             context?.fillRect(0, 0, canvas.width, canvas.height);
+            const testWindow = window as typeof window & { __potteryTestCameras?: HTMLCanvasElement[] };
+            testWindow.__potteryTestCameras ??= [];
+            testWindow.__potteryTestCameras.push(canvas);
             return canvas.captureStream(30);
           },
         });
