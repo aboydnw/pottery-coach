@@ -1,0 +1,10 @@
+{
+  "name": "Pottery Coach",
+  "short_name": "Pottery Coach",
+  "description": "Private, camera-assisted guidance for pottery practice.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#eee8df",
+  "theme_color": "#8b3f2f",
+  "orientation": "landscape"
+}

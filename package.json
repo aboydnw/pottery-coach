@@ -1,0 +1,39 @@
+{
+  "name": "pottery-coach",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "packageManager": "pnpm@10.34.6",
+  "engines": {
+    "node": ">=24 <25",
+    "pnpm": ">=10 <11"
+  },
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build",
+    "benchmark:camera": "tsx benchmarks/camera/run.ts",
+    "lint": "tsc --noEmit --pretty false",
+    "e2e": "playwright test",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit --pretty false"
+  },
+  "dependencies": {
+    "react": "~19.3.0",
+    "react-dom": "~19.3.0",
+    "vite-plugin-pwa": "~1.1.0",
+    "zod": "~4.1.0"
+  },
+  "devDependencies": {
+    "@playwright/test": "~1.58.2",
+    "@testing-library/jest-dom": "~6.9.1",
+    "@testing-library/react": "~16.3.0",
+    "@types/react": "~19.2.2",
+    "@types/react-dom": "~19.2.2",
+    "@vitejs/plugin-react": "~5.0.4",
+    "jsdom": "~27.0.1",
+    "tsx": "~4.20.6",
+    "typescript": "~7.0.2",
+    "vite": "~7.1.3",
+    "vitest": "~5.0.3"
+  }
+}

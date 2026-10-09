@@ -1,0 +1,21 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pottery-coach.local/schemas/camera-benchmark-result.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["benchmarkVersion", "commit", "fixtureId", "startedAt", "device", "os", "browser", "configHash", "metrics", "exclusions", "unmeasurableCount", "artifactChecksums"],
+  "properties": {
+    "benchmarkVersion": { "const": "camera-v1" },
+    "commit": { "type": "string", "minLength": 1 },
+    "fixtureId": { "type": "string", "minLength": 1 },
+    "startedAt": { "type": "string", "format": "date-time" },
+    "device": { "type": "string", "minLength": 1 },
+    "os": { "type": "string", "minLength": 1 },
+    "browser": { "type": "string", "minLength": 1 },
+    "configHash": { "type": "string", "minLength": 1 },
+    "metrics": { "type": "object", "additionalProperties": { "type": ["number", "null"] } },
+    "exclusions": { "type": "array", "items": { "type": "string" } },
+    "unmeasurableCount": { "type": "integer", "minimum": 0 },
+    "artifactChecksums": { "type": "array", "items": { "type": "string" } }
+  }
+}
