@@ -1,0 +1,22 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Pottery Coach field session",
+  "type": "object",
+  "required": ["participantPseudonym", "device", "studio", "mountGeometry", "completion", "setupTimeSeconds", "calibrationRetries", "metricIds", "distraction", "understanding", "bystanderNotice", "consentRevisions", "deletionDate"],
+  "properties": {
+    "participantPseudonym": { "type": "string", "minLength": 1 },
+    "device": { "type": "object", "required": ["class", "os", "browser"] },
+    "studio": { "type": "object", "required": ["light", "backdrop", "clay", "wetness"] },
+    "mountGeometry": { "type": "string" },
+    "completion": { "enum": ["unassisted", "rescued", "incomplete", "stopped"] },
+    "setupTimeSeconds": { "type": "number", "minimum": 0 },
+    "calibrationRetries": { "type": "integer", "minimum": 0 },
+    "metricIds": { "type": "array", "items": { "type": "string" } },
+    "distraction": { "type": "integer", "minimum": 1, "maximum": 5 },
+    "understanding": { "type": "boolean" },
+    "bystanderNotice": { "type": "boolean" },
+    "consentRevisions": { "type": "array", "minItems": 1 },
+    "deletionDate": { "type": ["string", "null"], "format": "date" }
+  },
+  "additionalProperties": false
+}

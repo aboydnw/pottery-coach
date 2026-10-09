@@ -1,12 +1,12 @@
-# Pottery Coach Prototype Planning Package
+# Pottery Coach Controlled Web Prototype
 
-This repository contains a research-backed specification and nine executable implementation plans for a web-first, hands-free AI pottery coach. It intentionally contains no production implementation.
+This repository contains the responsive web implementation and evidence package for a privacy-first, hands-free AI pottery coach. It is a controlled research prototype, not production or safety equipment.
 
-The implementation now begins with the Plan 1 web scaffold and browser capability contract. It remains a prototype until the physical-device gates below are completed.
+Plans 1–9 have implementation scaffolding and automated contracts. Physical-device, real-clay, paid-provider, accessibility assistive-technology, instructor, novice, and privacy-review gates remain explicitly pending until the consolidated field test.
 
 Research was completed on 2026-10-08. Claims based on documentation are cited inline. Physical-device, real-object, paid-API, and instructor gates remain explicitly unpassed because the research environment had no phones, calibration objects, pottery footage, provider credentials, or recruited instructor.
 
-Start with `docs/research/00-executive-summary.md`, then execute `docs/plans/01-foundation-and-camera-plan.md` only after accepting the gate policy in `docs/research/11-architecture-decision-record.md`.
+Start with `docs/runbook.md`, `docs/release-checklist.md`, and `research/field/protocol.md` before running the consolidated test.
 
 ## Document map
 

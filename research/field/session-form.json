@@ -1,0 +1,15 @@
+{
+  "participantPseudonym": "",
+  "device": { "class": "", "os": "", "browser": "" },
+  "studio": { "light": "", "backdrop": "", "clay": "", "wetness": "" },
+  "mountGeometry": "",
+  "completion": "incomplete",
+  "setupTimeSeconds": 0,
+  "calibrationRetries": 0,
+  "metricIds": [],
+  "distraction": 1,
+  "understanding": false,
+  "bystanderNotice": false,
+  "consentRevisions": [],
+  "deletionDate": null
+}

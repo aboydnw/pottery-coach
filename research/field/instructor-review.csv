@@ -1,0 +1,2 @@
+cue_id,instructor_pseudonym,clip_id,correctness,actionability,timing,possible_damage,uncertainty,distraction,decision,condition
+no-proactive-cues-enabled,pending,pending,,,,,,,disabled,pending two-instructor review

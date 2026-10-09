@@ -1,0 +1,5 @@
+{
+  "status": "pending-consolidated-physical-test",
+  "requiredClasses": ["recent iPhone class A", "recent iPhone class B", "recent Android class A", "recent Android class B", "desktop control"],
+  "completed": []
+}

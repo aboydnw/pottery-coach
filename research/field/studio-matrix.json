@@ -1,0 +1,10 @@
+{
+  "status": "pending-consolidated-physical-test",
+  "lights": ["diffuse", "side", "shadow", "brightness-change"],
+  "clayColorsRequired": 4,
+  "wetness": ["wet", "dry"],
+  "backdropsRequired": 3,
+  "occlusions": ["hands", "tools", "sponge", "clutter"],
+  "wheelDirections": ["clockwise", "counterclockwise"],
+  "completed": []
+}
