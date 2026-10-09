@@ -11,7 +11,14 @@ export const test = base.extend({
             canvas.width = 1280;
             canvas.height = 720;
             const context = canvas.getContext("2d");
-            context?.fillRect(0, 0, canvas.width, canvas.height);
+            let frame = 0;
+            const paint = () => {
+              if (!context) return;
+              context.fillStyle = frame++ % 2 === 0 ? "#111" : "#121212";
+              context.fillRect(0, 0, canvas.width, canvas.height);
+              requestAnimationFrame(paint);
+            };
+            paint();
             const testWindow = window as typeof window & { __potteryTestCameras?: HTMLCanvasElement[] };
             testWindow.__potteryTestCameras ??= [];
             testWindow.__potteryTestCameras.push(canvas);
