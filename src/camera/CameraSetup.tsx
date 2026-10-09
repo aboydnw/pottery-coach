@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import { CameraController } from "./CameraController";
 import { CanvasFrameSource } from "./CanvasFrameSource";
@@ -10,6 +10,16 @@ import { WasmTagDetector } from "../calibration/WasmTagDetector";
 import { solveCalibration } from "../calibration/homography";
 import { CalibrationFlow } from "../calibration/CalibrationFlow";
 import type { CalibrationResult, PointCorrespondence } from "../calibration/types";
+import type { MeasurementWorkerEvent } from "../vision/workerProtocol";
+import type { StableDimensionReading } from "../measurement/types";
+import { loadTemplates } from "../targets/loadTemplates";
+import { GoalForm } from "../goals/GoalForm";
+import type { GoalConfirmation } from "../goals/types";
+import { compareProfiles } from "../targets/compareProfiles";
+import { ProfileOverlay } from "../targets/ProfileOverlay";
+import { GoalProgress } from "../targets/GoalProgress";
+
+const TARGET_TEMPLATES = loadTemplates();
 
 function cameraErrorMessage(error: unknown): string {
   if (error instanceof DOMException) {
@@ -44,7 +54,14 @@ export function CameraSetup() {
     diagnosticsRef.current.snapshot(0),
   );
   const [calibration, setCalibration] = useState<CalibrationResult | null>(null);
+  const [calibrationConfirmed, setCalibrationConfirmed] = useState(false);
   const [calibrating, setCalibrating] = useState(false);
+  const [targetId, setTargetId] = useState(TARGET_TEMPLATES[0]!.id);
+  const [goal, setGoal] = useState<GoalConfirmation | null>(null);
+  const [stableReading, setStableReading] = useState<StableDimensionReading | null>(null);
+  const selectedTarget = TARGET_TEMPLATES.find((template) => template.id === targetId) ?? TARGET_TEMPLATES[0]!;
+  const scaledTarget = useMemo(() => goal ? { ...selectedTarget, intendedWetHeightMm: goal.wetHeightMm } : selectedTarget, [goal, selectedTarget]);
+  const comparison = useMemo(() => stableReading && goal ? compareProfiles(stableReading, scaledTarget) : null, [stableReading, goal, scaledTarget]);
 
   if (!controllerRef.current) {
     controllerRef.current = new CameraController();
@@ -98,6 +115,8 @@ export function CameraSetup() {
     setActive(false);
     setSettings(null);
     setCalibration(null);
+    setCalibrationConfirmed(false);
+    setStableReading(null);
     setInterrupted(false);
     void wakeLockRef.current?.release();
     wakeLockRef.current = null;
@@ -110,6 +129,10 @@ export function CameraSetup() {
     stopFramePipeline();
     const worker = new Worker(new URL("../vision/measurement.worker.ts", import.meta.url), {
       type: "module",
+    });
+    worker.addEventListener("message", (event: MessageEvent<MeasurementWorkerEvent>) => {
+      if (event.data?.type === "reading" && event.data.stable) setStableReading(event.data.stable);
+      if (event.data?.type === "invalidated") setStableReading(null);
     });
     const sink = new BoundedWorkerSink(worker, (diagnostic) => {
       const now = performance.now();
@@ -228,6 +251,7 @@ export function CameraSetup() {
         },
       );
       setCalibration(solved);
+      setCalibrationConfirmed(false);
     } catch (calibrationError) {
       setError(calibrationError instanceof Error
         ? `Calibration failed: ${calibrationError.message}`
@@ -239,6 +263,7 @@ export function CameraSetup() {
 
   function acceptCalibration(accepted: CalibrationResult): void {
     setCalibration(accepted);
+    setCalibrationConfirmed(true);
     workerRef.current?.postMessage({ type: "configure", calibration: accepted });
   }
 
@@ -280,8 +305,25 @@ export function CameraSetup() {
         <CalibrationFlow
           result={calibration}
           onAccepted={acceptCalibration}
-          onRecalibrate={() => setCalibration(null)}
+          onRecalibrate={() => { setCalibration(null); setCalibrationConfirmed(false); }}
         />
+      )}
+      {calibrationConfirmed && (
+        <section className="target-setup" aria-labelledby="target-title">
+          <h2 id="target-title">Choose a target</h2>
+          <label>Template
+            <select value={targetId} onChange={(event) => { setTargetId(event.target.value); setGoal(null); }}>
+              {TARGET_TEMPLATES.map((template) => <option key={template.id} value={template.id}>{template.name}</option>)}
+            </select>
+          </label>
+          <GoalForm targetId={targetId} onConfirm={setGoal} />
+        </section>
+      )}
+      {goal && stableReading && comparison && (
+        <section className="live-target" aria-label="Live target comparison">
+          <ProfileOverlay target={scaledTarget} reading={stableReading} mode="millimetres" />
+          <GoalProgress comparison={comparison} heightProgress={(stableReading.heightMm ?? 0) / goal.wetHeightMm} />
+        </section>
       )}
 
       <div className="actions">

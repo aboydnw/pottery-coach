@@ -1,0 +1,424 @@
+{
+  "id": "tapered-cylinder-v1",
+  "name": "Tapered cylinder",
+  "revision": 1,
+  "normalizedRadiusByHeight": [
+    {
+      "heightRatio": 0,
+      "radiusToHeightRatio": 0.22
+    },
+    {
+      "heightRatio": 0.01,
+      "radiusToHeightRatio": 0.2194
+    },
+    {
+      "heightRatio": 0.02,
+      "radiusToHeightRatio": 0.2188
+    },
+    {
+      "heightRatio": 0.03,
+      "radiusToHeightRatio": 0.2182
+    },
+    {
+      "heightRatio": 0.04,
+      "radiusToHeightRatio": 0.2176
+    },
+    {
+      "heightRatio": 0.05,
+      "radiusToHeightRatio": 0.217
+    },
+    {
+      "heightRatio": 0.06,
+      "radiusToHeightRatio": 0.2164
+    },
+    {
+      "heightRatio": 0.07,
+      "radiusToHeightRatio": 0.2158
+    },
+    {
+      "heightRatio": 0.08,
+      "radiusToHeightRatio": 0.2152
+    },
+    {
+      "heightRatio": 0.09,
+      "radiusToHeightRatio": 0.2146
+    },
+    {
+      "heightRatio": 0.1,
+      "radiusToHeightRatio": 0.214
+    },
+    {
+      "heightRatio": 0.11,
+      "radiusToHeightRatio": 0.2134
+    },
+    {
+      "heightRatio": 0.12,
+      "radiusToHeightRatio": 0.2128
+    },
+    {
+      "heightRatio": 0.13,
+      "radiusToHeightRatio": 0.2122
+    },
+    {
+      "heightRatio": 0.14,
+      "radiusToHeightRatio": 0.2116
+    },
+    {
+      "heightRatio": 0.15,
+      "radiusToHeightRatio": 0.211
+    },
+    {
+      "heightRatio": 0.16,
+      "radiusToHeightRatio": 0.2104
+    },
+    {
+      "heightRatio": 0.17,
+      "radiusToHeightRatio": 0.2098
+    },
+    {
+      "heightRatio": 0.18,
+      "radiusToHeightRatio": 0.2092
+    },
+    {
+      "heightRatio": 0.19,
+      "radiusToHeightRatio": 0.2086
+    },
+    {
+      "heightRatio": 0.2,
+      "radiusToHeightRatio": 0.208
+    },
+    {
+      "heightRatio": 0.21,
+      "radiusToHeightRatio": 0.2074
+    },
+    {
+      "heightRatio": 0.22,
+      "radiusToHeightRatio": 0.2068
+    },
+    {
+      "heightRatio": 0.23,
+      "radiusToHeightRatio": 0.2062
+    },
+    {
+      "heightRatio": 0.24,
+      "radiusToHeightRatio": 0.2056
+    },
+    {
+      "heightRatio": 0.25,
+      "radiusToHeightRatio": 0.205
+    },
+    {
+      "heightRatio": 0.26,
+      "radiusToHeightRatio": 0.2044
+    },
+    {
+      "heightRatio": 0.27,
+      "radiusToHeightRatio": 0.2038
+    },
+    {
+      "heightRatio": 0.28,
+      "radiusToHeightRatio": 0.2032
+    },
+    {
+      "heightRatio": 0.29,
+      "radiusToHeightRatio": 0.2026
+    },
+    {
+      "heightRatio": 0.3,
+      "radiusToHeightRatio": 0.202
+    },
+    {
+      "heightRatio": 0.31,
+      "radiusToHeightRatio": 0.2014
+    },
+    {
+      "heightRatio": 0.32,
+      "radiusToHeightRatio": 0.2008
+    },
+    {
+      "heightRatio": 0.33,
+      "radiusToHeightRatio": 0.2002
+    },
+    {
+      "heightRatio": 0.34,
+      "radiusToHeightRatio": 0.1996
+    },
+    {
+      "heightRatio": 0.35,
+      "radiusToHeightRatio": 0.199
+    },
+    {
+      "heightRatio": 0.36,
+      "radiusToHeightRatio": 0.1984
+    },
+    {
+      "heightRatio": 0.37,
+      "radiusToHeightRatio": 0.1978
+    },
+    {
+      "heightRatio": 0.38,
+      "radiusToHeightRatio": 0.1972
+    },
+    {
+      "heightRatio": 0.39,
+      "radiusToHeightRatio": 0.1966
+    },
+    {
+      "heightRatio": 0.4,
+      "radiusToHeightRatio": 0.196
+    },
+    {
+      "heightRatio": 0.41,
+      "radiusToHeightRatio": 0.1954
+    },
+    {
+      "heightRatio": 0.42,
+      "radiusToHeightRatio": 0.1948
+    },
+    {
+      "heightRatio": 0.43,
+      "radiusToHeightRatio": 0.1942
+    },
+    {
+      "heightRatio": 0.44,
+      "radiusToHeightRatio": 0.1936
+    },
+    {
+      "heightRatio": 0.45,
+      "radiusToHeightRatio": 0.193
+    },
+    {
+      "heightRatio": 0.46,
+      "radiusToHeightRatio": 0.1924
+    },
+    {
+      "heightRatio": 0.47,
+      "radiusToHeightRatio": 0.1918
+    },
+    {
+      "heightRatio": 0.48,
+      "radiusToHeightRatio": 0.1912
+    },
+    {
+      "heightRatio": 0.49,
+      "radiusToHeightRatio": 0.1906
+    },
+    {
+      "heightRatio": 0.5,
+      "radiusToHeightRatio": 0.19
+    },
+    {
+      "heightRatio": 0.51,
+      "radiusToHeightRatio": 0.1894
+    },
+    {
+      "heightRatio": 0.52,
+      "radiusToHeightRatio": 0.1888
+    },
+    {
+      "heightRatio": 0.53,
+      "radiusToHeightRatio": 0.1882
+    },
+    {
+      "heightRatio": 0.54,
+      "radiusToHeightRatio": 0.1876
+    },
+    {
+      "heightRatio": 0.55,
+      "radiusToHeightRatio": 0.187
+    },
+    {
+      "heightRatio": 0.56,
+      "radiusToHeightRatio": 0.1864
+    },
+    {
+      "heightRatio": 0.57,
+      "radiusToHeightRatio": 0.1858
+    },
+    {
+      "heightRatio": 0.58,
+      "radiusToHeightRatio": 0.1852
+    },
+    {
+      "heightRatio": 0.59,
+      "radiusToHeightRatio": 0.1846
+    },
+    {
+      "heightRatio": 0.6,
+      "radiusToHeightRatio": 0.184
+    },
+    {
+      "heightRatio": 0.61,
+      "radiusToHeightRatio": 0.1834
+    },
+    {
+      "heightRatio": 0.62,
+      "radiusToHeightRatio": 0.1828
+    },
+    {
+      "heightRatio": 0.63,
+      "radiusToHeightRatio": 0.1822
+    },
+    {
+      "heightRatio": 0.64,
+      "radiusToHeightRatio": 0.1816
+    },
+    {
+      "heightRatio": 0.65,
+      "radiusToHeightRatio": 0.181
+    },
+    {
+      "heightRatio": 0.66,
+      "radiusToHeightRatio": 0.1804
+    },
+    {
+      "heightRatio": 0.67,
+      "radiusToHeightRatio": 0.1798
+    },
+    {
+      "heightRatio": 0.68,
+      "radiusToHeightRatio": 0.1792
+    },
+    {
+      "heightRatio": 0.69,
+      "radiusToHeightRatio": 0.1786
+    },
+    {
+      "heightRatio": 0.7,
+      "radiusToHeightRatio": 0.178
+    },
+    {
+      "heightRatio": 0.71,
+      "radiusToHeightRatio": 0.1774
+    },
+    {
+      "heightRatio": 0.72,
+      "radiusToHeightRatio": 0.1768
+    },
+    {
+      "heightRatio": 0.73,
+      "radiusToHeightRatio": 0.1762
+    },
+    {
+      "heightRatio": 0.74,
+      "radiusToHeightRatio": 0.1756
+    },
+    {
+      "heightRatio": 0.75,
+      "radiusToHeightRatio": 0.175
+    },
+    {
+      "heightRatio": 0.76,
+      "radiusToHeightRatio": 0.1744
+    },
+    {
+      "heightRatio": 0.77,
+      "radiusToHeightRatio": 0.1738
+    },
+    {
+      "heightRatio": 0.78,
+      "radiusToHeightRatio": 0.1732
+    },
+    {
+      "heightRatio": 0.79,
+      "radiusToHeightRatio": 0.1726
+    },
+    {
+      "heightRatio": 0.8,
+      "radiusToHeightRatio": 0.172
+    },
+    {
+      "heightRatio": 0.81,
+      "radiusToHeightRatio": 0.1714
+    },
+    {
+      "heightRatio": 0.82,
+      "radiusToHeightRatio": 0.1708
+    },
+    {
+      "heightRatio": 0.83,
+      "radiusToHeightRatio": 0.1702
+    },
+    {
+      "heightRatio": 0.84,
+      "radiusToHeightRatio": 0.1696
+    },
+    {
+      "heightRatio": 0.85,
+      "radiusToHeightRatio": 0.169
+    },
+    {
+      "heightRatio": 0.86,
+      "radiusToHeightRatio": 0.1684
+    },
+    {
+      "heightRatio": 0.87,
+      "radiusToHeightRatio": 0.1678
+    },
+    {
+      "heightRatio": 0.88,
+      "radiusToHeightRatio": 0.1672
+    },
+    {
+      "heightRatio": 0.89,
+      "radiusToHeightRatio": 0.1666
+    },
+    {
+      "heightRatio": 0.9,
+      "radiusToHeightRatio": 0.166
+    },
+    {
+      "heightRatio": 0.91,
+      "radiusToHeightRatio": 0.1654
+    },
+    {
+      "heightRatio": 0.92,
+      "radiusToHeightRatio": 0.1648
+    },
+    {
+      "heightRatio": 0.93,
+      "radiusToHeightRatio": 0.1642
+    },
+    {
+      "heightRatio": 0.94,
+      "radiusToHeightRatio": 0.1636
+    },
+    {
+      "heightRatio": 0.95,
+      "radiusToHeightRatio": 0.163
+    },
+    {
+      "heightRatio": 0.96,
+      "radiusToHeightRatio": 0.1624
+    },
+    {
+      "heightRatio": 0.97,
+      "radiusToHeightRatio": 0.1618
+    },
+    {
+      "heightRatio": 0.98,
+      "radiusToHeightRatio": 0.1612
+    },
+    {
+      "heightRatio": 0.99,
+      "radiusToHeightRatio": 0.1606
+    },
+    {
+      "heightRatio": 1,
+      "radiusToHeightRatio": 0.16
+    }
+  ],
+  "intendedWetHeightMm": 300,
+  "shrinkageFraction": null,
+  "source": "curated-template",
+  "confidence": 0.9,
+  "exclusions": [
+    "Instructor milestone labels pending final domain review."
+  ],
+  "provenance": "Generated from documented linear function; geometry reviewed for prototype use.",
+  "generator": {
+    "kind": "linear",
+    "bottomRadiusRatio": 0.22,
+    "topRadiusRatio": 0.16
+  }
+}

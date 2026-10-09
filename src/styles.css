@@ -111,6 +111,29 @@ button.secondary {
   margin: 1rem 0;
 }
 
+.profile-overlay svg {
+  width: min(100%, 24rem);
+  background: #f4eee6;
+}
+
+.profile-centerline {
+  stroke: #8b8178;
+  stroke-width: 1;
+}
+
+.profile-target {
+  fill: none;
+  stroke: #8b3f2f;
+  stroke-width: 2;
+  stroke-dasharray: 6 4;
+}
+
+.profile-current {
+  fill: none;
+  stroke: #245c65;
+  stroke-width: 3;
+}
+
 .eyebrow {
   margin: 0 0 1rem;
   color: #8b3f2f;

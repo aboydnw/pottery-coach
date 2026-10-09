@@ -1,0 +1,424 @@
+{
+  "id": "straight-cylinder-v1",
+  "name": "Straight cylinder",
+  "revision": 1,
+  "normalizedRadiusByHeight": [
+    {
+      "heightRatio": 0,
+      "radiusToHeightRatio": 0.18
+    },
+    {
+      "heightRatio": 0.01,
+      "radiusToHeightRatio": 0.18
+    },
+    {
+      "heightRatio": 0.02,
+      "radiusToHeightRatio": 0.18
+    },
+    {
+      "heightRatio": 0.03,
+      "radiusToHeightRatio": 0.18
+    },
+    {
+      "heightRatio": 0.04,
+      "radiusToHeightRatio": 0.18
+    },
+    {
+      "heightRatio": 0.05,
+      "radiusToHeightRatio": 0.18
+    },
+    {
+      "heightRatio": 0.06,
+      "radiusToHeightRatio": 0.18
+    },
+    {
+      "heightRatio": 0.07,
+      "radiusToHeightRatio": 0.18
+    },
+    {
+      "heightRatio": 0.08,
+      "radiusToHeightRatio": 0.18
+    },
+    {
+      "heightRatio": 0.09,
+      "radiusToHeightRatio": 0.18
+    },
+    {
+      "heightRatio": 0.1,
+      "radiusToHeightRatio": 0.18
+    },
+    {
+      "heightRatio": 0.11,
+      "radiusToHeightRatio": 0.18
+    },
+    {
+      "heightRatio": 0.12,
+      "radiusToHeightRatio": 0.18
+    },
+    {
+      "heightRatio": 0.13,
+      "radiusToHeightRatio": 0.18
+    },
+    {
+      "heightRatio": 0.14,
+      "radiusToHeightRatio": 0.18
+    },
+    {
+      "heightRatio": 0.15,
+      "radiusToHeightRatio": 0.18
+    },
+    {
+      "heightRatio": 0.16,
+      "radiusToHeightRatio": 0.18
+    },
+    {
+      "heightRatio": 0.17,
+      "radiusToHeightRatio": 0.18
+    },
+    {
+      "heightRatio": 0.18,
+      "radiusToHeightRatio": 0.18
+    },
+    {
+      "heightRatio": 0.19,
+      "radiusToHeightRatio": 0.18
+    },
+    {
+      "heightRatio": 0.2,
+      "radiusToHeightRatio": 0.18
+    },
+    {
+      "heightRatio": 0.21,
+      "radiusToHeightRatio": 0.18
+    },
+    {
+      "heightRatio": 0.22,
+      "radiusToHeightRatio": 0.18
+    },
+    {
+      "heightRatio": 0.23,
+      "radiusToHeightRatio": 0.18
+    },
+    {
+      "heightRatio": 0.24,
+      "radiusToHeightRatio": 0.18
+    },
+    {
+      "heightRatio": 0.25,
+      "radiusToHeightRatio": 0.18
+    },
+    {
+      "heightRatio": 0.26,
+      "radiusToHeightRatio": 0.18
+    },
+    {
+      "heightRatio": 0.27,
+      "radiusToHeightRatio": 0.18
+    },
+    {
+      "heightRatio": 0.28,
+      "radiusToHeightRatio": 0.18
+    },
+    {
+      "heightRatio": 0.29,
+      "radiusToHeightRatio": 0.18
+    },
+    {
+      "heightRatio": 0.3,
+      "radiusToHeightRatio": 0.18
+    },
+    {
+      "heightRatio": 0.31,
+      "radiusToHeightRatio": 0.18
+    },
+    {
+      "heightRatio": 0.32,
+      "radiusToHeightRatio": 0.18
+    },
+    {
+      "heightRatio": 0.33,
+      "radiusToHeightRatio": 0.18
+    },
+    {
+      "heightRatio": 0.34,
+      "radiusToHeightRatio": 0.18
+    },
+    {
+      "heightRatio": 0.35,
+      "radiusToHeightRatio": 0.18
+    },
+    {
+      "heightRatio": 0.36,
+      "radiusToHeightRatio": 0.18
+    },
+    {
+      "heightRatio": 0.37,
+      "radiusToHeightRatio": 0.18
+    },
+    {
+      "heightRatio": 0.38,
+      "radiusToHeightRatio": 0.18
+    },
+    {
+      "heightRatio": 0.39,
+      "radiusToHeightRatio": 0.18
+    },
+    {
+      "heightRatio": 0.4,
+      "radiusToHeightRatio": 0.18
+    },
+    {
+      "heightRatio": 0.41,
+      "radiusToHeightRatio": 0.18
+    },
+    {
+      "heightRatio": 0.42,
+      "radiusToHeightRatio": 0.18
+    },
+    {
+      "heightRatio": 0.43,
+      "radiusToHeightRatio": 0.18
+    },
+    {
+      "heightRatio": 0.44,
+      "radiusToHeightRatio": 0.18
+    },
+    {
+      "heightRatio": 0.45,
+      "radiusToHeightRatio": 0.18
+    },
+    {
+      "heightRatio": 0.46,
+      "radiusToHeightRatio": 0.18
+    },
+    {
+      "heightRatio": 0.47,
+      "radiusToHeightRatio": 0.18
+    },
+    {
+      "heightRatio": 0.48,
+      "radiusToHeightRatio": 0.18
+    },
+    {
+      "heightRatio": 0.49,
+      "radiusToHeightRatio": 0.18
+    },
+    {
+      "heightRatio": 0.5,
+      "radiusToHeightRatio": 0.18
+    },
+    {
+      "heightRatio": 0.51,
+      "radiusToHeightRatio": 0.18
+    },
+    {
+      "heightRatio": 0.52,
+      "radiusToHeightRatio": 0.18
+    },
+    {
+      "heightRatio": 0.53,
+      "radiusToHeightRatio": 0.18
+    },
+    {
+      "heightRatio": 0.54,
+      "radiusToHeightRatio": 0.18
+    },
+    {
+      "heightRatio": 0.55,
+      "radiusToHeightRatio": 0.18
+    },
+    {
+      "heightRatio": 0.56,
+      "radiusToHeightRatio": 0.18
+    },
+    {
+      "heightRatio": 0.57,
+      "radiusToHeightRatio": 0.18
+    },
+    {
+      "heightRatio": 0.58,
+      "radiusToHeightRatio": 0.18
+    },
+    {
+      "heightRatio": 0.59,
+      "radiusToHeightRatio": 0.18
+    },
+    {
+      "heightRatio": 0.6,
+      "radiusToHeightRatio": 0.18
+    },
+    {
+      "heightRatio": 0.61,
+      "radiusToHeightRatio": 0.18
+    },
+    {
+      "heightRatio": 0.62,
+      "radiusToHeightRatio": 0.18
+    },
+    {
+      "heightRatio": 0.63,
+      "radiusToHeightRatio": 0.18
+    },
+    {
+      "heightRatio": 0.64,
+      "radiusToHeightRatio": 0.18
+    },
+    {
+      "heightRatio": 0.65,
+      "radiusToHeightRatio": 0.18
+    },
+    {
+      "heightRatio": 0.66,
+      "radiusToHeightRatio": 0.18
+    },
+    {
+      "heightRatio": 0.67,
+      "radiusToHeightRatio": 0.18
+    },
+    {
+      "heightRatio": 0.68,
+      "radiusToHeightRatio": 0.18
+    },
+    {
+      "heightRatio": 0.69,
+      "radiusToHeightRatio": 0.18
+    },
+    {
+      "heightRatio": 0.7,
+      "radiusToHeightRatio": 0.18
+    },
+    {
+      "heightRatio": 0.71,
+      "radiusToHeightRatio": 0.18
+    },
+    {
+      "heightRatio": 0.72,
+      "radiusToHeightRatio": 0.18
+    },
+    {
+      "heightRatio": 0.73,
+      "radiusToHeightRatio": 0.18
+    },
+    {
+      "heightRatio": 0.74,
+      "radiusToHeightRatio": 0.18
+    },
+    {
+      "heightRatio": 0.75,
+      "radiusToHeightRatio": 0.18
+    },
+    {
+      "heightRatio": 0.76,
+      "radiusToHeightRatio": 0.18
+    },
+    {
+      "heightRatio": 0.77,
+      "radiusToHeightRatio": 0.18
+    },
+    {
+      "heightRatio": 0.78,
+      "radiusToHeightRatio": 0.18
+    },
+    {
+      "heightRatio": 0.79,
+      "radiusToHeightRatio": 0.18
+    },
+    {
+      "heightRatio": 0.8,
+      "radiusToHeightRatio": 0.18
+    },
+    {
+      "heightRatio": 0.81,
+      "radiusToHeightRatio": 0.18
+    },
+    {
+      "heightRatio": 0.82,
+      "radiusToHeightRatio": 0.18
+    },
+    {
+      "heightRatio": 0.83,
+      "radiusToHeightRatio": 0.18
+    },
+    {
+      "heightRatio": 0.84,
+      "radiusToHeightRatio": 0.18
+    },
+    {
+      "heightRatio": 0.85,
+      "radiusToHeightRatio": 0.18
+    },
+    {
+      "heightRatio": 0.86,
+      "radiusToHeightRatio": 0.18
+    },
+    {
+      "heightRatio": 0.87,
+      "radiusToHeightRatio": 0.18
+    },
+    {
+      "heightRatio": 0.88,
+      "radiusToHeightRatio": 0.18
+    },
+    {
+      "heightRatio": 0.89,
+      "radiusToHeightRatio": 0.18
+    },
+    {
+      "heightRatio": 0.9,
+      "radiusToHeightRatio": 0.18
+    },
+    {
+      "heightRatio": 0.91,
+      "radiusToHeightRatio": 0.18
+    },
+    {
+      "heightRatio": 0.92,
+      "radiusToHeightRatio": 0.18
+    },
+    {
+      "heightRatio": 0.93,
+      "radiusToHeightRatio": 0.18
+    },
+    {
+      "heightRatio": 0.94,
+      "radiusToHeightRatio": 0.18
+    },
+    {
+      "heightRatio": 0.95,
+      "radiusToHeightRatio": 0.18
+    },
+    {
+      "heightRatio": 0.96,
+      "radiusToHeightRatio": 0.18
+    },
+    {
+      "heightRatio": 0.97,
+      "radiusToHeightRatio": 0.18
+    },
+    {
+      "heightRatio": 0.98,
+      "radiusToHeightRatio": 0.18
+    },
+    {
+      "heightRatio": 0.99,
+      "radiusToHeightRatio": 0.18
+    },
+    {
+      "heightRatio": 1,
+      "radiusToHeightRatio": 0.18
+    }
+  ],
+  "intendedWetHeightMm": 300,
+  "shrinkageFraction": null,
+  "source": "curated-template",
+  "confidence": 0.9,
+  "exclusions": [
+    "Instructor milestone labels pending final domain review."
+  ],
+  "provenance": "Generated from documented linear function; geometry reviewed for prototype use.",
+  "generator": {
+    "kind": "linear",
+    "bottomRadiusRatio": 0.18,
+    "topRadiusRatio": 0.18
+  }
+}
