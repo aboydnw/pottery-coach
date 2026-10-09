@@ -18,6 +18,8 @@ import type { GoalConfirmation } from "../goals/types";
 import { compareProfiles } from "../targets/compareProfiles";
 import { ProfileOverlay } from "../targets/ProfileOverlay";
 import { GoalProgress } from "../targets/GoalProgress";
+import { MockRealtimeTransport } from "../voice/MockRealtimeTransport";
+import { VoiceControls } from "../voice/VoiceControls";
 
 const TARGET_TEMPLATES = loadTemplates();
 
@@ -46,6 +48,7 @@ export function CameraSetup() {
   const wakeLockRef = useRef<{ release(): Promise<void> } | null>(null);
   const previewCallbackRef = useRef<number | null>(null);
   const detectorRef = useRef<WasmTagDetector | null>(null);
+  const voiceTransportRef = useRef<MockRealtimeTransport | null>(null);
   const [settings, setSettings] = useState<CameraSettings | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [active, setActive] = useState(false);
@@ -59,6 +62,7 @@ export function CameraSetup() {
   const [targetId, setTargetId] = useState(TARGET_TEMPLATES[0]!.id);
   const [goal, setGoal] = useState<GoalConfirmation | null>(null);
   const [stableReading, setStableReading] = useState<StableDimensionReading | null>(null);
+  const [voiceTransport, setVoiceTransport] = useState<MockRealtimeTransport | null>(null);
   const selectedTarget = TARGET_TEMPLATES.find((template) => template.id === targetId) ?? TARGET_TEMPLATES[0]!;
   const scaledTarget = useMemo(() => goal ? { ...selectedTarget, intendedWetHeightMm: goal.wetHeightMm } : selectedTarget, [goal, selectedTarget]);
   const comparison = useMemo(() => stableReading && goal ? compareProfiles(stableReading, scaledTarget) : null, [stableReading, goal, scaledTarget]);
@@ -86,6 +90,7 @@ export function CameraSetup() {
       controller?.stop();
       void wakeLockRef.current?.release();
       detectorRef.current?.dispose();
+      void voiceTransportRef.current?.close();
     };
   }, []);
 
@@ -117,6 +122,9 @@ export function CameraSetup() {
     setCalibration(null);
     setCalibrationConfirmed(false);
     setStableReading(null);
+    void voiceTransportRef.current?.close();
+    voiceTransportRef.current = null;
+    setVoiceTransport(null);
     setInterrupted(false);
     void wakeLockRef.current?.release();
     wakeLockRef.current = null;
@@ -267,6 +275,13 @@ export function CameraSetup() {
     workerRef.current?.postMessage({ type: "configure", calibration: accepted });
   }
 
+  async function startMockVoice(): Promise<void> {
+    const transport = new MockRealtimeTransport();
+    await transport.connect({ provider: "mock", model: "mock-v1", voice: "local", language: "en", instructionsRevision: "instructions-v1", toolsRevision: "tools-v1" });
+    voiceTransportRef.current = transport;
+    setVoiceTransport(transport);
+  }
+
   return (
     <section className="camera-setup" aria-labelledby="camera-title">
       <p className="eyebrow">Private setup</p>
@@ -325,6 +340,10 @@ export function CameraSetup() {
           <GoalProgress comparison={comparison} heightProgress={(stableReading.heightMm ?? 0) / goal.wetHeightMm} />
         </section>
       )}
+      {goal && !voiceTransport && (
+        <button type="button" className="secondary" onClick={startMockVoice}>Start voice coach in offline mock mode</button>
+      )}
+      {voiceTransport && <VoiceControls transport={voiceTransport} />}
 
       <div className="actions">
         {!active ? (
