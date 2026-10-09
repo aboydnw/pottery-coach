@@ -1,0 +1,8 @@
+policy_id,revision,mode,enabled,instructor_approval_id,review_status,notes
+measurement-unavailable,1,reactive,true,,pending,Explicit uncertainty response only
+current-dimensions,1,reactive,true,,pending,Tool-grounded direct response
+visible-centering,1,reactive,true,,pending,External visual claim only
+target-regional-difference,1,proactive,false,,pending,Disabled until instructor approval
+target-height-milestone,1,proactive,false,,pending,Disabled until instructor approval
+significant-visible-oscillation,1,proactive,false,,pending,Disabled until wobble gate and instructor approval
+session-control,1,reactive,true,,pending,Pause resume and end confirmations
