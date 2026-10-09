@@ -26,6 +26,7 @@ it("shows honest chart gaps, an accessible table, and suppression events", () =>
   expect(screen.getByText(/not measured reliably/i)).toBeInTheDocument();
   expect(screen.getByText(/cue suppressed/i)).toBeInTheDocument();
   expect(screen.queryByText(/caused/i)).not.toBeInTheDocument();
+  expect(screen.getByLabelText(/reliable height measurements/i).querySelectorAll("path")).toHaveLength(2);
 });
 
 it("lets a keyboard user select a marked moment", () => {

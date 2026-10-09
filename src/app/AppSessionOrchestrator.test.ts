@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { createSessionState, transition, type SessionState } from "./AppSessionOrchestrator";
+import { createSessionState, restoreSessionShell, transition, type SessionState } from "./AppSessionOrchestrator";
 
 describe("session lifecycle", () => {
   it("follows the explicit happy path and supports review deletion", () => {
@@ -32,5 +32,19 @@ describe("session lifecycle", () => {
     state = transition(state, { type: "RESUME" });
     expect(state.modes.paused).toBe(false);
     expect(state.requiresFreshEvidence).toBe(true);
+  });
+
+  it("recovers only a non-sensitive resumable shell after reload", () => {
+    const restored = restoreSessionShell(JSON.stringify({ step: "goal", modes: { voice: false }, secret: "must-ignore" }));
+    expect(restored.step).toBe("camera");
+    expect(restored.modes.voice).toBe(false);
+    expect(JSON.stringify(restored)).not.toContain("must-ignore");
+  });
+
+  it("audits permission denial and permits explicit retry", () => {
+    let state = transition({ ...createSessionState(), step: "camera" }, { type: "CAMERA_DENIED" });
+    expect(state.cameraError).toBe("permission-denied");
+    state = transition(state, { type: "RETRY_CAMERA" });
+    expect(state.cameraError).toBeNull();
   });
 });

@@ -54,4 +54,13 @@ describe("CanvasFrameSource", () => {
 
     expect(sink).not.toHaveBeenCalled();
   });
+
+  it("adapts processing rate while preserving the 640×360 ROI floor", async () => {
+    const source = new CanvasFrameSource(); const sink = vi.fn(() => "accepted" as const);
+    source.start({} as HTMLVideoElement, { targetFps: 10, roi: { x: 0, y: 0, width: 640, height: 360 } }, sink);
+    source.updateOptions({ targetFps: 5, roi: { x: 0, y: 0, width: 320, height: 180 } });
+    await vi.advanceTimersByTimeAsync(1000);
+    expect(sink.mock.calls.length).toBeLessThanOrEqual(5);
+    expect((createImageBitmap as ReturnType<typeof vi.fn>).mock.calls[0]?.slice(3)).toEqual([640, 360]);
+  });
 });

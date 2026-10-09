@@ -2,6 +2,7 @@ import { expect, test } from "@playwright/test";
 
 test("camera starts only after consent and can be stopped", async ({ page }) => {
   await page.goto("/");
+  await page.getByRole("button", { name: /begin private setup/i }).click();
 
   await expect(page.getByRole("button", { name: "Start camera" })).toBeVisible();
   await expect(page.getByText(/Camera delivering/)).toHaveCount(0);

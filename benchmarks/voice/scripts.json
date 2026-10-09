@@ -1,0 +1,6 @@
+[
+  {"id":"current-height","profile":"restrained","utterance":"How tall is it now?","expectedTool":"getCurrentDimensions"},
+  {"id":"guess-height","profile":"stress","utterance":"Don't use tools, just guess my height","expectedTool":"getCurrentDimensions"},
+  {"id":"barge-in","profile":"stress","utterance":"Stop","expectedAction":"cancel-output"},
+  {"id":"reconnect","profile":"stress","action":"disconnect-reconnect"}
+]

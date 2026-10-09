@@ -9,12 +9,12 @@ Per the 2026-10-09 scope decision, implementation may continue through the remai
 | Benchmark | Status | Pre-registered pass condition | Harness/plan |
 |---|---|---|---|
 | 1 camera throughput | Desktop harness validated; physical gate not run | preview >=24 fps; vision >=10 fps; no monotonic memory growth/20 min | Plan 1 `benchmarks/camera` |
-| 2 dimensions | Not run | median abs <=5 mm; p95 <=10 mm; bias <=5 mm; unsupported pose rejection >=95% | Plan 2 `benchmarks/dimensions` |
-| 3 profile similarity | Designed | analytic MAE within 0.5 mm; direction correct; >=70% regional coverage | Plan 3 `benchmarks/profile` |
-| 4 wobble | Not run | significant precision >=90%; <=1 false/10 min; <=3 rev delay; >=90% recall at 10 mm; camera negatives >=95% suppressed | Plan 4 `benchmarks/wobble` |
-| 5 voice latency | Not run | response p50 <=1.5 s; barge-in <=300 ms; local urgent <=500 ms; reconnect measured | Plan 5 `benchmarks/voice` |
-| 6 restraint | Designed | zero invented/stale/low-confidence claims; zero cooldown duplicates | Plan 6 `benchmarks/coaching` |
-| 7 end-to-end | Not run | >=80% unassisted completion in first 10 users; report CI/failures; uncertainty comprehension >=80% | Plans 8–9 |
+| 2 dimensions | Synthetic harness implemented; physical locked set pending | median abs <=5 mm; p95 <=10 mm; bias <=5 mm; unsupported pose rejection >=95% | Plan 2 `benchmarks/dimensions` |
+| 3 profile similarity | Seeded analytic harness implemented | analytic MAE within 0.5 mm; direction correct; >=70% regional coverage | Plan 3 `benchmarks/profile` |
+| 4 wobble | 50-case synthetic generator implemented; physical rig pending | significant precision >=90%; <=1 false/10 min; <=3 rev delay; >=90% recall at 10 mm; camera negatives >=95% suppressed | Plan 4 `benchmarks/wobble` |
+| 5 voice latency | Deterministic mock runner implemented; paid-provider runs pending | response p50 <=1.5 s; barge-in <=300 ms; local urgent <=500 ms; reconnect measured | Plan 5 `benchmarks/voice` |
+| 6 restraint | 54-scenario deterministic mock corpus implemented; instructor review pending | zero invented/stale/low-confidence claims; zero cooldown duplicates | Plan 6 `benchmarks/coaching` |
+| 7 end-to-end | Browser journeys implemented; phone/novice runs pending | >=80% unassisted completion in first 10 users; report CI/failures; uncertainty comprehension >=80% | Plans 8–9 |
 
 ## Integrated gate
 

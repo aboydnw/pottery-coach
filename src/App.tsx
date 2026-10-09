@@ -1,6 +1,6 @@
 import { detectCapabilities } from "./platform/capabilities";
-import { CameraSetup } from "./camera/CameraSetup";
 import { ErrorBoundary } from "./app/ErrorBoundary";
+import { AppRoutes } from "./app/routes";
 
 export function App() {
   const capabilities = detectCapabilities();
@@ -22,7 +22,7 @@ export function App() {
 
   return (
     <main className="app-shell">
-      <ErrorBoundary><CameraSetup /></ErrorBoundary>
+      <ErrorBoundary><AppRoutes /></ErrorBoundary>
     </main>
   );
 }

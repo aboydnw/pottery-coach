@@ -7,12 +7,20 @@ import { scoreConfidence } from "../measurement/confidence";
 import { TemporalFilter } from "../measurement/temporalFilter";
 import type { CalibrationResult } from "../calibration/types";
 import type { DiagnosticResponse, MeasurementWorkerEvent, MeasurementWorkerRequest } from "./workerProtocol";
+import { TemporalContourBuffer } from "../wobble/TemporalContourBuffer";
+import { contourSampleFromReading } from "../wobble/fromReading";
+import { estimatePeriod } from "../wobble/period";
+import { fitOscillation } from "../wobble/fitOscillation";
+import { classifyWobble } from "../wobble/classifyWobble";
+import { WobbleService } from "../wobble/WobbleService";
 
 const worker = self as unknown as DedicatedWorkerGlobalScope;
 let calibration: CalibrationResult | null = null;
 let backgroundFrames: LabImage[] = [];
 let background: ReturnType<typeof buildBackground> | null = null;
 const temporalFilter = new TemporalFilter();
+const contourBuffer = new TemporalContourBuffer();
+const wobbleService = new WobbleService();
 
 worker.addEventListener("message", async (event: MessageEvent<MeasurementWorkerRequest>) => {
   if (event.data?.type === "configure") {
@@ -20,12 +28,14 @@ worker.addEventListener("message", async (event: MessageEvent<MeasurementWorkerR
     backgroundFrames = [];
     background = null;
     temporalFilter.reset("calibration-change");
+    contourBuffer.clear("calibration-change");
     return;
   }
   if (event.data?.type === "reset") {
     temporalFilter.reset(event.data.reason);
     backgroundFrames = [];
     background = null;
+    contourBuffer.clear(event.data.reason);
     const invalidated: MeasurementWorkerEvent = { type: "invalidated", reason: event.data.reason };
     worker.postMessage(invalidated);
     return;
@@ -68,6 +78,16 @@ worker.addEventListener("message", async (event: MessageEvent<MeasurementWorkerR
           stable: temporalFilter.push(instantaneous),
         };
         worker.postMessage(reading);
+        const contour = contourSampleFromReading(instantaneous);
+        contourBuffer.push(contour);
+        const window = contourBuffer.window(12_000);
+        const periodSamples = window.flatMap((sample) => sample.rimCenterMm === null ? [] : [{ timestampMs: sample.timestampMs, value: sample.rimCenterMm }]);
+        const period = estimatePeriod(periodSamples, { minMs: 300, maxMs: 3000 });
+        if (period && periodSamples.length >= 20) {
+          const fit = fitOscillation(periodSamples, period.periodMs);
+          wobbleService.update(classifyWobble(window, fit, { periodMs: period.periodMs, cameraMotionRmsMm: null }));
+          worker.postMessage({ type: "wobble", reading: wobbleService.getLatest(event.data.capturedAtMs) } satisfies MeasurementWorkerEvent);
+        }
       }
     }
   } finally {

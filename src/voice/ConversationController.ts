@@ -1,4 +1,6 @@
 import type { ConversationState, RealtimeCoachTransport, RealtimeEvent, RealtimeSessionConfig } from "./types";
+import { validateSpokenClaim, type ClaimValidation } from "../coaching/ClaimValidator";
+import type { CueCandidate } from "../coaching/types";
 
 type CompactContext = { goalId: string | null; phase: string; policyRevision: number };
 
@@ -15,6 +17,8 @@ export class ConversationController {
   private intentionallyClosed = false;
   private compactContext: CompactContext = { goalId: null, phase: "setup", policyRevision: 1 };
   private ephemeralReadingId: string | null = null;
+  private proactiveCloudSpeechEnabled = true;
+  private claimAudit: Array<{ policyId: string; validation: ClaimValidation }> = [];
 
   constructor(private readonly createTransport: () => RealtimeCoachTransport) {}
 
@@ -23,6 +27,14 @@ export class ConversationController {
   getCompactContext(): CompactContext { return { ...this.compactContext }; }
   setEphemeralReadingId(id: string | null): void { this.ephemeralReadingId = id; }
   getEphemeralReadingId(): string | null { return this.ephemeralReadingId; }
+  isProactiveCloudSpeechEnabled(): boolean { return this.proactiveCloudSpeechEnabled; }
+  getClaimAudit() { return this.claimAudit.map((entry) => ({ ...entry, validation: { ...entry.validation, violations: [...entry.validation.violations] } })); }
+  validateFinalClaim(transcript: string, cue: CueCandidate, toolResults: Array<Record<string, unknown>>) {
+    const validation = validateSpokenClaim(transcript, cue, toolResults);
+    this.claimAudit.push({ policyId: cue.policyId, validation });
+    if (validation.disableProactiveCloudSpeech) this.proactiveCloudSpeechEnabled = false;
+    return validation;
+  }
 
   async connect(config: RealtimeSessionConfig): Promise<void> {
     this.config = config;

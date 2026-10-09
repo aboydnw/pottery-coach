@@ -1,0 +1,1 @@
+{"$schema":"https://json-schema.org/draft/2020-12/schema","type":"object","required":["fixtureId","groundTruthMm","supported","artifactChecksum"],"properties":{"fixtureId":{"type":"string"},"groundTruthMm":{"type":"number"},"supported":{"type":"boolean"},"artifactChecksum":{"type":"string"}},"additionalProperties":false}

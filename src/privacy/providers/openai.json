@@ -12,6 +12,14 @@
     "textOutput": 2.4
   },
   "retention": "Realtime is eligible for Zero Data Retention. Account configuration must be verified before field use; default abuse-monitoring retention may apply for up to 30 days.",
+  "fieldAccountVerification": {
+    "status": "pending-consolidated-provider-test",
+    "zeroDataRetention": null,
+    "region": null,
+    "subprocessorsReviewedAt": null,
+    "deletionRouteVerified": false
+  },
+  "consentRevision": "2026-10-09",
   "sources": [
     "https://developers.openai.com/api/docs/guides/voice-webrtc",
     "https://platform.openai.com/pricing",

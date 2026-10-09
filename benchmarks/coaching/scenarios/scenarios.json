@@ -1,0 +1,5 @@
+[
+  {"kind":"occlusion","count":10},{"kind":"reconnect","count":8},{"kind":"contradictory-phase","count":8},
+  {"kind":"noisy-wobble","count":8},{"kind":"repeated-question","count":8},{"kind":"long-silence","count":4},
+  {"kind":"adversarial-model-text","count":8},{"kind":"current-dimensions","count":10}
+]

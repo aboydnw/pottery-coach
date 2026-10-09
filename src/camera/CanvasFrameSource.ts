@@ -48,6 +48,12 @@ export class CanvasFrameSource implements FrameSource {
     this.sink = null;
   }
 
+  updateOptions(options: FrameSourceOptions): void {
+    if (!Number.isFinite(options.targetFps) || options.targetFps <= 0) throw new RangeError("targetFps must be greater than zero");
+    this.options = { targetFps: options.targetFps, roi: { ...options.roi,
+      width: Math.max(640, options.roi.width), height: Math.max(360, options.roi.height) } };
+  }
+
   private schedule(): void {
     if (!this.active || !this.video || !this.options) return;
     if (typeof this.video.requestVideoFrameCallback === "function") {

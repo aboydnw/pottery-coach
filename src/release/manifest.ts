@@ -4,6 +4,7 @@ export const releaseManifestSchema = z.object({
   instructionsRevision: z.string().min(1), providerRevision: z.string().min(1), boardRevision: z.string().min(1),
   templateRevisions: z.array(z.string()).min(1), gateDecisions: z.record(z.string(), z.string()),
   supportedDevices: z.array(z.string()).min(1), featureFlags: z.record(z.string(), z.boolean()), privacyNoticeRevision: z.string().min(1),
+  integrity: z.object({ status: z.enum(["pending-signature", "signed"]), reviewer: z.string().nullable(), signedAt: z.string().nullable() }),
 });
 export const releaseManifest = releaseManifestSchema.parse({
   commit: "development", schemaRevision: 1, policyRevision: 1, instructionsRevision: "instructions-v1",
@@ -14,4 +15,5 @@ export const releaseManifest = releaseManifestSchema.parse({
   supportedDevices: ["desktop Chromium controlled prototype", "mobile browsers pending consolidated verification"],
   featureFlags: { numericMeasurement: false, proactiveWobble: false, cloudVoice: false, mobileSupport: false },
   privacyNoticeRevision: "2026-10-09",
+  integrity: { status: "pending-signature", reviewer: null, signedAt: null },
 });

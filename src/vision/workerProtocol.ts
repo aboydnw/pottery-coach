@@ -1,6 +1,7 @@
 import type { AcquiredFrame } from "../camera/FrameSource";
 import type { CalibrationResult } from "../calibration/types";
 import type { DimensionReading, StableDimensionReading } from "../measurement/types";
+import type { WobbleReading } from "../wobble/types";
 
 export type FrameRequest = {
   type: "frame";
@@ -24,6 +25,7 @@ export type MeasurementWorkerRequest =
 
 export type MeasurementWorkerEvent =
   | { type: "reading"; instantaneous: DimensionReading; stable: StableDimensionReading | null }
+  | { type: "wobble"; reading: WobbleReading }
   | DiagnosticResponse
   | { type: "invalidated"; reason: string };
 

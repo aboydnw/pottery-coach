@@ -64,4 +64,12 @@ describe("SessionRepository", () => {
       label: "rim", stillBlobId: "blob-1", localOnly: false,
     }, new Blob(["still"]))).rejects.toThrow(/snapshot/i);
   });
+
+  it("expires ended records at the boundary while preserving active sessions", async () => {
+    const repository = new SessionRepository(`test-${crypto.randomUUID()}`); databases.push(repository);
+    await repository.create({ ...record("old"), startedAtMs: 0, endedAtMs: 1, outcome: "completed" });
+    await repository.create({ ...record("active"), startedAtMs: 0 });
+    expect(await repository.expire(30 * 86_400_000, 30 * 86_400_000)).toEqual(["old"]);
+    expect(await repository.get("active")).toBeDefined();
+  });
 });

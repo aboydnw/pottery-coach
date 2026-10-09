@@ -91,6 +91,15 @@ export class SessionRepository {
 
   async listEvents(sessionId: string) { return this.db.events.where("sessionId").equals(sessionId).sortBy("timestampMs"); }
   async list() { return this.db.sessions.orderBy("startedAtMs").reverse().toArray(); }
+  async update(id: string, patch: Partial<Pick<SessionRecord, "endedAtMs" | "goal" | "outcome" | "calibrationId">>) {
+    await this.requireSession(id);
+    await this.db.sessions.update(id, structuredClone(patch));
+  }
+  async expire(now = Date.now(), retentionMs = 30 * 86_400_000) {
+    const expired = (await this.list()).filter((session) => session.endedAtMs !== null && now - session.startedAtMs >= retentionMs);
+    await Promise.all(expired.map((session) => this.delete(session.id)));
+    return expired.map((session) => session.id);
+  }
   async delete(id: string) {
     const exists = Boolean(await this.db.sessions.get(id));
     if (!exists) return false;

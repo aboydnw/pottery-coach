@@ -12,9 +12,10 @@ export class SessionRecorder {
   private lastReadingAt = -Infinity;
   private lastDiagnosticAt = -Infinity;
   readonly dropped = { diagnostic: 0, evidence: 0 };
+  storageAvailable = true;
 
   constructor(private repository: SessionRepository, private sessionId: string,
-    private options: { maxQueue?: number; autoFlush?: boolean } = {}) {}
+    private options: { maxQueue?: number; autoFlush?: boolean; onStorageUnavailable?: (reason: string) => void } = {}) {}
 
   recordReading(value: RecordedReading) {
     if (value.sessionId !== this.sessionId || value.timestampMs - this.lastReadingAt < 500) return;
@@ -33,6 +34,7 @@ export class SessionRecorder {
   }
 
   private enqueue(item: QueueItem) {
+    if (!this.storageAvailable) return;
     const maxQueue = this.options.maxQueue ?? 100;
     if (this.queue.length >= maxQueue) {
       const diagnosticIndex = this.queue.findIndex((queued) => queued.kind === "diagnostic");
@@ -55,11 +57,18 @@ export class SessionRecorder {
   }
 
   private async drain() {
-    while (this.queue.length) {
-      const item = this.queue.shift()!;
-      if (item.kind === "reading") await this.repository.appendReading(item.value);
-      else if (item.kind === "diagnostic") await this.repository.appendDiagnostic(item.value);
-      else await this.repository.appendEvent(item.value);
+    try {
+      while (this.queue.length) {
+        const item = this.queue.shift()!;
+        if (item.kind === "reading") await this.repository.appendReading(item.value);
+        else if (item.kind === "diagnostic") await this.repository.appendDiagnostic(item.value);
+        else await this.repository.appendEvent(item.value);
+      }
+    } catch (error) {
+      this.queue = [];
+      this.storageAvailable = false;
+      const reason = error instanceof DOMException && error.name === "QuotaExceededError" ? "quota-exceeded" : "storage-unavailable";
+      this.options.onStorageUnavailable?.(reason);
     }
   }
 }

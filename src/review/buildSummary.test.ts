@@ -11,7 +11,7 @@ const bundle: SessionBundle = {
     { id: "r1", sessionId: "s", timestampMs: 0, kind: "stable", values: { heightMm: 20 }, confidence: 0.9 },
     { id: "r2", sessionId: "s", timestampMs: 1_000, kind: "stable", values: { heightMm: 30 }, confidence: 0.4 },
     { id: "r3", sessionId: "s", timestampMs: 2_000, kind: "stable", values: { heightMm: 25 }, confidence: 0.9 },
-  ], diagnostics: [], events: [], moments: [], transcripts: [],
+  ], diagnostics: [], events: [{ id: "m", sessionId: "s", timestampMs: 2_000, type: "goal-milestone", evidenceIds: ["r3"], payload: { percent: 80 } }], moments: [], transcripts: [],
 };
 
 describe("buildSummary", () => {
@@ -19,6 +19,7 @@ describe("buildSummary", () => {
     expect(buildSummary(bundle)).toMatchObject({
       schemaVersion: 1, peak: { heightMm: 25, evidenceIds: ["r3"] },
       final: { heightMm: 25, evidenceIds: ["r3"] }, unmeasurableDurationMs: 1_000,
+      milestones: [{ percent: 80, timestampMs: 2_000, evidenceIds: ["r3"] }],
     });
   });
 });

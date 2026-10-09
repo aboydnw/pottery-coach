@@ -45,4 +45,18 @@ describe("SessionRecorder", () => {
     expect((await repository.get("s"))?.diagnostics).toHaveLength(1);
     expect(recorder.dropped).toEqual({ diagnostic: 1, evidence: 0 });
   });
+
+  it("continues ephemerally and discloses storage failure", async () => {
+    const disclosures: string[] = [];
+    const failing = {
+      appendReading: async () => { throw new DOMException("full", "QuotaExceededError"); },
+      appendDiagnostic: async () => undefined,
+      appendEvent: async () => undefined,
+    } as unknown as SessionRepository;
+    const recorder = new SessionRecorder(failing, "s", { onStorageUnavailable: (reason) => disclosures.push(reason) });
+    recorder.recordReading({ id: "r", sessionId: "s", timestampMs: 0, kind: "stable", values: {}, confidence: 0.9 });
+    await recorder.flush();
+    expect(recorder.storageAvailable).toBe(false);
+    expect(disclosures).toEqual(["quota-exceeded"]);
+  });
 });

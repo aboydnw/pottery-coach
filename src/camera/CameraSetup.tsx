@@ -20,6 +20,23 @@ import { ProfileOverlay } from "../targets/ProfileOverlay";
 import { GoalProgress } from "../targets/GoalProgress";
 import { MockRealtimeTransport } from "../voice/MockRealtimeTransport";
 import { VoiceControls } from "../voice/VoiceControls";
+import type { WobbleReading } from "../wobble/types";
+import { AdaptiveRateController, type AdaptiveMode } from "../performance/AdaptiveRateController";
+
+export type CameraSetupProps = {
+  onCameraReady?(): void;
+  onCameraDenied?(): void;
+  onCalibrated?(): void;
+  onAudioDecided?(enabled: boolean): void;
+  onGoalSet?(goal: GoalConfirmation): void;
+  onReading?(reading: StableDimensionReading): void;
+  onWobble?(reading: WobbleReading): void;
+  onMilestone?(percent: number, evidenceId: string): void;
+  onProcessingModeChange?(mode: AdaptiveMode): void;
+  onMarkMoment?(): void | Promise<void>;
+  onEnded?(): void;
+  numericEnabled?: boolean;
+};
 
 const TARGET_TEMPLATES = loadTemplates();
 
@@ -38,7 +55,7 @@ function cameraErrorMessage(error: unknown): string {
   return "The camera could not be started. Check the connection and retry.";
 }
 
-export function CameraSetup() {
+export function CameraSetup(props: CameraSetupProps = {}) {
   const controllerRef = useRef<CameraController | null>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const frameSourceRef = useRef<CanvasFrameSource | null>(null);
@@ -62,7 +79,18 @@ export function CameraSetup() {
   const [targetId, setTargetId] = useState(TARGET_TEMPLATES[0]!.id);
   const [goal, setGoal] = useState<GoalConfirmation | null>(null);
   const [stableReading, setStableReading] = useState<StableDimensionReading | null>(null);
+  const [wobbleReading, setWobbleReading] = useState<WobbleReading | null>(null);
   const [voiceTransport, setVoiceTransport] = useState<MockRealtimeTransport | null>(null);
+  const [audioDecided, setAudioDecided] = useState(false);
+  const [demoAnswer, setDemoAnswer] = useState<string | null>(null);
+  const [momentMarked, setMomentMarked] = useState(false);
+  const [processingHz, setProcessingHz] = useState<10 | 7.5 | 5>(10);
+  const adaptiveRef = useRef(new AdaptiveRateController((mode) => {
+    setProcessingHz(mode.processingHz);
+    frameSourceRef.current?.updateOptions({ targetFps: mode.processingHz, roi: { x: 0, y: 0, ...mode.roi } });
+    props.onProcessingModeChange?.(mode);
+  }));
+  const demoMode = new URLSearchParams(window.location.search).get("mode") === "demo";
   const selectedTarget = TARGET_TEMPLATES.find((template) => template.id === targetId) ?? TARGET_TEMPLATES[0]!;
   const scaledTarget = useMemo(() => goal ? { ...selectedTarget, intendedWetHeightMm: goal.wetHeightMm } : selectedTarget, [goal, selectedTarget]);
   const comparison = useMemo(() => stableReading && goal ? compareProfiles(stableReading, scaledTarget) : null, [stableReading, goal, scaledTarget]);
@@ -80,7 +108,9 @@ export function CameraSetup() {
       }
     });
     const interval = window.setInterval(() => {
-      setSample(diagnosticsRef.current.snapshot());
+      const next = diagnosticsRef.current.snapshot();
+      setSample(next);
+      adaptiveRef.current.update({ processingMsP95: next.workerProcessingMsP95, frameAgeMsP95: next.frameAgeMsP95 });
     }, 1000);
     void readBatteryLevel(diagnosticsRef.current);
     return () => {
@@ -103,6 +133,7 @@ export function CameraSetup() {
       }
       setSettings(result.settings);
       setActive(true);
+      props.onCameraReady?.();
       setInterrupted(false);
       diagnosticsRef.current.reset();
       startFramePipeline(result.settings);
@@ -110,6 +141,7 @@ export function CameraSetup() {
     } catch (startError) {
       setError(cameraErrorMessage(startError));
       setActive(false);
+      props.onCameraDenied?.();
     }
   }
 
@@ -122,6 +154,8 @@ export function CameraSetup() {
     setCalibration(null);
     setCalibrationConfirmed(false);
     setStableReading(null);
+    setWobbleReading(null);
+    setAudioDecided(false);
     void voiceTransportRef.current?.close();
     voiceTransportRef.current = null;
     setVoiceTransport(null);
@@ -132,15 +166,19 @@ export function CameraSetup() {
 
   function startFramePipeline(delivered: CameraSettings): void {
     const video = videoRef.current;
-    if (new URLSearchParams(window.location.search).get("mode") === "camera-only") return;
+    if (new URLSearchParams(window.location.search).get("mode") === "camera-only" || props.numericEnabled === false) return;
     if (!video || typeof Worker === "undefined" || typeof createImageBitmap !== "function") return;
     stopFramePipeline();
     const worker = new Worker(new URL("../vision/measurement.worker.ts", import.meta.url), {
       type: "module",
     });
     worker.addEventListener("message", (event: MessageEvent<MeasurementWorkerEvent>) => {
-      if (event.data?.type === "reading" && event.data.stable) setStableReading(event.data.stable);
+      if (event.data?.type === "reading" && event.data.stable) {
+        setStableReading(event.data.stable);
+        props.onReading?.(event.data.stable);
+      }
       if (event.data?.type === "invalidated") setStableReading(null);
+      if (event.data?.type === "wobble") { setWobbleReading(event.data.reading); props.onWobble?.(event.data.reading); }
     });
     const sink = new BoundedWorkerSink(worker, (diagnostic) => {
       const now = performance.now();
@@ -269,10 +307,30 @@ export function CameraSetup() {
     }
   }
 
+  function loadDemoCalibration() {
+    const width = settings?.width ?? 640, height = settings?.height ?? 360;
+    setCalibration({ id: "demo-calibration", createdAtMs: Date.now(), status: "accepted",
+      homographyImageToMm: [1, 0, 0, 0, 1, 0, 0, 0, 1], wheelBaseline: [{ x: 45, y: 120 }, { x: 165, y: 120 }],
+      wheelCenterlineXmm: 105, roiImage: { x: 0, y: 0, width, height }, markerPlaneOffsetToleranceMm: 30,
+      quality: { tagCount: 4, reprojectionErrorPx95: 0.2, scaleVariationFraction: 0.005, estimatedErrorMm95: 2,
+        poseYawDeg: 0, posePitchDeg: 0, blurScore: 1, contrastScore: 1 }, reasons: [], provenance: "automatic",
+      boardRevision: "board-v1", supportedBoardRevision: "board-v1", roiClipped: false });
+    const component = { score: 0.95, reasons: [] };
+    const reading: StableDimensionReading = { id: "demo-reading-1", timestampMs: Date.now(), sourceFrameId: 1,
+      calibrationId: "demo-calibration", heightMm: 120, maximumWidthMm: 92, rimWidthMm: 78, baseWidthMm: 70,
+      centerlineOffsetMm: 1, visibleAsymmetryMm: 2,
+      profile: Array.from({ length: 64 }, (_, index) => ({ heightRatio: index / 63, radiusMm: 35 + index * 0.18, confidence: 0.95 })),
+      confidence: { overall: 0.95, calibration: component, segmentation: component, occlusion: component,
+        temporalStability: component, freshnessMs: 0, estimatedErrorMm95: 2 }, windowStartMs: Date.now() - 500,
+      contributingFrameCount: 5, lastReliableTimestampMs: Date.now() };
+    setStableReading(reading); props.onReading?.(reading);
+  }
+
   function acceptCalibration(accepted: CalibrationResult): void {
     setCalibration(accepted);
     setCalibrationConfirmed(true);
     workerRef.current?.postMessage({ type: "configure", calibration: accepted });
+    props.onCalibrated?.();
   }
 
   async function startMockVoice(): Promise<void> {
@@ -280,6 +338,28 @@ export function CameraSetup() {
     await transport.connect({ provider: "mock", model: "mock-v1", voice: "local", language: "en", instructionsRevision: "instructions-v1", toolsRevision: "tools-v1" });
     voiceTransportRef.current = transport;
     setVoiceTransport(transport);
+    setAudioDecided(true);
+    props.onAudioDecided?.(true);
+  }
+
+  function continueWithoutVoice() {
+    setAudioDecided(true);
+    props.onAudioDecided?.(false);
+  }
+
+  function confirmGoal(value: GoalConfirmation) {
+    setGoal(value);
+    props.onGoalSet?.(value);
+  }
+
+  function endSession() {
+    stopCamera();
+    props.onEnded?.();
+  }
+
+  async function markMoment() {
+    await props.onMarkMoment?.();
+    setMomentMarked(true);
   }
 
   return (
@@ -300,6 +380,9 @@ export function CameraSetup() {
           {settings.frameRate ? ` at ${Math.round(settings.frameRate)} fps` : ""}.
         </p>
       )}
+      {active && <p className="capture-indicator" role="status">Camera active · frames stay on this device</p>}
+      {active && <p>Vision processing target: {processingHz} Hz. Preview quality is unchanged.</p>}
+      {active && props.numericEnabled === false && <p>Numeric measurements are disabled until the signed physical calibration gate passes.</p>}
       {interrupted && (
         <div role="status" className="stale-banner">
           Camera was interrupted. Readings are stale until you resume.
@@ -314,6 +397,7 @@ export function CameraSetup() {
           <button type="button" className="secondary" disabled={calibrating} onClick={runCalibration}>
             {calibrating ? "Detecting board…" : "Calibrate printed board"}
           </button>
+          {demoMode && <button type="button" className="secondary" onClick={loadDemoCalibration}>Load deterministic demo calibration</button>}
         </div>
       )}
       {calibration && (
@@ -323,7 +407,14 @@ export function CameraSetup() {
           onRecalibrate={() => { setCalibration(null); setCalibrationConfirmed(false); }}
         />
       )}
-      {calibrationConfirmed && (
+      {calibrationConfirmed && !audioDecided && (
+        <section aria-labelledby="audio-choice-title"><h2 id="audio-choice-title">Choose voice coaching</h2>
+          <p>Offline mock voice sends no audio to a provider. Cloud voice remains disabled until its provider gate passes.</p>
+          <button type="button" className="secondary" onClick={startMockVoice}>Use offline mock voice</button>
+          <button type="button" className="secondary" onClick={continueWithoutVoice}>Continue without voice</button>
+        </section>
+      )}
+      {calibrationConfirmed && audioDecided && (
         <section className="target-setup" aria-labelledby="target-title">
           <h2 id="target-title">Choose a target</h2>
           <label>Template
@@ -331,19 +422,27 @@ export function CameraSetup() {
               {TARGET_TEMPLATES.map((template) => <option key={template.id} value={template.id}>{template.name}</option>)}
             </select>
           </label>
-          <GoalForm targetId={targetId} onConfirm={setGoal} />
+          <GoalForm targetId={targetId} onConfirm={confirmGoal} />
         </section>
       )}
       {goal && stableReading && comparison && (
         <section className="live-target" aria-label="Live target comparison">
           <ProfileOverlay target={scaledTarget} reading={stableReading} mode="millimetres" />
-          <GoalProgress comparison={comparison} heightProgress={(stableReading.heightMm ?? 0) / goal.wetHeightMm} />
+          <GoalProgress comparison={comparison} heightProgress={(stableReading.heightMm ?? 0) / goal.wetHeightMm} onMilestone={props.onMilestone} />
         </section>
       )}
-      {goal && !voiceTransport && (
-        <button type="button" className="secondary" onClick={startMockVoice}>Start voice coach in offline mock mode</button>
-      )}
+      {goal && wobbleReading && <section aria-label="Visible stability status"><h2>Visible stability</h2>
+        <p>{wobbleReading.classification.replaceAll("-", " ")} · confidence {Math.round(wobbleReading.confidence * 100)}%</p>
+        <p>This describes visible motion only and does not infer clay pressure, thickness, moisture, or cause.</p>
+      </section>}
       {voiceTransport && <VoiceControls transport={voiceTransport} />}
+      {demoMode && goal && stableReading && <section aria-label="Demo evidence question">
+        <button type="button" className="secondary" onClick={() => setDemoAnswer(`Height is ${stableReading.heightMm} mm · evidence ${stableReading.id}`)}>Ask “How tall is it?”</button>
+        {demoAnswer && <p role="status">{demoAnswer}</p>}
+      </section>}
+      {goal && <div className="session-actions"><button type="button" className="secondary" onClick={() => void markMoment()}>Mark this moment</button>
+        <button type="button" onClick={endSession}>End session and review</button></div>}
+      {momentMarked && <p role="status">Moment marked locally.</p>}
 
       <div className="actions">
         {!active ? (

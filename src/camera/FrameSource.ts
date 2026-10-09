@@ -20,6 +20,7 @@ export type FrameSourceOptions = {
 
 export interface FrameSource {
   start(video: HTMLVideoElement, options: FrameSourceOptions, sink: FrameSink): void;
+  updateOptions?(options: FrameSourceOptions): void;
   stop(): void;
 }
 

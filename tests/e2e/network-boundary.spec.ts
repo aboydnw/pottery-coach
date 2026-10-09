@@ -10,6 +10,7 @@ test("camera workflow sends no raw image, video, or frame payload", async ({ pag
     if (!new URL(request.url()).hostname.match(/^(127\.0\.0\.1|localhost)$/)) violations.push(`domain:${request.url()}`);
   });
   await page.goto("/");
+  await page.getByRole("button", { name: /begin private setup/i }).click();
   await page.getByRole("button", { name: "Start camera" }).click();
   await expect(page.getByRole("button", { name: "Stop camera" })).toBeVisible();
   expect(violations).toEqual([]);

@@ -3,6 +3,7 @@ import { afterEach, expect, it, vi } from "vitest";
 import { ConversationController, reconnectDelayMs } from "./ConversationController";
 import { MockRealtimeTransport } from "./MockRealtimeTransport";
 import type { RealtimeSessionConfig } from "./types";
+import type { CueCandidate } from "../coaching/types";
 
 const config: RealtimeSessionConfig = {
   provider: "mock", model: "mock-v1", voice: "local", language: "en",
@@ -38,4 +39,13 @@ it("does not restore stale readings when reconnecting a fresh session", async ()
   await vi.waitFor(() => expect(transports.length).toBe(2));
   expect(controller.getEphemeralReadingId()).toBeNull();
   expect(controller.getCompactContext()).toEqual({ goalId: "goal-1", phase: "pulling", policyRevision: 2 });
+});
+
+it("disables proactive cloud speech and audits a claim violation", () => {
+  const controller = new ConversationController(() => new MockRealtimeTransport());
+  const cue: CueCandidate = { policyId: "height", createdAtMs: 0, expiresAtMs: 1_000, evidenceIds: ["r1"], facts: { heightMm: 120 }, priority: 2 };
+  const result = controller.validateFinalClaim("It is 999 mm tall", cue, [{ evidenceId: "r1", heightMm: 120, confidence: 0.9, freshnessMs: 100 }]);
+  expect(result.valid).toBe(false);
+  expect(controller.isProactiveCloudSpeechEnabled()).toBe(false);
+  expect(controller.getClaimAudit()).toHaveLength(1);
 });
