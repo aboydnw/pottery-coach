@@ -1,0 +1,20 @@
+{
+  "provider": "OpenAI",
+  "verifiedAt": "2026-10-09",
+  "transport": "WebRTC unified interface via server-side /v1/realtime/calls",
+  "model": "gpt-realtime-2.1-mini",
+  "pricingUsdPerMillionTokens": {
+    "audioInput": 10,
+    "audioCachedInput": 0.3,
+    "audioOutput": 20,
+    "textInput": 0.6,
+    "textCachedInput": 0.06,
+    "textOutput": 2.4
+  },
+  "retention": "Realtime is eligible for Zero Data Retention. Account configuration must be verified before field use; default abuse-monitoring retention may apply for up to 30 days.",
+  "sources": [
+    "https://developers.openai.com/api/docs/guides/voice-webrtc",
+    "https://platform.openai.com/pricing",
+    "https://developers.openai.com/api/docs/guides/your-data"
+  ]
+}
