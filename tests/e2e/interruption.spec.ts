@@ -1,4 +1,4 @@
-import { expect, test } from "./fixtures/playwright";
+import { expect, test } from "@playwright/test";
 
 test("an interrupted camera becomes stale until explicitly resumed", async ({ page }) => {
   await page.goto("/");

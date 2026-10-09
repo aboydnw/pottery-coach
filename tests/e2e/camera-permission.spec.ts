@@ -1,4 +1,4 @@
-import { expect, test } from "./fixtures/playwright";
+import { expect, test } from "@playwright/test";
 
 test("camera starts only after consent and can be stopped", async ({ page }) => {
   await page.goto("/");

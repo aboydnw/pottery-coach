@@ -1,4 +1,4 @@
-import { expect, test } from "./fixtures/playwright";
+import { expect, test } from "@playwright/test";
 import { beginDemoSession, chooseNoVoiceAndConfirmWetGoal } from "./fixtures/session-streams";
 
 test("completes an evidence-linked cylinder session through review and deletion", async ({ page }) => {

@@ -1,4 +1,4 @@
-import { expect, test } from "./fixtures/playwright";
+import { expect, test } from "@playwright/test";
 
 test("raw media is absent from local databases and capture ends explicitly", async ({ page }) => {
   await page.goto("/"); await page.getByRole("button", { name: /begin private setup/i }).click();

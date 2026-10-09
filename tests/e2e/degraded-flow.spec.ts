@@ -1,4 +1,4 @@
-import { expect, test } from "./fixtures/playwright";
+import { expect, test } from "@playwright/test";
 import { beginDemoSession } from "./fixtures/session-streams";
 
 test("keeps visual setup available while cloud and proactive features remain gated", async ({ page }) => {

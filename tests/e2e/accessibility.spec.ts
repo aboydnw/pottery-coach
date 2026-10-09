@@ -1,5 +1,5 @@
 import AxeBuilder from "@axe-core/playwright";
-import { expect, test } from "./fixtures/playwright";
+import { expect, test } from "@playwright/test";
 
 test("critical setup screen has no serious automated accessibility violations", async ({ page }) => {
   await page.goto("/");

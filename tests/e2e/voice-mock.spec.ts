@@ -1,4 +1,4 @@
-import { expect, test } from "./fixtures/playwright";
+import { expect, test } from "@playwright/test";
 import { beginDemoSession } from "./fixtures/session-streams";
 
 test("offline mock voice is pausable, resumable, and independently endable", async ({ page }) => {

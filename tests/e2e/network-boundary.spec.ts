@@ -1,4 +1,4 @@
-import { expect, test } from "./fixtures/playwright";
+import { expect, test } from "@playwright/test";
 
 test("camera workflow sends no raw image, video, or frame payload", async ({ page }) => {
   const violations: string[] = [];
