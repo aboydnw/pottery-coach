@@ -20,13 +20,18 @@ const flags = deriveGatedFeatureFlags(releaseManifest);
 /** Top-level journey: privacy notice, live camera session, then review and deletion. */
 export function SessionFlow() {
   const [state, dispatch] = useReducer(transition, undefined, () =>
-    typeof sessionStorage === "undefined" ? createSessionState() : restoreSessionShell(sessionStorage.getItem(SHELL_KEY)));
+    typeof sessionStorage === "undefined"
+      ? createSessionState()
+      : restoreSessionShell(sessionStorage.getItem(SHELL_KEY)),
+  );
   const [bundle, setBundle] = useState<SessionBundle | null>(null);
   const [demoMode] = useState(() => isDemoMode());
   const [cameraOnly] = useState(() => isCameraOnlyMode());
   const recording = useSessionRecording(repository, () => dispatch({ type: "STORAGE_FAILED" }));
 
-  useEffect(() => { void new RetentionService(repository).expire().catch(() => undefined); }, []);
+  useEffect(() => {
+    void new RetentionService(repository).expire().catch(() => undefined);
+  }, []);
   useEffect(() => {
     sessionStorage.setItem(SHELL_KEY, serializeSessionShell(state));
     const path = state.step === "notice" ? "/" : `/session/${state.step}`;
@@ -60,7 +65,10 @@ export function SessionFlow() {
       <section className="notice" aria-labelledby="notice-title">
         <p className="eyebrow">Controlled prototype</p>
         <h1 id="notice-title">Before you begin</h1>
-        <p>Pottery Coach processes camera frames on this device. It is not safety equipment. Raw video is not stored or uploaded, and microphone access is a separate choice.</p>
+        <p>
+          Pottery Coach processes camera frames on this device. It is not safety equipment. Raw video is not stored or
+          uploaded, and microphone access is a separate choice.
+        </p>
         <button onClick={() => dispatch({ type: "ACCEPT_NOTICE" })}>Begin private setup</button>
       </section>
     );
@@ -79,7 +87,8 @@ export function SessionFlow() {
     <>
       {!state.modes.storage && (
         <div className="stale-banner" role="alert">
-          Session storage is unavailable. Live coaching can continue ephemerally, but this session cannot be reviewed later.
+          Session storage is unavailable. Live coaching can continue ephemerally, but this session cannot be reviewed
+          later.
         </div>
       )}
       <CameraSetup
@@ -87,13 +96,19 @@ export function SessionFlow() {
         numericEnabled={flags.numericMeasurement || demoMode}
         demoMode={demoMode}
         cameraOnly={cameraOnly}
-        onCameraReady={() => { dispatch({ type: "CAMERA_READY" }); void recording.begin(); }}
+        onCameraReady={() => {
+          dispatch({ type: "CAMERA_READY" });
+          void recording.begin();
+        }}
         onCameraDenied={() => dispatch({ type: "CAMERA_DENIED" })}
         onCameraStopped={() => dispatch({ type: "CAMERA_STOPPED" })}
         onCalibrated={() => dispatch({ type: "CALIBRATED" })}
         onRecalibrate={() => dispatch({ type: "RECALIBRATE" })}
         onAudioDecided={() => dispatch({ type: "AUDIO_DECIDED" })}
-        onGoalSet={(goal) => { dispatch({ type: "GOAL_SET" }); void recording.setGoal(goal); }}
+        onGoalSet={(goal) => {
+          dispatch({ type: "GOAL_SET" });
+          void recording.setGoal(goal);
+        }}
         onGoalCleared={() => dispatch({ type: "GOAL_CLEARED" })}
         onReading={recording.recordReading}
         onWobble={recording.recordWobble}

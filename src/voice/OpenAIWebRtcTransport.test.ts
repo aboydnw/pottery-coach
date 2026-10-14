@@ -6,39 +6,106 @@ import { OpenAIWebRtcTransport } from "./OpenAIWebRtcTransport";
 it("exchanges an offer, routes remote audio, stops tracks, and closes idempotently", async () => {
   const track = { stop: vi.fn(), enabled: true, readyState: "live" } as unknown as MediaStreamTrack;
   const stream = { getTracks: () => [track], getAudioTracks: () => [track] } as unknown as MediaStream;
-  const channel = Object.assign(new EventTarget(), { readyState: "open", send: vi.fn(), close: vi.fn() }) as unknown as RTCDataChannel;
+  const channel = Object.assign(new EventTarget(), {
+    readyState: "open",
+    send: vi.fn(),
+    close: vi.fn(),
+  }) as unknown as RTCDataChannel;
   const peer = Object.assign(new EventTarget(), {
-    addTrack: vi.fn(), createDataChannel: vi.fn(() => channel), createOffer: vi.fn().mockResolvedValue({ type: "offer", sdp: "v=0 offer long enough" }),
-    setLocalDescription: vi.fn(), setRemoteDescription: vi.fn(), close: vi.fn(), connectionState: "connected",
+    addTrack: vi.fn(),
+    createDataChannel: vi.fn(() => channel),
+    createOffer: vi.fn().mockResolvedValue({ type: "offer", sdp: "v=0 offer long enough" }),
+    setLocalDescription: vi.fn(),
+    setRemoteDescription: vi.fn(),
+    close: vi.fn(),
+    connectionState: "connected",
   }) as unknown as RTCPeerConnection;
-  const audio = { autoplay: false, playsInline: false, srcObject: null, play: vi.fn().mockResolvedValue(undefined), pause: vi.fn() } as unknown as HTMLAudioElement;
-  const fetch = vi.fn().mockResolvedValue(new Response("v=0 answer", { status: 200, headers: { "content-type": "application/sdp" } }));
-  const transport = new OpenAIWebRtcTransport({ createPeer: () => peer, getUserMedia: vi.fn().mockResolvedValue(stream), createAudio: () => audio, fetch });
+  const audio = {
+    autoplay: false,
+    playsInline: false,
+    srcObject: null,
+    play: vi.fn().mockResolvedValue(undefined),
+    pause: vi.fn(),
+  } as unknown as HTMLAudioElement;
+  const fetch = vi
+    .fn()
+    .mockResolvedValue(new Response("v=0 answer", { status: 200, headers: { "content-type": "application/sdp" } }));
+  const transport = new OpenAIWebRtcTransport({
+    createPeer: () => peer,
+    getUserMedia: vi.fn().mockResolvedValue(stream),
+    createAudio: () => audio,
+    fetch,
+  });
 
-  await transport.connect({ provider: "openai", model: "server-owned", voice: "server-owned", language: "en", instructionsRevision: "i1", toolsRevision: "t1" });
+  await transport.connect({
+    provider: "openai",
+    model: "server-owned",
+    voice: "server-owned",
+    language: "en",
+    instructionsRevision: "i1",
+    toolsRevision: "t1",
+  });
   expect(fetch).toHaveBeenCalledWith("/api/realtime/session", expect.objectContaining({ method: "POST" }));
   expect(peer.setRemoteDescription).toHaveBeenCalledWith({ type: "answer", sdp: "v=0 answer" });
-  await transport.close(); await transport.close();
-  expect(track.stop).toHaveBeenCalledOnce(); expect(peer.close).toHaveBeenCalledOnce();
+  await transport.close();
+  await transport.close();
+  expect(track.stop).toHaveBeenCalledOnce();
+  expect(peer.close).toHaveBeenCalledOnce();
 });
 
 it("rejects malformed provider events instead of notifying listeners", async () => {
-  const channel = Object.assign(new EventTarget(), { readyState: "open", send: vi.fn(), close: vi.fn() }) as unknown as RTCDataChannel;
-  const peer = Object.assign(new EventTarget(), { addTrack: vi.fn(), createDataChannel: () => channel, createOffer: vi.fn().mockResolvedValue({ type: "offer", sdp: "v=0 offer long enough" }), setLocalDescription: vi.fn(), setRemoteDescription: vi.fn(), close: vi.fn(), connectionState: "connected" }) as unknown as RTCPeerConnection;
-  const transport = new OpenAIWebRtcTransport({ createPeer: () => peer, getUserMedia: vi.fn().mockResolvedValue({ getTracks: () => [], getAudioTracks: () => [] } as unknown as MediaStream), createAudio: () => ({ play: vi.fn(), pause: vi.fn() } as unknown as HTMLAudioElement), fetch: vi.fn().mockResolvedValue(new Response("v=0 answer")) });
-  const listener = vi.fn(); transport.onEvent(listener);
-  await transport.connect({ provider: "openai", model: "x", voice: "x", language: "en", instructionsRevision: "i", toolsRevision: "t" });
+  const channel = Object.assign(new EventTarget(), {
+    readyState: "open",
+    send: vi.fn(),
+    close: vi.fn(),
+  }) as unknown as RTCDataChannel;
+  const peer = Object.assign(new EventTarget(), {
+    addTrack: vi.fn(),
+    createDataChannel: () => channel,
+    createOffer: vi.fn().mockResolvedValue({ type: "offer", sdp: "v=0 offer long enough" }),
+    setLocalDescription: vi.fn(),
+    setRemoteDescription: vi.fn(),
+    close: vi.fn(),
+    connectionState: "connected",
+  }) as unknown as RTCPeerConnection;
+  const transport = new OpenAIWebRtcTransport({
+    createPeer: () => peer,
+    getUserMedia: vi
+      .fn()
+      .mockResolvedValue({ getTracks: () => [], getAudioTracks: () => [] } as unknown as MediaStream),
+    createAudio: () => ({ play: vi.fn(), pause: vi.fn() }) as unknown as HTMLAudioElement,
+    fetch: vi.fn().mockResolvedValue(new Response("v=0 answer")),
+  });
+  const listener = vi.fn();
+  transport.onEvent(listener);
+  await transport.connect({
+    provider: "openai",
+    model: "x",
+    voice: "x",
+    language: "en",
+    instructionsRevision: "i",
+    toolsRevision: "t",
+  });
   channel.dispatchEvent(new MessageEvent("message", { data: "not-json" }));
   expect(listener).not.toHaveBeenCalledWith(expect.objectContaining({ type: "tool-call" }));
 });
 
 function fakePeer(overrides: Record<string, unknown> = {}) {
-  const channel = Object.assign(new EventTarget(), { readyState: "open", send: vi.fn(), close: vi.fn() }) as unknown as RTCDataChannel;
+  const channel = Object.assign(new EventTarget(), {
+    readyState: "open",
+    send: vi.fn(),
+    close: vi.fn(),
+  }) as unknown as RTCDataChannel;
   const sender = { replaceTrack: vi.fn().mockResolvedValue(undefined) };
   const peer = Object.assign(new EventTarget(), {
-    addTrack: vi.fn(() => sender), createDataChannel: vi.fn(() => channel),
+    addTrack: vi.fn(() => sender),
+    createDataChannel: vi.fn(() => channel),
     createOffer: vi.fn().mockResolvedValue({ type: "offer", sdp: "v=0 offer long enough" }),
-    setLocalDescription: vi.fn(), setRemoteDescription: vi.fn(), close: vi.fn(), connectionState: "connected", ...overrides,
+    setLocalDescription: vi.fn(),
+    setRemoteDescription: vi.fn(),
+    close: vi.fn(),
+    connectionState: "connected",
+    ...overrides,
   }) as unknown as RTCPeerConnection;
   return { peer, channel, sender };
 }
@@ -48,14 +115,25 @@ function fakeStream(readyState = "live") {
   return { track, stream: { getTracks: () => [track], getAudioTracks: () => [track] } as unknown as MediaStream };
 }
 
-const config = { provider: "openai", model: "x", voice: "x", language: "en", instructionsRevision: "i", toolsRevision: "t" } as const;
-const audio = () => ({ play: vi.fn().mockResolvedValue(undefined), pause: vi.fn() } as unknown as HTMLAudioElement);
+const config = {
+  provider: "openai",
+  model: "x",
+  voice: "x",
+  language: "en",
+  instructionsRevision: "i",
+  toolsRevision: "t",
+} as const;
+const audio = () => ({ play: vi.fn().mockResolvedValue(undefined), pause: vi.fn() }) as unknown as HTMLAudioElement;
 
 it("releases the microphone and peer when the session exchange fails", async () => {
   const { peer, channel } = fakePeer();
   const { track, stream } = fakeStream();
-  const transport = new OpenAIWebRtcTransport({ createPeer: () => peer, getUserMedia: vi.fn().mockResolvedValue(stream), createAudio: audio,
-    fetch: vi.fn().mockResolvedValue(new Response("{}", { status: 503 })) });
+  const transport = new OpenAIWebRtcTransport({
+    createPeer: () => peer,
+    getUserMedia: vi.fn().mockResolvedValue(stream),
+    createAudio: audio,
+    fetch: vi.fn().mockResolvedValue(new Response("{}", { status: 503 })),
+  });
 
   await expect(transport.connect(config)).rejects.toThrow();
 
@@ -69,7 +147,12 @@ it("replaces an ended microphone track on the existing sender without renegotiat
   const first = fakeStream();
   const replacement = fakeStream();
   const getUserMedia = vi.fn().mockResolvedValueOnce(first.stream).mockResolvedValueOnce(replacement.stream);
-  const transport = new OpenAIWebRtcTransport({ createPeer: () => peer, getUserMedia, createAudio: audio, fetch: vi.fn().mockResolvedValue(new Response("v=0 answer")) });
+  const transport = new OpenAIWebRtcTransport({
+    createPeer: () => peer,
+    getUserMedia,
+    createAudio: audio,
+    fetch: vi.fn().mockResolvedValue(new Response("v=0 answer")),
+  });
   await transport.connect(config);
   Object.assign(first.track, { readyState: "ended" });
 
@@ -82,7 +165,13 @@ it("replaces an ended microphone track on the existing sender without renegotiat
 it("sends the field-test access token as a bearer header", async () => {
   const { peer } = fakePeer();
   const fetch = vi.fn().mockResolvedValue(new Response("v=0 answer"));
-  const transport = new OpenAIWebRtcTransport({ createPeer: () => peer, getUserMedia: vi.fn().mockResolvedValue(fakeStream().stream), createAudio: audio, fetch, getAccessToken: () => "field-token" });
+  const transport = new OpenAIWebRtcTransport({
+    createPeer: () => peer,
+    getUserMedia: vi.fn().mockResolvedValue(fakeStream().stream),
+    createAudio: audio,
+    fetch,
+    getAccessToken: () => "field-token",
+  });
 
   await transport.connect(config);
 

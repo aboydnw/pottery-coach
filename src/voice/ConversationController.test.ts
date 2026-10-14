@@ -6,8 +6,12 @@ import type { RealtimeSessionConfig } from "./types";
 import type { CueCandidate } from "../coaching/types";
 
 const config: RealtimeSessionConfig = {
-  provider: "mock", model: "mock-v1", voice: "local", language: "en",
-  instructionsRevision: "instructions-v1", toolsRevision: "tools-v1",
+  provider: "mock",
+  model: "mock-v1",
+  voice: "local",
+  language: "en",
+  instructionsRevision: "instructions-v1",
+  toolsRevision: "tools-v1",
 };
 
 afterEach(() => vi.useRealTimers());
@@ -22,15 +26,20 @@ it("transitions deterministically through connect, pause, resume, and close", as
   expect(controller.getState()).toBe("idle");
   await controller.connect(config);
   expect(controller.getState()).toBe("connected");
-  await controller.pause(); expect(controller.getState()).toBe("paused");
-  await controller.resume(); expect(controller.getState()).toBe("connected");
-  await controller.close(); expect(controller.getState()).toBe("closed");
+  await controller.pause();
+  expect(controller.getState()).toBe("paused");
+  await controller.resume();
+  expect(controller.getState()).toBe("connected");
+  await controller.close();
+  expect(controller.getState()).toBe("closed");
 });
 
 it("does not restore stale readings when reconnecting a fresh session", async () => {
   const transports: MockRealtimeTransport[] = [];
   const controller = new ConversationController(() => {
-    const transport = new MockRealtimeTransport(); transports.push(transport); return transport;
+    const transport = new MockRealtimeTransport();
+    transports.push(transport);
+    return transport;
   });
   controller.setCompactContext({ goalId: "goal-1", phase: "pulling", policyRevision: 2 });
   controller.setEphemeralReadingId("reading-stale");
@@ -43,8 +52,17 @@ it("does not restore stale readings when reconnecting a fresh session", async ()
 
 it("disables proactive cloud speech and audits a claim violation", () => {
   const controller = new ConversationController(() => new MockRealtimeTransport());
-  const cue: CueCandidate = { policyId: "height", createdAtMs: 0, expiresAtMs: 1_000, evidenceIds: ["r1"], facts: { heightMm: 120 }, priority: 2 };
-  const result = controller.validateFinalClaim("It is 999 mm tall", cue, [{ evidenceId: "r1", heightMm: 120, confidence: 0.9, freshnessMs: 100 }]);
+  const cue: CueCandidate = {
+    policyId: "height",
+    createdAtMs: 0,
+    expiresAtMs: 1_000,
+    evidenceIds: ["r1"],
+    facts: { heightMm: 120 },
+    priority: 2,
+  };
+  const result = controller.validateFinalClaim("It is 999 mm tall", cue, [
+    { evidenceId: "r1", heightMm: 120, confidence: 0.9, freshnessMs: 100 },
+  ]);
   expect(result.valid).toBe(false);
   expect(controller.isProactiveCloudSpeechEnabled()).toBe(false);
   expect(controller.getClaimAudit()).toHaveLength(1);
@@ -54,7 +72,9 @@ it("does not reconnect after close cancels a pending retry", async () => {
   vi.useFakeTimers();
   const transports: MockRealtimeTransport[] = [];
   const controller = new ConversationController(() => {
-    const transport = new MockRealtimeTransport(); transports.push(transport); return transport;
+    const transport = new MockRealtimeTransport();
+    transports.push(transport);
+    return transport;
   });
   await controller.connect(config);
   transports[0]!.emit({ type: "closed", reason: "network" });
@@ -67,7 +87,9 @@ it("does not reconnect after close cancels a pending retry", async () => {
 it("treats provider error events as non-fatal", async () => {
   const transports: MockRealtimeTransport[] = [];
   const controller = new ConversationController(() => {
-    const transport = new MockRealtimeTransport(); transports.push(transport); return transport;
+    const transport = new MockRealtimeTransport();
+    transports.push(transport);
+    return transport;
   });
   await controller.connect(config);
   transports[0]!.emit({ type: "error", code: "response_cancel_not_active", message: "nothing to cancel" });
@@ -79,7 +101,9 @@ it("closes the previous transport before reconnecting and resets the retry budge
   vi.useFakeTimers();
   const transports: MockRealtimeTransport[] = [];
   const controller = new ConversationController(() => {
-    const transport = new MockRealtimeTransport(); transports.push(transport); return transport;
+    const transport = new MockRealtimeTransport();
+    transports.push(transport);
+    return transport;
   });
   await controller.connect(config);
   for (let drop = 0; drop < 6; drop += 1) {

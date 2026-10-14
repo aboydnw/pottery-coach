@@ -11,7 +11,9 @@ export type BackgroundModel = {
 export function buildBackground(frames: LabImage[]): BackgroundModel {
   if (frames.length < 3) throw new Error("At least three background frames are required");
   const { width, height } = frames[0]!;
-  if (frames.some((frame) => frame.width !== width || frame.height !== height || frame.lab.length !== width * height * 3)) {
+  if (
+    frames.some((frame) => frame.width !== width || frame.height !== height || frame.lab.length !== width * height * 3)
+  ) {
     throw new Error("Background frames must have matching dimensions");
   }
   const medianLab = new Float32Array(width * height * 3);
@@ -22,7 +24,8 @@ export function buildBackground(frames: LabImage[]): BackgroundModel {
     values.sort();
     const median = values[Math.floor(values.length / 2)]!;
     medianLab[index] = median;
-    for (let frame = 0; frame < frames.length; frame += 1) deviations[index * frames.length + frame] = Math.abs(values[frame]! - median);
+    for (let frame = 0; frame < frames.length; frame += 1)
+      deviations[index * frames.length + frame] = Math.abs(values[frame]! - median);
   }
   deviations.sort();
   const mad = deviations[Math.floor(deviations.length / 2)] ?? 0;

@@ -23,10 +23,17 @@ test("local databases hold measurements but no raw media after a session", async
           request.addEventListener("success", () => resolve(request.result));
           request.addEventListener("error", () => reject(request.error));
         });
-        const isBinary = (value: unknown): boolean => value instanceof Blob || value instanceof ArrayBuffer || ArrayBuffer.isView(value)
-          || (typeof value === "object" && value !== null && Object.values(value).some(isBinary));
-        summary.push({ store, rows: rows.length, binary: rows.filter(isBinary).length,
-          largestRowBytes: Math.max(0, ...rows.map((row) => JSON.stringify(row).length)) });
+        const isBinary = (value: unknown): boolean =>
+          value instanceof Blob ||
+          value instanceof ArrayBuffer ||
+          ArrayBuffer.isView(value) ||
+          (typeof value === "object" && value !== null && Object.values(value).some(isBinary));
+        summary.push({
+          store,
+          rows: rows.length,
+          binary: rows.filter(isBinary).length,
+          largestRowBytes: Math.max(0, ...rows.map((row) => JSON.stringify(row).length)),
+        });
       }
       database.close();
     }

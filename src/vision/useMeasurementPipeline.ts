@@ -49,7 +49,8 @@ export function useMeasurementPipeline(callbacks: MeasurementCallbacks = {}) {
     const interval = window.setInterval(() => {
       const next = diagnostics.snapshot();
       setSample(next);
-      if (pipelineRef.current) adaptive.update({ processingMsP95: next.workerProcessingMsP95, frameAgeMsP95: next.frameAgeMsP95 });
+      if (pipelineRef.current)
+        adaptive.update({ processingMsP95: next.workerProcessingMsP95, frameAgeMsP95: next.frameAgeMsP95 });
     }, 1000);
     return () => {
       window.clearInterval(interval);
@@ -79,17 +80,28 @@ export function useMeasurementPipeline(callbacks: MeasurementCallbacks = {}) {
         latest.current.onWobble?.(message.reading);
       }
     });
-    const sink = new BoundedWorkerSink(worker, (diagnostic) => diagnostics.record("processed", performance.now(), diagnostic.frameId));
+    const sink = new BoundedWorkerSink(worker, (diagnostic) =>
+      diagnostics.record("processed", performance.now(), diagnostic.frameId),
+    );
     const source = new CanvasFrameSource();
-    source.start(video, {
-      targetFps: processingHz,
-      roi: { x: 0, y: 0, width: settings.width ?? video.videoWidth ?? 640, height: settings.height ?? video.videoHeight ?? 360 },
-    }, (frame) => {
-      diagnostics.record("acquired", performance.now(), frame.frameId);
-      const result = sink.submit(frame);
-      if (result === "busy") diagnostics.recordDropped();
-      return result;
-    });
+    source.start(
+      video,
+      {
+        targetFps: processingHz,
+        roi: {
+          x: 0,
+          y: 0,
+          width: settings.width ?? video.videoWidth ?? 640,
+          height: settings.height ?? video.videoHeight ?? 360,
+        },
+      },
+      (frame) => {
+        diagnostics.record("acquired", performance.now(), frame.frameId);
+        const result = sink.submit(frame);
+        if (result === "busy") diagnostics.recordDropped();
+        return result;
+      },
+    );
     const pipeline: Pipeline = { worker, sink, source, video, previewHandle: null };
     if (typeof video.requestVideoFrameCallback === "function") {
       const tick: VideoFrameRequestCallback = (now) => {

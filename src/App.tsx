@@ -12,8 +12,8 @@ export function App() {
           <p className="eyebrow">Pottery Coach</p>
           <h1 id="unsupported-title">This browser cannot open a camera.</h1>
           <p>
-            Use a current version of Safari or Chrome on a device with a camera,
-            and open Pottery Coach over a secure HTTPS connection.
+            Use a current version of Safari or Chrome on a device with a camera, and open Pottery Coach over a secure
+            HTTPS connection.
           </p>
         </section>
       </main>
@@ -22,7 +22,9 @@ export function App() {
 
   return (
     <main className="app-shell">
-      <ErrorBoundary><SessionFlow /></ErrorBoundary>
+      <ErrorBoundary>
+        <SessionFlow />
+      </ErrorBoundary>
     </main>
   );
 }

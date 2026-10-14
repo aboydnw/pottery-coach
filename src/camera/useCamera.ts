@@ -69,7 +69,8 @@ export function useCamera(videoRef: RefObject<HTMLVideoElement | null>, callback
 
 function cameraErrorMessage(error: unknown): string {
   if (error instanceof DOMException) {
-    if (error.name === "NotAllowedError") return "Camera access was denied. Allow camera access in browser settings and retry.";
+    if (error.name === "NotAllowedError")
+      return "Camera access was denied. Allow camera access in browser settings and retry.";
     if (error.name === "NotFoundError") return "No camera was found on this device.";
     if (error.name === "NotReadableError") return "The camera is already in use by another app.";
   }
@@ -77,7 +78,8 @@ function cameraErrorMessage(error: unknown): string {
 }
 
 async function requestWakeLock(): Promise<WakeLockSentinelLike | null> {
-  const wakeLock = (navigator as Navigator & { wakeLock?: { request(type: "screen"): Promise<WakeLockSentinelLike> } }).wakeLock;
+  const wakeLock = (navigator as Navigator & { wakeLock?: { request(type: "screen"): Promise<WakeLockSentinelLike> } })
+    .wakeLock;
   if (!wakeLock) return null;
   try {
     return await wakeLock.request("screen");

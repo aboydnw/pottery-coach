@@ -18,7 +18,10 @@ export class AdaptiveRateController {
     const recovered = sample.frameAgeMsP95 < 250 && sample.processingMsP95 < 60;
     if (overloaded) this.index = Math.min(this.rates.length - 1, this.index + 1);
     else if (recovered) this.index = Math.max(0, this.index - 1);
-    const mode: AdaptiveMode = { processingHz: this.rates[this.index]!, reason: overloaded ? "latency-pressure" : recovered ? "recovered" : "stable" };
+    const mode: AdaptiveMode = {
+      processingHz: this.rates[this.index]!,
+      reason: overloaded ? "latency-pressure" : recovered ? "recovered" : "stable",
+    };
     if (previous !== this.index) this.onModeChange?.(mode);
     return mode;
   }

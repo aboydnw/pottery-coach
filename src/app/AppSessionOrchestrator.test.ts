@@ -4,7 +4,15 @@ import { createSessionState, restoreSessionShell, transition, type SessionState 
 describe("session lifecycle", () => {
   it("follows the explicit happy path and supports review deletion", () => {
     let state = createSessionState();
-    for (const event of ["ACCEPT_NOTICE", "CAMERA_READY", "CALIBRATED", "AUDIO_DECIDED", "GOAL_SET", "START_LIVE", "END_SESSION"] as const)
+    for (const event of [
+      "ACCEPT_NOTICE",
+      "CAMERA_READY",
+      "CALIBRATED",
+      "AUDIO_DECIDED",
+      "GOAL_SET",
+      "START_LIVE",
+      "END_SESSION",
+    ] as const)
       state = transition(state, { type: event });
     expect(state.step).toBe("review");
     expect(transition(state, { type: "DELETE_SESSION" }).step).toBe("notice");
@@ -35,7 +43,9 @@ describe("session lifecycle", () => {
   });
 
   it("recovers only a non-sensitive resumable shell after reload", () => {
-    const restored = restoreSessionShell(JSON.stringify({ step: "goal", modes: { voice: false }, secret: "must-ignore" }));
+    const restored = restoreSessionShell(
+      JSON.stringify({ step: "goal", modes: { voice: false }, secret: "must-ignore" }),
+    );
     expect(restored.step).toBe("camera");
     expect(restored.modes.voice).toBe(false);
     expect(JSON.stringify(restored)).not.toContain("must-ignore");

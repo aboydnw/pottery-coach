@@ -2,6 +2,7 @@
   "name": "pottery-coach",
   "private": true,
   "version": "0.0.0",
+  "license": "MIT",
   "type": "module",
   "packageManager": "pnpm@10.34.6",
   "engines": {
@@ -12,6 +13,9 @@
     "dev": "vite",
     "build": "tsc --noEmit -p tsconfig.json && vite build",
     "calibration:board": "tsx scripts/generate-calibration-board.ts",
+    "deploy": "pnpm build && wrangler deploy",
+    "deploy:dry-run": "pnpm build && wrangler deploy --dry-run",
+    "preview:worker": "pnpm build && wrangler dev",
     "benchmark:camera": "tsx benchmarks/camera/run.ts",
     "benchmark:tags": "tsx benchmarks/tags/run.ts",
     "benchmark:dimensions": "tsx benchmarks/dimensions/run.ts",
@@ -24,10 +28,12 @@
     "benchmark:verify-manifests": "node scripts/validate-field-manifests.mjs && node scripts/verify-plan-artifacts.mjs",
     "research:summarize-field": "tsx scripts/summarize-field.ts",
     "lint": "oxlint --deny-warnings",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
     "e2e": "playwright test",
     "test": "vitest run",
-    "typecheck": "tsc --noEmit --pretty false -p tsconfig.json && tsc --noEmit --pretty false -p tsconfig.node.json",
-    "verify": "pnpm lint && pnpm test && pnpm typecheck && pnpm build && pnpm e2e && pnpm benchmark:verify-manifests"
+    "typecheck": "wrangler types && tsc --noEmit --pretty false -p tsconfig.json && tsc --noEmit --pretty false -p tsconfig.node.json && tsc --noEmit --pretty false -p tsconfig.worker.json",
+    "verify": "pnpm lint && pnpm format:check && pnpm test && pnpm typecheck && pnpm build && pnpm e2e && pnpm benchmark:verify-manifests"
   },
   "dependencies": {
     "dexie": "~4.2.1",
@@ -48,10 +54,12 @@
     "fast-check": "~4.3.0",
     "jsdom": "~27.0.1",
     "oxlint": "~1.88.0",
+    "prettier": "~3.9.10",
     "tsx": "~4.20.6",
     "typescript": "~7.0.2",
     "vite": "~7.1.3",
     "vite-plugin-pwa": "~1.1.0",
-    "vitest": "~5.0.3"
+    "vitest": "~5.0.3",
+    "wrangler": "~4.151.0"
   }
 }

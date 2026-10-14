@@ -1,16 +1,6 @@
-export type CameraSettings = Pick<
-  MediaTrackSettings,
-  "deviceId" | "facingMode" | "width" | "height" | "frameRate"
->;
+export type CameraSettings = Pick<MediaTrackSettings, "deviceId" | "facingMode" | "width" | "height" | "frameRate">;
 
-export type CameraEventType =
-  | "started"
-  | "settings"
-  | "muted"
-  | "unmuted"
-  | "ended"
-  | "interrupted"
-  | "error";
+export type CameraEventType = "started" | "settings" | "muted" | "unmuted" | "ended" | "interrupted" | "error";
 
 export type CameraEvent = {
   type: CameraEventType;

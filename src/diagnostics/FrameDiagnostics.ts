@@ -74,7 +74,10 @@ export class FrameDiagnostics {
       frameAgeMsP50: percentile(frameAges, 0.5),
       frameAgeMsP95: percentile(frameAges, 0.95),
       droppedFrames: this.droppedFrames,
-      workerProcessingMsP95: percentile(this.processingTimes.map((sample) => sample.value), 0.95),
+      workerProcessingMsP95: percentile(
+        this.processingTimes.map((sample) => sample.value),
+        0.95,
+      ),
       memoryBytes: readMemoryBytes(),
       batteryLevel: this.batteryLevel,
       thermalSignal: this.osThermalWarning
@@ -104,16 +107,20 @@ export class FrameDiagnostics {
   private trim(now: number): void {
     const cutoff = now - this.windowMs;
     const inWindow = (record: { timestampMs: number }) => record.timestampMs >= cutoff && record.timestampMs <= now;
-    for (const kind of Object.keys(this.records) as DiagnosticKind[]) this.records[kind] = this.records[kind].filter(inWindow);
+    for (const kind of Object.keys(this.records) as DiagnosticKind[])
+      this.records[kind] = this.records[kind].filter(inWindow);
     this.frameAges = this.frameAges.filter(inWindow);
     this.processingTimes = this.processingTimes.filter(inWindow);
-    for (const [frameId, acquiredAt] of this.acquiredAt) if (acquiredAt < cutoff - 5_000) this.acquiredAt.delete(frameId);
+    for (const [frameId, acquiredAt] of this.acquiredAt)
+      if (acquiredAt < cutoff - 5_000) this.acquiredAt.delete(frameId);
   }
 }
 
 function readMemoryBytes(): number | null {
-  const memory = (performance as Performance & {
-    memory?: { usedJSHeapSize?: number };
-  }).memory;
+  const memory = (
+    performance as Performance & {
+      memory?: { usedJSHeapSize?: number };
+    }
+  ).memory;
   return typeof memory?.usedJSHeapSize === "number" ? memory.usedJSHeapSize : null;
 }

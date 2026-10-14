@@ -9,12 +9,7 @@ type Props = {
   onRecalibrate?(): void;
 };
 
-const HARD_FAILURES = new Set([
-  "ROI_CLIPPED",
-  "BOARD_REVISION",
-  "ESTIMATED_ERROR",
-  "SCALE_VARIATION",
-]);
+const HARD_FAILURES = new Set(["ROI_CLIPPED", "BOARD_REVISION", "ESTIMATED_ERROR", "SCALE_VARIATION"]);
 
 export function CalibrationFlow({ result, boardMoved = false, onAccepted, onRecalibrate }: Props) {
   const [scaleConfirmed, setScaleConfirmed] = useState(false);
@@ -27,7 +22,9 @@ export function CalibrationFlow({ result, boardMoved = false, onAccepted, onReca
       <section aria-labelledby="calibration-title">
         <h2 id="calibration-title">Calibration</h2>
         <p role="status">The board moved. Measurements are stale until you recalibrate.</p>
-        <button type="button" onClick={onRecalibrate}>Recalibrate</button>
+        <button type="button" onClick={onRecalibrate}>
+          Recalibrate
+        </button>
       </section>
     );
   }
@@ -45,11 +42,21 @@ export function CalibrationFlow({ result, boardMoved = false, onAccepted, onReca
         <fieldset>
           <legend>Manual geometry review</legend>
           <label>
-            <input required type="checkbox" checked={baselineConfirmed} onChange={(event) => setBaselineConfirmed(event.target.checked)} />
+            <input
+              required
+              type="checkbox"
+              checked={baselineConfirmed}
+              onChange={(event) => setBaselineConfirmed(event.target.checked)}
+            />
             Wheel baseline matches the overlay
           </label>
           <label>
-            <input required type="checkbox" checked={axisConfirmed} onChange={(event) => setAxisConfirmed(event.target.checked)} />
+            <input
+              required
+              type="checkbox"
+              checked={axisConfirmed}
+              onChange={(event) => setAxisConfirmed(event.target.checked)}
+            />
             Vertical axis matches the overlay
           </label>
         </fieldset>
@@ -57,7 +64,9 @@ export function CalibrationFlow({ result, boardMoved = false, onAccepted, onReca
 
       {result.reasons.length > 0 && (
         <ul aria-label="Calibration problems">
-          {result.reasons.map((reason) => <li key={reason}>{reasonLabel(reason)}</li>)}
+          {result.reasons.map((reason) => (
+            <li key={reason}>{reasonLabel(reason)}</li>
+          ))}
         </ul>
       )}
 
@@ -65,11 +74,13 @@ export function CalibrationFlow({ result, boardMoved = false, onAccepted, onReca
         <button
           type="button"
           disabled={!scaleConfirmed || (result.status === "manual-review" && (!baselineConfirmed || !axisConfirmed))}
-          onClick={() => onAccepted({
-            ...result,
-            status: "accepted",
-            provenance: result.status === "manual-review" ? "manual-assisted" : result.provenance,
-          })}
+          onClick={() =>
+            onAccepted({
+              ...result,
+              status: "accepted",
+              provenance: result.status === "manual-review" ? "manual-assisted" : result.provenance,
+            })
+          }
         >
           Use calibration
         </button>

@@ -89,14 +89,15 @@ describe("CameraController", () => {
 
     document.dispatchEvent(new Event("visibilitychange"));
 
-    expect(listener).toHaveBeenCalledWith(
-      expect.objectContaining({ type: "interrupted", reason: "document-hidden" }),
-    );
+    expect(listener).toHaveBeenCalledWith(expect.objectContaining({ type: "interrupted", reason: "document-hidden" }));
   });
 
   it("reports a camera-ended event and maps revoked permission", async () => {
-    const controller = new CameraController(); const listener = vi.fn(); controller.subscribe(listener);
-    await controller.start(); track.dispatchEvent(new Event("ended"));
+    const controller = new CameraController();
+    const listener = vi.fn();
+    controller.subscribe(listener);
+    await controller.start();
+    track.dispatchEvent(new Event("ended"));
     expect(listener).toHaveBeenCalledWith(expect.objectContaining({ type: "ended", reason: "track-ended" }));
     getUserMedia.mockRejectedValueOnce(new DOMException("revoked", "NotAllowedError"));
     await expect(controller.start()).rejects.toThrow();
@@ -106,7 +107,12 @@ describe("CameraController", () => {
   it("stops a stream that arrives after a newer start or stop", async () => {
     const lateTrack = new FakeTrack();
     let resolveFirst: (stream: unknown) => void = () => undefined;
-    getUserMedia.mockImplementationOnce(() => new Promise((resolve) => { resolveFirst = resolve; }));
+    getUserMedia.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          resolveFirst = resolve;
+        }),
+    );
     const controller = new CameraController();
 
     const first = controller.start();

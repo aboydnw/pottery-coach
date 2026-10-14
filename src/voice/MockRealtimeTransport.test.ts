@@ -6,7 +6,14 @@ it("emits deterministic events, supports unsubscribe, and closes idempotently", 
   const transport = new MockRealtimeTransport();
   const listener = vi.fn();
   const unsubscribe = transport.onEvent(listener);
-  await transport.connect({ provider: "mock", model: "mock", voice: "local", language: "en", instructionsRevision: "i1", toolsRevision: "t1" });
+  await transport.connect({
+    provider: "mock",
+    model: "mock",
+    voice: "local",
+    language: "en",
+    instructionsRevision: "i1",
+    toolsRevision: "t1",
+  });
   expect(listener).toHaveBeenCalledWith({ type: "connected" });
   unsubscribe();
   transport.emit({ type: "speech-started", timestampMs: 10 });

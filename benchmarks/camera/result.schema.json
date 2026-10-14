@@ -3,7 +3,20 @@
   "$id": "https://pottery-coach.local/schemas/camera-benchmark-result.json",
   "type": "object",
   "additionalProperties": false,
-  "required": ["benchmarkVersion", "commit", "fixtureId", "startedAt", "device", "os", "browser", "configHash", "metrics", "exclusions", "unmeasurableCount", "artifactChecksums"],
+  "required": [
+    "benchmarkVersion",
+    "commit",
+    "fixtureId",
+    "startedAt",
+    "device",
+    "os",
+    "browser",
+    "configHash",
+    "metrics",
+    "exclusions",
+    "unmeasurableCount",
+    "artifactChecksums"
+  ],
   "properties": {
     "benchmarkVersion": { "const": "camera-v1" },
     "commit": { "type": "string", "minLength": 1 },

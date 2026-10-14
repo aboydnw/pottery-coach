@@ -14,8 +14,11 @@ export class SessionRecorder {
   readonly dropped = { diagnostic: 0, evidence: 0 };
   storageAvailable = true;
 
-  constructor(private repository: SessionRepository, private sessionId: string,
-    private options: { maxQueue?: number; autoFlush?: boolean; onStorageUnavailable?: (reason: string) => void } = {}) {}
+  constructor(
+    private repository: SessionRepository,
+    private sessionId: string,
+    private options: { maxQueue?: number; autoFlush?: boolean; onStorageUnavailable?: (reason: string) => void } = {},
+  ) {}
 
   recordReading(value: RecordedReading) {
     if (value.sessionId !== this.sessionId || value.timestampMs - this.lastReadingAt < 500) return;
@@ -66,7 +69,8 @@ export class SessionRecorder {
     } catch (error) {
       this.queue = [];
       this.storageAvailable = false;
-      const reason = error instanceof DOMException && error.name === "QuotaExceededError" ? "quota-exceeded" : "storage-unavailable";
+      const reason =
+        error instanceof DOMException && error.name === "QuotaExceededError" ? "quota-exceeded" : "storage-unavailable";
       this.options.onStorageUnavailable?.(reason);
     }
   }

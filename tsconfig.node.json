@@ -3,5 +3,12 @@
   "compilerOptions": {
     "types": ["node"]
   },
-  "include": ["api", "benchmarks", "scripts", "tests", "vite.config.ts", "playwright.config.ts", "playwright.staging.config.ts"]
+  "include": [
+    "benchmarks",
+    "scripts",
+    "tests",
+    "vite.config.ts",
+    "playwright.config.ts",
+    "playwright.staging.config.ts"
+  ]
 }

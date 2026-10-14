@@ -30,16 +30,16 @@ try {
   await page.waitForTimeout(durationSeconds * 1000);
   const diagnostics = await page.evaluate(() => {
     const entries = [...document.querySelectorAll(".diagnostics dl div")];
-    return Object.fromEntries(entries.map((entry) => {
-      const key = entry.querySelector("dt")?.textContent ?? "unknown";
-      const value = Number.parseFloat(entry.querySelector("dd")?.textContent ?? "0");
-      return [key, Number.isFinite(value) ? value : null];
-    }));
+    return Object.fromEntries(
+      entries.map((entry) => {
+        const key = entry.querySelector("dt")?.textContent ?? "unknown";
+        const value = Number.parseFloat(entry.querySelector("dd")?.textContent ?? "0");
+        return [key, Number.isFinite(value) ? value : null];
+      }),
+    );
   });
   const version = browser.version();
-  const configHash = createHash("sha256")
-    .update(JSON.stringify({ durationSeconds, mode }))
-    .digest("hex");
+  const configHash = createHash("sha256").update(JSON.stringify({ durationSeconds, mode })).digest("hex");
   const result = {
     benchmarkVersion: "camera-v1",
     commit: "git-metadata-unavailable",
@@ -77,7 +77,20 @@ function readArgument(name: string): string | undefined {
 }
 
 function validateResult(result: Record<string, unknown>): void {
-  const required = ["benchmarkVersion", "commit", "fixtureId", "startedAt", "device", "os", "browser", "configHash", "metrics", "exclusions", "unmeasurableCount", "artifactChecksums"];
+  const required = [
+    "benchmarkVersion",
+    "commit",
+    "fixtureId",
+    "startedAt",
+    "device",
+    "os",
+    "browser",
+    "configHash",
+    "metrics",
+    "exclusions",
+    "unmeasurableCount",
+    "artifactChecksums",
+  ];
   for (const key of required) if (!(key in result)) throw new Error(`result missing ${key}`);
   if (result.benchmarkVersion !== "camera-v1") throw new Error("invalid benchmark version");
 }

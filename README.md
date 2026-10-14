@@ -17,16 +17,21 @@ Open the printed URL. Camera access needs HTTPS except on `localhost`, and the a
 
 To calibrate for real, print [`public/calibration/board-v1.svg`](public/calibration/board-v1.svg) at 100% scale and check that the reference line measures 100 mm.
 
+## Deployment
+
+The app runs on Cloudflare Workers at **https://potterycoach.anthonynboyd.com**, and every push to `main` deploys through Workers Builds. [`deploy/config.md`](deploy/config.md) covers setup, secrets and rollback. `pnpm deploy:dry-run` validates the bundle locally.
+
 ## Checks
 
-| Command | What it does |
-|---|---|
-| `pnpm lint` | oxlint (TypeScript, React hooks, accessibility, Vitest rules) |
-| `pnpm typecheck` | Type-checks the app (`tsconfig.json`) and the Node code in `api/`, `benchmarks/`, `scripts/` and `tests/` (`tsconfig.node.json`) |
-| `pnpm test` | Vitest unit and component tests |
-| `pnpm e2e` | Playwright journeys in Chromium (fake camera), mobile Chromium and WebKit. One project feeds a rendered calibration board to the real tag detector |
-| `E2E_PREVIEW=1 pnpm e2e` | The same journeys against a production build |
-| `pnpm verify` | Everything above plus the build and evidence-manifest checks |
+| Command                  | What it does                                                                                                                                       |
+| ------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `pnpm lint`              | oxlint (TypeScript, React hooks, accessibility, Vitest rules)                                                                                      |
+| `pnpm format`            | Formats with Prettier; CI runs `pnpm format:check`                                                                                                 |
+| `pnpm typecheck`         | Type-checks the app (`tsconfig.json`) and the Node code in `api/`, `benchmarks/`, `scripts/` and `tests/` (`tsconfig.node.json`)                   |
+| `pnpm test`              | Vitest unit and component tests                                                                                                                    |
+| `pnpm e2e`               | Playwright journeys in Chromium (fake camera), mobile Chromium and WebKit. One project feeds a rendered calibration board to the real tag detector |
+| `E2E_PREVIEW=1 pnpm e2e` | The same journeys against a production build                                                                                                       |
+| `pnpm verify`            | Everything above plus the build and evidence-manifest checks                                                                                       |
 
 After changing `src/calibration/boardV1.ts`, regenerate the printable board with `pnpm calibration:board`. A unit test fails if the SVG and the definition drift apart.
 
@@ -43,7 +48,7 @@ camera ──▶ CanvasFrameSource ──▶ measurement worker ──▶ stable
 - `src/camera/`, `src/vision/`, `src/measurement/` and `src/wobble/` hold the camera, the worker pipeline, dimension extraction and oscillation detection.
 - `src/calibration/` holds the board definition, the AprilTag worker (vendored WebAssembly in `public/vendor/apriltag`) and the homography.
 - `src/session/`, `src/privacy/` and `src/review/` hold local storage, retention and deletion, and the post-session review.
-- `api/realtime/session.ts` exchanges a WebRTC offer with the voice provider. It returns 503 until its secrets are configured (see [`deploy/config.md`](deploy/config.md)).
+- `worker/` is the Cloudflare Worker. It serves the built app and exchanges a WebRTC offer with the voice provider at `/api/realtime/session`, which returns 503 until its secrets are configured.
 
 ### Built but not yet wired into the app
 
@@ -67,8 +72,8 @@ Claims in the docs carry one of four labels:
 - **Engineering inference:** a design judgement that is still waiting on a gate.
 - **Domain hypothesis:** needs review by a pottery instructor.
 
-## Contributing
+## Contributing and license
 
-See [CONTRIBUTING.md](CONTRIBUTING.md).
+See [CONTRIBUTING.md](CONTRIBUTING.md). Pottery Coach is released under the [MIT License](LICENSE).
 
 The AprilTag detector and tag patterns come from [AprilRobotics](https://github.com/AprilRobotics/apriltag) via [apriltag-js](https://github.com/AliAlimohamad/apriltag-js), under the BSD-2-Clause license (see [`third_party/apriltag`](third_party/apriltag)).

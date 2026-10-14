@@ -23,9 +23,11 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm lint
+      - run: pnpm format:check
       - run: pnpm test
       - run: pnpm typecheck
       - run: pnpm build
+      - run: pnpm exec wrangler deploy --dry-run
       - run: pnpm benchmark:verify-manifests
       - run: pnpm exec playwright install --with-deps chromium webkit
       - run: pnpm e2e

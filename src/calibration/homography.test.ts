@@ -6,7 +6,10 @@ import type { CalibrationBoard, CalibrationFrame, PointCorrespondence } from "./
 const board: CalibrationBoard = {
   revision: "board-v1",
   supportedRevision: "board-v1",
-  wheelBaseline: [{ x: 0, y: 0 }, { x: 100, y: 0 }],
+  wheelBaseline: [
+    { x: 0, y: 0 },
+    { x: 100, y: 0 },
+  ],
   wheelCenterlineXmm: 50,
   markerPlaneOffsetToleranceMm: 30,
 };

@@ -9,14 +9,15 @@ type DetectorResponse = {
 export class WasmTagDetector implements TagDetector {
   private readonly worker: Worker;
   private nextRequestId = 1;
-  private pending = new Map<number, {
-    resolve(value: TagDetection[]): void;
-    reject(reason: Error): void;
-  }>();
+  private pending = new Map<
+    number,
+    {
+      resolve(value: TagDetection[]): void;
+      reject(reason: Error): void;
+    }
+  >();
 
-  constructor(
-    workerFactory: () => Worker = () => new Worker(new URL("./tag-detector.worker.ts", import.meta.url)),
-  ) {
+  constructor(workerFactory: () => Worker = () => new Worker(new URL("./tag-detector.worker.ts", import.meta.url))) {
     this.worker = workerFactory();
     this.worker.addEventListener("message", this.onMessage);
     this.worker.addEventListener("error", this.onError);

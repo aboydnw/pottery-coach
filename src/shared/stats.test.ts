@@ -19,5 +19,8 @@ it("returns zero for the mean of nothing", () => {
 });
 
 it("groups items in first-seen key order", () => {
-  expect([...groupBy(["a1", "b1", "a2"], (value) => value[0]).entries()]).toEqual([["a", ["a1", "a2"]], ["b", ["b1"]]]);
+  expect([...groupBy(["a1", "b1", "a2"], (value) => value[0]).entries()]).toEqual([
+    ["a", ["a1", "a2"]],
+    ["b", ["b1"]],
+  ]);
 });

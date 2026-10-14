@@ -5,7 +5,12 @@ import { extractDimensions } from "../measurement/extractProfile";
 import { scoreConfidence } from "../measurement/confidence";
 import { TemporalFilter } from "../measurement/temporalFilter";
 import type { CalibrationResult } from "../calibration/types";
-import type { DiagnosticResponse, FrameRequest, MeasurementWorkerEvent, MeasurementWorkerRequest } from "./workerProtocol";
+import type {
+  DiagnosticResponse,
+  FrameRequest,
+  MeasurementWorkerEvent,
+  MeasurementWorkerRequest,
+} from "./workerProtocol";
 import { TemporalContourBuffer } from "../wobble/TemporalContourBuffer";
 import { contourSampleFromReading } from "../wobble/fromReading";
 import { estimatePeriod } from "../wobble/period";
@@ -96,7 +101,9 @@ function processFrame(request: FrameRequest, active: CalibrationResult): void {
   post({ type: "reading", instantaneous, stable: temporalFilter.push(instantaneous) });
   contourBuffer.push(contourSampleFromReading(instantaneous));
   const window = contourBuffer.window(12_000);
-  const periodSamples = window.flatMap((sample) => sample.rimCenterMm === null ? [] : [{ timestampMs: sample.timestampMs, value: sample.rimCenterMm }]);
+  const periodSamples = window.flatMap((sample) =>
+    sample.rimCenterMm === null ? [] : [{ timestampMs: sample.timestampMs, value: sample.rimCenterMm }],
+  );
   const period = estimatePeriod(periodSamples, { minMs: 300, maxMs: 3000 });
   if (period && periodSamples.length >= 20) {
     const fit = fitOscillation(periodSamples, period.periodMs);

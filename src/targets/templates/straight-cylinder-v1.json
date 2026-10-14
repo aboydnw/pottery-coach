@@ -412,9 +412,7 @@
   "shrinkageFraction": null,
   "source": "curated-template",
   "confidence": 0.9,
-  "exclusions": [
-    "Instructor milestone labels pending final domain review."
-  ],
+  "exclusions": ["Instructor milestone labels pending final domain review."],
   "provenance": "Generated from documented linear function; geometry reviewed for prototype use.",
   "generator": {
     "kind": "linear",

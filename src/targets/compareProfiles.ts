@@ -23,11 +23,17 @@ export function compareProfiles(reading: StableDimensionReading, target: TargetP
       error: currentRadius === null ? null : currentRadius - targetRadius,
     };
   });
-  const valid = rows.filter((row): row is typeof row & { currentRadius: number; error: number } => row.error !== null && row.currentRadius !== null);
+  const valid = rows.filter(
+    (row): row is typeof row & { currentRadius: number; error: number } =>
+      row.error !== null && row.currentRadius !== null,
+  );
   const coverage = valid.length / rows.length;
   const regions: RegionalProfileError[] = REGION_RANGES.map(({ region, start, end }) => {
     const candidates = rows.filter((row) => row.ratio >= start && row.ratio < end);
-    const available = candidates.filter((row): row is typeof row & { currentRadius: number; error: number } => row.error !== null && row.currentRadius !== null);
+    const available = candidates.filter(
+      (row): row is typeof row & { currentRadius: number; error: number } =>
+        row.error !== null && row.currentRadius !== null,
+    );
     const regionalCoverage = available.length / candidates.length;
     const eligible = regionalCoverage >= 0.7;
     return {
@@ -35,7 +41,9 @@ export function compareProfiles(reading: StableDimensionReading, target: TargetP
       signedMedianRadiusErrorMm: eligible ? median(available.map((row) => row.error)) : null,
       meanAbsoluteRadiusErrorMm: eligible ? mean(available.map((row) => Math.abs(row.error))) : null,
       coverage: regionalCoverage,
-      confidence: eligible ? Math.min(reading.confidence.overall, target.confidence, mean(available.map((row) => row.confidence))) : 0,
+      confidence: eligible
+        ? Math.min(reading.confidence.overall, target.confidence, mean(available.map((row) => row.confidence)))
+        : 0,
     };
   });
   const intersection = valid.reduce((sum, row) => sum + Math.min(row.currentRadius, row.targetRadius), 0);
@@ -51,4 +59,3 @@ export function compareProfiles(reading: StableDimensionReading, target: TargetP
     confidence: reading.confidence,
   };
 }
-

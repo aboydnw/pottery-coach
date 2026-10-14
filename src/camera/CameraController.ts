@@ -16,9 +16,7 @@ export class CameraController {
   private listeningForVisibility = false;
   private generation = 0;
 
-  async start(
-    constraints: MediaStreamConstraints = DEFAULT_CONSTRAINTS,
-  ): Promise<CameraStartResult> {
+  async start(constraints: MediaStreamConstraints = DEFAULT_CONSTRAINTS): Promise<CameraStartResult> {
     this.stop();
     const generation = this.generation;
     this.listenForVisibility();
@@ -39,9 +37,7 @@ export class CameraController {
       const settings = this.pickSettings(track.getSettings());
       track.addEventListener("mute", () => this.emit({ type: "muted" }));
       track.addEventListener("unmute", () => this.emit({ type: "unmuted" }));
-      track.addEventListener("ended", () =>
-        this.emit({ type: "ended", reason: "track-ended" }),
-      );
+      track.addEventListener("ended", () => this.emit({ type: "ended", reason: "track-ended" }));
       this.emit({ type: "started", settings });
       this.emit({ type: "settings", settings });
       return { stream, settings };

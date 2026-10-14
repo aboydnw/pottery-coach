@@ -15,21 +15,24 @@ export async function writeBoardVideo(): Promise<void> {
   const browser = await chromium.launch();
   try {
     const page = await browser.newPage();
-    const rgba = await page.evaluate(async ({ markup, width, height }) => {
-      const image = new Image();
-      image.src = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(markup)}`;
-      await image.decode();
-      const canvas = document.createElement("canvas");
-      canvas.width = width;
-      canvas.height = height;
-      const context = canvas.getContext("2d")!;
-      context.fillStyle = "#b8b0a4";
-      context.fillRect(0, 0, width, height);
-      const boardWidth = 1000;
-      const boardHeight = boardWidth * (148 / 210);
-      context.drawImage(image, (width - boardWidth) / 2, (height - boardHeight) / 2, boardWidth, boardHeight);
-      return Array.from(context.getImageData(0, 0, width, height).data);
-    }, { markup: svg, width: WIDTH, height: HEIGHT });
+    const rgba = await page.evaluate(
+      async ({ markup, width, height }) => {
+        const image = new Image();
+        image.src = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(markup)}`;
+        await image.decode();
+        const canvas = document.createElement("canvas");
+        canvas.width = width;
+        canvas.height = height;
+        const context = canvas.getContext("2d")!;
+        context.fillStyle = "#b8b0a4";
+        context.fillRect(0, 0, width, height);
+        const boardWidth = 1000;
+        const boardHeight = boardWidth * (148 / 210);
+        context.drawImage(image, (width - boardWidth) / 2, (height - boardHeight) / 2, boardWidth, boardHeight);
+        return Array.from(context.getImageData(0, 0, width, height).data);
+      },
+      { markup: svg, width: WIDTH, height: HEIGHT },
+    );
     await mkdir(dirname(BOARD_VIDEO_PATH), { recursive: true });
     await writeFile(BOARD_VIDEO_PATH, toY4m(Uint8Array.from(rgba), WIDTH, HEIGHT));
   } finally {
@@ -51,7 +54,7 @@ function toY4m(rgba: Uint8Array, width: number, height: number): Buffer {
   }
   for (let y = 0; y < chromaHeight; y += 1) {
     for (let x = 0; x < chromaWidth; x += 1) {
-      const offset = ((y * 2) * width + x * 2) * 4;
+      const offset = (y * 2 * width + x * 2) * 4;
       const [red, green, blue] = [rgba[offset]!, rgba[offset + 1]!, rgba[offset + 2]!];
       u[y * chromaWidth + x] = clamp(-0.148 * red - 0.291 * green + 0.439 * blue + 128);
       v[y * chromaWidth + x] = clamp(0.439 * red - 0.368 * green - 0.071 * blue + 128);

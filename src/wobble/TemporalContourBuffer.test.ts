@@ -4,7 +4,18 @@ import { TemporalContourBuffer } from "./TemporalContourBuffer";
 import type { TemporalContourSample } from "./types";
 
 function sample(timestampMs: number, frameId = timestampMs): TemporalContourSample {
-  return { timestampMs, frameId, centersMm: [0, null, 1], leftMm: [-1, null, 0], rightMm: [1, null, 2], rimCenterMm: 0, rimHeightMm: 100, cameraTransformConfidence: 1, occluded: false, shapeChangeRate: 0 };
+  return {
+    timestampMs,
+    frameId,
+    centersMm: [0, null, 1],
+    leftMm: [-1, null, 0],
+    rightMm: [1, null, 2],
+    rimCenterMm: 0,
+    rimHeightMm: 100,
+    cameraTransformConfidence: 1,
+    occluded: false,
+    shapeChangeRate: 0,
+  };
 }
 
 it("returns irregular samples chronologically and preserves null bands", () => {
@@ -24,7 +35,8 @@ it("evicts evidence older than 120 seconds and caps at 2400 samples", () => {
 });
 
 it("clears on calibration or visibility invalidation", () => {
-  const buffer = new TemporalContourBuffer(); buffer.push(sample(1));
+  const buffer = new TemporalContourBuffer();
+  buffer.push(sample(1));
   buffer.clear("visibility-change");
   expect(buffer.window(1000)).toEqual([]);
 });

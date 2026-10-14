@@ -19,7 +19,14 @@ function dilate(mask: Uint8Array, width: number, height: number, size: number): 
   return pass(pass(mask, width, height, size, 1, false), width, height, size, width, false);
 }
 
-function pass(mask: Uint8Array, width: number, height: number, size: number, stride: number, requireAll: boolean): Uint8Array {
+function pass(
+  mask: Uint8Array,
+  width: number,
+  height: number,
+  size: number,
+  stride: number,
+  requireAll: boolean,
+): Uint8Array {
   const radius = Math.floor(size / 2);
   const output = new Uint8Array(mask.length);
   const horizontal = stride === 1;
@@ -33,8 +40,14 @@ function pass(mask: Uint8Array, width: number, height: number, size: number, str
         const neighbor = position + offset;
         if (neighbor < 0 || neighbor >= limit) continue;
         const set = mask[index + offset * stride] !== 0;
-        if (requireAll && !set) { value = 0; break; }
-        if (!requireAll && set) { value = 1; break; }
+        if (requireAll && !set) {
+          value = 0;
+          break;
+        }
+        if (!requireAll && set) {
+          value = 1;
+          break;
+        }
       }
       output[index] = value;
     }

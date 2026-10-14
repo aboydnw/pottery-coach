@@ -2,19 +2,29 @@ import { useEffect, useState } from "react";
 
 import type { RealtimeCoachTransport } from "./types";
 
-export function VoiceControls({ transport, connectionLabel = "cloud provider" }: { transport: RealtimeCoachTransport; connectionLabel?: string }) {
+export function VoiceControls({
+  transport,
+  connectionLabel = "cloud provider",
+}: {
+  transport: RealtimeCoachTransport;
+  connectionLabel?: string;
+}) {
   const [paused, setPaused] = useState(false);
   const [ended, setEnded] = useState(false);
   const [caption, setCaption] = useState("");
   const [bargeInLatencyMs, setBargeInLatencyMs] = useState<number | null>(null);
 
-  useEffect(() => transport.onEvent((event) => {
-    if (event.type === "speech-started") {
-      const started = performance.now();
-      void transport.cancelOutput("barge-in").finally(() => setBargeInLatencyMs(performance.now() - started));
-    }
-    if (event.type === "transcript-delta" || event.type === "transcript-final") setCaption(event.text);
-  }), [transport]);
+  useEffect(
+    () =>
+      transport.onEvent((event) => {
+        if (event.type === "speech-started") {
+          const started = performance.now();
+          void transport.cancelOutput("barge-in").finally(() => setBargeInLatencyMs(performance.now() - started));
+        }
+        if (event.type === "transcript-delta" || event.type === "transcript-final") setCaption(event.text);
+      }),
+    [transport],
+  );
 
   async function togglePause(): Promise<void> {
     if (paused) await transport.resumeInput();
@@ -32,11 +42,19 @@ export function VoiceControls({ transport, connectionLabel = "cloud provider" }:
     <section className="voice-controls" aria-labelledby="voice-title">
       <h2 id="voice-title">Voice coach</h2>
       <p aria-live="polite">{caption || "Captions will appear here."}</p>
-      <p>Microphone: {paused ? "paused" : "listening"} · Coach transport: {connectionLabel}</p>
-      {bargeInLatencyMs !== null && <p className="diagnostic-note">Last interruption: {Math.round(bargeInLatencyMs)} ms</p>}
+      <p>
+        Microphone: {paused ? "paused" : "listening"} · Coach transport: {connectionLabel}
+      </p>
+      {bargeInLatencyMs !== null && (
+        <p className="diagnostic-note">Last interruption: {Math.round(bargeInLatencyMs)} ms</p>
+      )}
       <div className="actions">
-        <button type="button" onClick={togglePause}>{paused ? "Resume listening" : "Pause listening"}</button>
-        <button type="button" className="secondary" onClick={end}>End voice</button>
+        <button type="button" onClick={togglePause}>
+          {paused ? "Resume listening" : "Pause listening"}
+        </button>
+        <button type="button" className="secondary" onClick={end}>
+          End voice
+        </button>
       </div>
     </section>
   );
