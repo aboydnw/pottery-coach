@@ -2,6 +2,7 @@
   "name": "pottery-coach",
   "private": true,
   "version": "0.0.0",
+  "license": "MIT",
   "type": "module",
   "packageManager": "pnpm@10.34.6",
   "engines": {
@@ -24,10 +25,12 @@
     "benchmark:verify-manifests": "node scripts/validate-field-manifests.mjs && node scripts/verify-plan-artifacts.mjs",
     "research:summarize-field": "tsx scripts/summarize-field.ts",
     "lint": "oxlint --deny-warnings",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
     "e2e": "playwright test",
     "test": "vitest run",
     "typecheck": "tsc --noEmit --pretty false -p tsconfig.json && tsc --noEmit --pretty false -p tsconfig.node.json",
-    "verify": "pnpm lint && pnpm test && pnpm typecheck && pnpm build && pnpm e2e && pnpm benchmark:verify-manifests"
+    "verify": "pnpm lint && pnpm format:check && pnpm test && pnpm typecheck && pnpm build && pnpm e2e && pnpm benchmark:verify-manifests"
   },
   "dependencies": {
     "dexie": "~4.2.1",
@@ -48,6 +51,7 @@
     "fast-check": "~4.3.0",
     "jsdom": "~27.0.1",
     "oxlint": "~1.88.0",
+    "prettier": "~3.9.10",
     "tsx": "~4.20.6",
     "typescript": "~7.0.2",
     "vite": "~7.1.3",

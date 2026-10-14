@@ -1,0 +1,12 @@
+dist
+node_modules
+pnpm-lock.yaml
+public/vendor
+benchmarks/**/artifacts
+test-results
+playwright-report
+docs/plans
+docs/research
+docs/reviews
+docs/specs
+research
