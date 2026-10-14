@@ -10,7 +10,7 @@ const required = [
   "benchmarks/voice/scripts.json", "benchmarks/voice/run.ts", "benchmarks/voice/summarize.ts",
   "benchmarks/coaching/scenarios/scenarios.json", "benchmarks/coaching/run.ts", "benchmarks/coaching/summarize.ts",
   "benchmarks/integrated/result.schema.json", "benchmarks/integrated/run.ts", "benchmarks/integrated/summarize.ts",
-  "src/app/AppSessionOrchestrator.ts", "src/app/routes.tsx", "src/release/manifest.ts",
+  "src/app/AppSessionOrchestrator.ts", "src/app/SessionFlow.tsx", "src/release/manifest.ts",
   "tests/e2e/cylinder-flow.spec.ts", "tests/e2e/template-flow.spec.ts", "tests/e2e/degraded-flow.spec.ts",
   "tests/e2e/network-boundary.spec.ts", "tests/e2e/memory-soak.spec.ts", "tests/e2e/privacy-field.spec.ts",
   "docs/calibration-fixture-protocol.md", "docs/wobble-rig-protocol.md", "docs/voice-test-protocol.md",

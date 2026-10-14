@@ -48,3 +48,29 @@ describe("session lifecycle", () => {
     expect(state.cameraError).toBeNull();
   });
 });
+
+describe("returning to earlier steps", () => {
+  const at = (step: SessionState["step"]): SessionState => ({ ...createSessionState(), step });
+
+  it("returns to camera setup from any later step when the camera stops", () => {
+    for (const step of ["calibration", "audio-consent", "goal", "live"] as const) {
+      expect(transition(at(step), { type: "CAMERA_STOPPED" }).step).toBe("camera");
+    }
+  });
+
+  it("allows recalibration after calibration and marks evidence stale", () => {
+    const state = transition(at("live"), { type: "RECALIBRATE" });
+    expect(state.step).toBe("calibration");
+    expect(state.requiresFreshEvidence).toBe(true);
+  });
+
+  it("returns to goal selection when the goal is cleared during a live session", () => {
+    expect(transition(at("live"), { type: "GOAL_CLEARED" }).step).toBe("goal");
+  });
+
+  it("keeps the audit trail bounded", () => {
+    let state = at("notice");
+    for (let index = 0; index < 250; index += 1) state = transition(state, { type: "START_LIVE" });
+    expect(state.audit).toHaveLength(100);
+  });
+});

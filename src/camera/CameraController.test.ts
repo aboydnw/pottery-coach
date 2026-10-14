@@ -102,4 +102,29 @@ describe("CameraController", () => {
     await expect(controller.start()).rejects.toThrow();
     expect(listener).toHaveBeenCalledWith(expect.objectContaining({ type: "error", reason: "permission-denied" }));
   });
+
+  it("stops a stream that arrives after a newer start or stop", async () => {
+    const lateTrack = new FakeTrack();
+    let resolveFirst: (stream: unknown) => void = () => undefined;
+    getUserMedia.mockImplementationOnce(() => new Promise((resolve) => { resolveFirst = resolve; }));
+    const controller = new CameraController();
+
+    const first = controller.start();
+    controller.stop();
+    resolveFirst({ getTracks: () => [lateTrack], getVideoTracks: () => [lateTrack] });
+
+    await expect(first).rejects.toThrow();
+    expect(lateTrack.stop).toHaveBeenCalledOnce();
+  });
+
+  it("removes its visibility listener when disposed", async () => {
+    const removeEventListener = vi.spyOn(document, "removeEventListener");
+    const controller = new CameraController();
+    await controller.start();
+
+    controller.dispose();
+
+    expect(removeEventListener).toHaveBeenCalledWith("visibilitychange", expect.any(Function));
+    expect(track.stop).toHaveBeenCalled();
+  });
 });

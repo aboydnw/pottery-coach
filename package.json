@@ -11,6 +11,7 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc --noEmit -p tsconfig.json && vite build",
+    "calibration:board": "tsx scripts/generate-calibration-board.ts",
     "benchmark:camera": "tsx benchmarks/camera/run.ts",
     "benchmark:tags": "tsx benchmarks/tags/run.ts",
     "benchmark:dimensions": "tsx benchmarks/dimensions/run.ts",
@@ -32,7 +33,6 @@
     "dexie": "~4.2.1",
     "react": "~19.3.0",
     "react-dom": "~19.3.0",
-    "react-router": "~8.4.0",
     "zod": "~4.1.0"
   },
   "devDependencies": {
