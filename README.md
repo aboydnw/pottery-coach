@@ -67,8 +67,8 @@ Claims in the docs carry one of four labels:
 - **Engineering inference:** a design judgement that is still waiting on a gate.
 - **Domain hypothesis:** needs review by a pottery instructor.
 
-## Contributing
+## Contributing and license
 
-See [CONTRIBUTING.md](CONTRIBUTING.md).
+See [CONTRIBUTING.md](CONTRIBUTING.md). Pottery Coach is released under the [MIT License](LICENSE).
 
 The AprilTag detector and tag patterns come from [AprilRobotics](https://github.com/AprilRobotics/apriltag) via [apriltag-js](https://github.com/AliAlimohamad/apriltag-js), under the BSD-2-Clause license (see [`third_party/apriltag`](third_party/apriltag)).
