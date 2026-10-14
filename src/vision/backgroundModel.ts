@@ -7,6 +7,7 @@ export type BackgroundModel = {
   distanceThreshold: number;
 };
 
+/** Builds a per-pixel median background and a noise-scaled distance threshold from at least three frames. */
 export function buildBackground(frames: LabImage[]): BackgroundModel {
   if (frames.length < 3) throw new Error("At least three background frames are required");
   const { width, height } = frames[0]!;
@@ -14,14 +15,16 @@ export function buildBackground(frames: LabImage[]): BackgroundModel {
     throw new Error("Background frames must have matching dimensions");
   }
   const medianLab = new Float32Array(width * height * 3);
-  const deviations: number[] = [];
+  const deviations = new Float32Array(medianLab.length * frames.length);
+  const values = new Float32Array(frames.length);
   for (let index = 0; index < medianLab.length; index += 1) {
-    const values = frames.map((frame) => frame.lab[index]!).sort((left, right) => left - right);
+    for (let frame = 0; frame < frames.length; frame += 1) values[frame] = frames[frame]!.lab[index]!;
+    values.sort();
     const median = values[Math.floor(values.length / 2)]!;
     medianLab[index] = median;
-    deviations.push(...values.map((value) => Math.abs(value - median)));
+    for (let frame = 0; frame < frames.length; frame += 1) deviations[index * frames.length + frame] = Math.abs(values[frame]! - median);
   }
-  deviations.sort((left, right) => left - right);
+  deviations.sort();
   const mad = deviations[Math.floor(deviations.length / 2)] ?? 0;
   return { width, height, medianLab, distanceThreshold: Math.max(8, mad * 6) };
 }

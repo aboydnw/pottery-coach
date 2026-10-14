@@ -35,3 +35,17 @@ it("lets a keyboard user select a marked moment", () => {
   fireEvent.keyDown(moment, { key: "Enter" });
   expect(screen.getByText(/no still was saved/i)).toBeInTheDocument();
 });
+
+it("shows times relative to the session start rather than raw epoch timestamps", () => {
+  const start = 1_791_581_160_000;
+  const shifted: SessionBundle = {
+    ...bundle,
+    session: { ...bundle.session, startedAtMs: start, endedAtMs: start + 2_000 },
+    readings: bundle.readings.map((reading) => ({ ...reading, timestampMs: start + reading.timestampMs })),
+    events: bundle.events.map((event) => ({ ...event, timestampMs: start + event.timestampMs })),
+  };
+  render(<SessionReview bundle={shifted} />);
+  expect(screen.getByRole("table", { name: /measurement data/i })).toHaveTextContent("2.0s");
+  expect(within(screen.getByRole("list")).getByText(/at 1\.5s/)).toBeInTheDocument();
+  expect(document.body).not.toHaveTextContent("1791581");
+});

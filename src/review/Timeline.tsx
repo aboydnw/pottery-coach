@@ -1,6 +1,7 @@
 import { useState } from "react";
 import type { SessionEvent } from "../session/types";
-export function Timeline({ events }: { events: SessionEvent[] }) {
+/** Lists session events with times shown as seconds since `sessionStartMs`. */
+export function Timeline({ events, sessionStartMs = 0 }: { events: SessionEvent[]; sessionStartMs?: number }) {
   const [filter, setFilter] = useState("all");
   const types = [...new Set(events.map((event) => event.type))].sort();
   const filteredEvents = filter === "all" ? events : events.filter((event) => event.type === filter);
@@ -13,7 +14,7 @@ export function Timeline({ events }: { events: SessionEvent[] }) {
     onChange={(event) => { setFilter(event.target.value); setPage(0); }}><option value="all">All events</option>
     {types.map((type) => <option key={type} value={type}>{type.replaceAll("-", " ")}</option>)}</select></label>
     {visible.length ? <ol start={start + 1}>{visible.map((event) => <li key={event.id}>
-    <strong>{event.type.replaceAll("-", " ")}</strong> at {(event.timestampMs / 1000).toFixed(1)}s
+    <strong>{event.type.replaceAll("-", " ")}</strong> at {((event.timestampMs - sessionStartMs) / 1000).toFixed(1)}s
     {event.evidenceIds.length > 0 && <span> · evidence {event.evidenceIds.join(", ")}</span>}
   </li>)}</ol> : <p>No events match this filter.</p>}{filteredEvents.length > 500 && <nav aria-label="Timeline pages"><p>{start + 1}–{start + visible.length} of {filteredEvents.length}</p>
     <button className="secondary" disabled={page === 0} onClick={() => setPage(0)}>First page</button>

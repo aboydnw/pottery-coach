@@ -2,66 +2,95 @@ import type { BackgroundModel, LabImage } from "./backgroundModel";
 import { closeMask, openMask } from "./morphology";
 
 export type ExclusionRegion = { x: number; y: number; width: number; height: number };
-export type SegmentationResult = { mask: Uint8Array; rowReliability: Uint8Array; reasons: string[] };
 
-export function segmentVessel(
-  rectified: LabImage,
-  model: BackgroundModel,
-  exclusions: ExclusionRegion[],
-): SegmentationResult {
+export type SegmentationResult = {
+  mask: Uint8Array;
+  /** 1 for rows inside the vessel's vertical span whose edges were found away from the frame border. */
+  rowReliability: Uint8Array;
+  /** First and last image rows covered by the selected vessel component. */
+  span: { top: number; bottom: number } | null;
+  /** Reliable rows divided by rows in the vessel's span; 0 when no vessel was found. */
+  reliableFraction: number;
+  reasons: string[];
+};
+
+const WHEEL_BAND_FRACTION = 0.8;
+
+/**
+ * Separates the vessel from a background model and keeps the largest foreground component that
+ * reaches the wheel band (the bottom 20% of the frame), which excludes detached hands and tools.
+ */
+export function segmentVessel(rectified: LabImage, model: BackgroundModel, exclusions: ExclusionRegion[]): SegmentationResult {
   const { width, height } = rectified;
   if (model.width !== width || model.height !== height) throw new Error("Background dimensions do not match frame");
   const initial = new Uint8Array(width * height);
-  for (let pixel = 0; pixel < initial.length; pixel += 1) {
-    const offset = pixel * 3;
-    const distance = Math.hypot(
-      rectified.lab[offset]! - model.medianLab[offset]!,
-      rectified.lab[offset + 1]! - model.medianLab[offset + 1]!,
-      rectified.lab[offset + 2]! - model.medianLab[offset + 2]!,
-    );
-    initial[pixel] = distance > model.distanceThreshold ? 1 : 0;
+  const threshold = model.distanceThreshold * model.distanceThreshold;
+  for (let pixel = 0, offset = 0; pixel < initial.length; pixel += 1, offset += 3) {
+    const dl = rectified.lab[offset]! - model.medianLab[offset]!;
+    const da = rectified.lab[offset + 1]! - model.medianLab[offset + 1]!;
+    const db = rectified.lab[offset + 2]! - model.medianLab[offset + 2]!;
+    initial[pixel] = dl * dl + da * da + db * db > threshold ? 1 : 0;
   }
-  for (const region of exclusions) for (let y = region.y; y < region.y + region.height; y += 1) {
-    for (let x = region.x; x < region.x + region.width; x += 1) {
-      if (x >= 0 && y >= 0 && x < width && y < height) initial[y * width + x] = 0;
+  for (const region of exclusions) {
+    for (let y = Math.max(0, region.y); y < Math.min(height, region.y + region.height); y += 1) {
+      for (let x = Math.max(0, region.x); x < Math.min(width, region.x + region.width); x += 1) initial[y * width + x] = 0;
     }
   }
   const cleaned = closeMask(openMask(initial, width, height, 3), width, height, 5);
-  const components = connectedComponents(cleaned, width, height);
-  const selected = components
-    .filter((component) => component.some((index) => Math.floor(index / width) >= Math.floor(height * 0.8)))
-    .sort((left, right) => right.length - left.length)[0];
+  const selected = largestWheelComponent(cleaned, width, height);
   const mask = new Uint8Array(width * height);
-  const reasons: string[] = [];
-  if (!selected) reasons.push("NO_WHEEL_CONNECTED_COMPONENT");
-  else selected.forEach((index) => { mask[index] = 1; });
   const rowReliability = new Uint8Array(height);
-  for (let y = 0; y < height; y += 1) {
-    const pixels: number[] = [];
-    for (let x = 0; x < width; x += 1) if (mask[y * width + x]) pixels.push(x);
-    rowReliability[y] = pixels.length >= 2 && pixels[0] !== 0 && pixels.at(-1) !== width - 1 ? 1 : 0;
+  const reasons: string[] = [];
+  if (!selected) {
+    reasons.push("NO_WHEEL_CONNECTED_COMPONENT");
+    return { mask, rowReliability, span: null, reliableFraction: 0, reasons };
   }
-  if (rowReliability.some((value) => value === 0)) reasons.push("UNRELIABLE_ROWS");
-  return { mask, rowReliability, reasons };
+  for (let index = 0; index < mask.length; index += 1) if (selected.labels[index] === selected.label) mask[index] = 1;
+  let reliableRows = 0;
+  for (let y = selected.top; y <= selected.bottom; y += 1) {
+    let left = -1;
+    let right = -1;
+    for (let x = 0; x < width; x += 1) {
+      if (!mask[y * width + x]) continue;
+      if (left < 0) left = x;
+      right = x;
+    }
+    const reliable = left >= 0 && right > left && left !== 0 && right !== width - 1;
+    rowReliability[y] = reliable ? 1 : 0;
+    if (reliable) reliableRows += 1;
+  }
+  const spanRows = selected.bottom - selected.top + 1;
+  if (reliableRows < spanRows) reasons.push("UNRELIABLE_ROWS");
+  return { mask, rowReliability, span: { top: selected.top, bottom: selected.bottom }, reliableFraction: reliableRows / spanRows, reasons };
 }
 
-function connectedComponents(mask: Uint8Array, width: number, height: number): number[][] {
-  const seen = new Uint8Array(mask.length);
-  const components: number[][] = [];
+function largestWheelComponent(mask: Uint8Array, width: number, height: number) {
+  const labels = new Int32Array(mask.length);
+  const queue = new Int32Array(mask.length);
+  const wheelBandStart = Math.floor(height * WHEEL_BAND_FRACTION);
+  let best: { label: number; size: number; top: number; bottom: number } | null = null;
+  let nextLabel = 0;
   for (let start = 0; start < mask.length; start += 1) {
-    if (!mask[start] || seen[start]) continue;
-    const component: number[] = [];
-    const queue = [start]; seen[start] = 1;
-    for (let cursor = 0; cursor < queue.length; cursor += 1) {
-      const index = queue[cursor]!; component.push(index);
-      const x = index % width; const y = Math.floor(index / width);
-      const neighbors = [[x - 1, y], [x + 1, y], [x, y - 1], [x, y + 1]];
-      for (const [nx, ny] of neighbors) if (nx! >= 0 && ny! >= 0 && nx! < width && ny! < height) {
-        const next = ny! * width + nx!;
-        if (mask[next] && !seen[next]) { seen[next] = 1; queue.push(next); }
-      }
+    if (!mask[start] || labels[start]) continue;
+    nextLabel += 1;
+    let head = 0;
+    let tail = 0;
+    queue[tail++] = start;
+    labels[start] = nextLabel;
+    let top = height;
+    let bottom = -1;
+    while (head < tail) {
+      const index = queue[head++]!;
+      const x = index % width;
+      const y = (index - x) / width;
+      if (y < top) top = y;
+      if (y > bottom) bottom = y;
+      if (x > 0 && mask[index - 1] && !labels[index - 1]) { labels[index - 1] = nextLabel; queue[tail++] = index - 1; }
+      if (x < width - 1 && mask[index + 1] && !labels[index + 1]) { labels[index + 1] = nextLabel; queue[tail++] = index + 1; }
+      if (y > 0 && mask[index - width] && !labels[index - width]) { labels[index - width] = nextLabel; queue[tail++] = index - width; }
+      if (y < height - 1 && mask[index + width] && !labels[index + width]) { labels[index + width] = nextLabel; queue[tail++] = index + width; }
     }
-    components.push(component);
+    if (bottom >= wheelBandStart && (!best || tail > best.size)) best = { label: nextLabel, size: tail, top, bottom };
   }
-  return components;
+  return best ? { ...best, labels } : null;
 }

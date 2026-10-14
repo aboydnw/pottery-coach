@@ -35,3 +35,18 @@ it("emits no retained current value during occlusion and resets explicitly", () 
   filter.reset("visibility-change");
   expect(filter.push(reading(7))).toBeNull();
 });
+
+it("adopts a sustained level shift instead of rejecting it forever", () => {
+  const filter = new TemporalFilter(() => 2_000);
+  for (let frame = 1; frame <= 5; frame += 1) filter.push(reading(frame, 100));
+  const results = [6, 7, 8, 9, 10].map((frame) => filter.push(reading(frame, 140 + (frame % 2))));
+  expect(results.slice(0, 4).every((stable) => stable!.heightMm! < 110)).toBe(true);
+  expect(results[4]?.heightMm).toBeGreaterThan(135);
+});
+
+it("does not adopt scattered outliers as a new level", () => {
+  const filter = new TemporalFilter(() => 2_000);
+  for (let frame = 1; frame <= 5; frame += 1) filter.push(reading(frame, 100));
+  const results = [140, 300, 60, 500, 20].map((height, index) => filter.push(reading(index + 6, height)));
+  expect(results.every((stable) => stable!.heightMm! < 110)).toBe(true);
+});

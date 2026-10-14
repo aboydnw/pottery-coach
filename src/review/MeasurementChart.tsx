@@ -1,9 +1,10 @@
 import type { RecordedReading } from "../session/types";
 
-export function MeasurementChart({ readings }: { readings: RecordedReading[] }) {
+/** Plots reliable heights against seconds since `sessionStartMs`; unreliable stretches stay as gaps. */
+export function MeasurementChart({ readings, sessionStartMs = 0 }: { readings: RecordedReading[]; sessionStartMs?: number }) {
   const reliable = readings.filter((reading) => reading.confidence >= 0.7 && reading.values.heightMm != null);
   const max = Math.max(1, ...reliable.map((reading) => reading.values.heightMm ?? 0));
-  const lastTime = Math.max(1, ...readings.map((reading) => reading.timestampMs));
+  const span = Math.max(1, ...readings.map((reading) => reading.timestampMs - sessionStartMs));
   const groups = readings.reduce<RecordedReading[][]>((all, reading) => {
     if (reading.confidence < 0.7 || reading.values.heightMm == null) {
       if (all.at(-1)?.length) all.push([]);
@@ -14,11 +15,11 @@ export function MeasurementChart({ readings }: { readings: RecordedReading[] }) 
     <h2 id="measurements-title">Measurements</h2>
     <svg viewBox="0 0 300 110" role="img" aria-label="Reliable height measurements; gaps are not connected">
       {groups.map((group, groupIndex) => <path key={groupIndex}
-        d={group.map((reading, index) => `${index ? "L" : "M"} ${(reading.timestampMs / lastTime) * 300} ${100 - ((reading.values.heightMm ?? 0) / max) * 90}`).join(" ")}
+        d={group.map((reading, index) => `${index ? "L" : "M"} ${((reading.timestampMs - sessionStartMs) / span) * 300} ${100 - ((reading.values.heightMm ?? 0) / max) * 90}`).join(" ")}
         fill="none" stroke="currentColor" strokeWidth="3" />)}
     </svg>
     <table aria-label="Measurement data"><thead><tr><th>Time</th><th>Height</th><th>Status</th><th>Evidence</th></tr></thead>
-      <tbody>{readings.map((reading) => { const measurable = reading.confidence >= 0.7 && reading.values.heightMm != null; return <tr key={reading.id} data-evidence-id={reading.id}><td>{(reading.timestampMs / 1000).toFixed(1)}s</td>
+      <tbody>{readings.map((reading) => { const measurable = reading.confidence >= 0.7 && reading.values.heightMm != null; return <tr key={reading.id} data-evidence-id={reading.id}><td>{((reading.timestampMs - sessionStartMs) / 1000).toFixed(1)}s</td>
         <td>{measurable ? `${reading.values.heightMm} mm` : "—"}</td>
         <td>{measurable ? "Measured" : "Not measured reliably"}</td><td><code>{reading.id}</code></td></tr>; })}</tbody></table>
   </section>;

@@ -1,36 +1,43 @@
+/** Binary opening (erode then dilate) with a `size`×`size` square; removes specks smaller than the square. */
 export function openMask(mask: Uint8Array, width: number, height: number, size: number): Uint8Array {
   return dilate(erode(mask, width, height, size), width, height, size);
 }
 
+/** Binary closing (dilate then erode) with a `size`×`size` square; fills holes smaller than the square. */
 export function closeMask(mask: Uint8Array, width: number, height: number, size: number): Uint8Array {
   return erode(dilate(mask, width, height, size), width, height, size);
 }
 
+// A square structuring element is separable: a row pass followed by a column pass gives the same
+// result as the full 2-D window at O(size) instead of O(size²) work per pixel. Pixels outside the
+// image are ignored, so borders neither erode nor grow.
 function erode(mask: Uint8Array, width: number, height: number, size: number): Uint8Array {
-  const radius = Math.floor(size / 2);
-  const output = new Uint8Array(mask.length);
-  for (let y = 0; y < height; y += 1) for (let x = 0; x < width; x += 1) {
-    let keep = 1;
-    for (let dy = -radius; dy <= radius && keep; dy += 1) for (let dx = -radius; dx <= radius; dx += 1) {
-      const nx = x + dx; const ny = y + dy;
-      if (nx < 0 || ny < 0 || nx >= width || ny >= height) continue;
-      if (mask[ny * width + nx] === 0) { keep = 0; break; }
-    }
-    output[y * width + x] = keep;
-  }
-  return output;
+  return pass(pass(mask, width, height, size, 1, true), width, height, size, width, true);
 }
 
 function dilate(mask: Uint8Array, width: number, height: number, size: number): Uint8Array {
+  return pass(pass(mask, width, height, size, 1, false), width, height, size, width, false);
+}
+
+function pass(mask: Uint8Array, width: number, height: number, size: number, stride: number, requireAll: boolean): Uint8Array {
   const radius = Math.floor(size / 2);
   const output = new Uint8Array(mask.length);
-  for (let y = 0; y < height; y += 1) for (let x = 0; x < width; x += 1) {
-    let set = 0;
-    for (let dy = -radius; dy <= radius && !set; dy += 1) for (let dx = -radius; dx <= radius; dx += 1) {
-      const nx = x + dx; const ny = y + dy;
-      if (nx >= 0 && ny >= 0 && nx < width && ny < height && mask[ny * width + nx] !== 0) { set = 1; break; }
+  const horizontal = stride === 1;
+  for (let y = 0; y < height; y += 1) {
+    for (let x = 0; x < width; x += 1) {
+      const position = horizontal ? x : y;
+      const limit = horizontal ? width : height;
+      const index = y * width + x;
+      let value = requireAll ? 1 : 0;
+      for (let offset = -radius; offset <= radius; offset += 1) {
+        const neighbor = position + offset;
+        if (neighbor < 0 || neighbor >= limit) continue;
+        const set = mask[index + offset * stride] !== 0;
+        if (requireAll && !set) { value = 0; break; }
+        if (!requireAll && set) { value = 1; break; }
+      }
+      output[index] = value;
     }
-    output[y * width + x] = set;
   }
   return output;
 }

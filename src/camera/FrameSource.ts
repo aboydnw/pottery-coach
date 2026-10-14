@@ -7,8 +7,13 @@ export type RegionOfInterest = {
 
 export type AcquiredFrame = {
   frameId: number;
+  /** Capture time in epoch milliseconds (see `epochNow`). */
   capturedAtMs: number;
   bitmap: ImageBitmap;
+  /** Region of the source video, in video pixels, that the bitmap covers. */
+  sourceRoi: RegionOfInterest;
+  /** Source video pixels per bitmap pixel; greater than 1 when the frame was downscaled. */
+  scale: number;
 };
 
 export type FrameSink = (frame: AcquiredFrame) => "accepted" | "busy";
@@ -16,12 +21,14 @@ export type FrameSink = (frame: AcquiredFrame) => "accepted" | "busy";
 export type FrameSourceOptions = {
   targetFps: number;
   roi: RegionOfInterest;
+  /** Frames wider than this are downscaled before processing, keeping the aspect ratio. */
+  maxOutputWidth?: number;
 };
 
 export interface FrameSource {
   start(video: HTMLVideoElement, options: FrameSourceOptions, sink: FrameSink): void;
-  updateOptions?(options: FrameSourceOptions): void;
+  updateOptions?(options: Partial<FrameSourceOptions>): void;
   stop(): void;
 }
 
-export const ENABLE_TRACK_PROCESSOR = false;
+export const DEFAULT_PROCESSING_WIDTH = 320;

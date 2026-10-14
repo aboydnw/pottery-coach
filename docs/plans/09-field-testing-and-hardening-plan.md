@@ -38,7 +38,7 @@
 
 ### Task 3: Novice end-to-end study
 
-**Files:** Create `research/field/session-form.json`, `scripts/summarize-field.ts`, `.test.ts`, `research/field/results.md`; modify benchmark results/open questions.
+**Files:** Create `research/field/session-form.json`, `scripts/summarize-field.mjs`, `.test.ts`, `research/field/results.md`; modify benchmark results/open questions.
 
 - [ ] Write summarizer tests for completion/rescue, median setup time, failure reasons, spoken-query success, barge-in success, uncertainty comprehension, distraction 1–5, bystander compliance, deletion success, and participant-cluster bootstrap intervals.
 - [ ] Freeze release manifest; recruit first cohort of 10 novices who meet safety/instruction prerequisites; observe without rescue unless safety/protocol requires; collect structured data, not default raw media.

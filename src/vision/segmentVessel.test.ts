@@ -20,3 +20,18 @@ it("selects the clay component connected to the wheel band and excludes a detach
   expect(result.mask[8 * width + 5]).toBe(1);
   expect(result.reasons).not.toContain("NO_WHEEL_CONNECTED_COMPONENT");
 });
+
+it("scores reliability over the vessel's own rows, not the whole frame", () => {
+  const width = 20;
+  const height = 40;
+  const lab = new Float32Array(width * height * 3);
+  for (let y = 30; y < 40; y += 1) for (let x = 8; x <= 12; x += 1) lab[(y * width + x) * 3] = 70;
+  const result = segmentVessel(
+    { width, height, lab },
+    { width, height, medianLab: new Float32Array(width * height * 3), distanceThreshold: 15 },
+    [],
+  );
+  expect(result.span).toEqual({ top: 30, bottom: 39 });
+  expect(result.reliableFraction).toBe(1);
+  expect(result.reasons).not.toContain("UNRELIABLE_ROWS");
+});
