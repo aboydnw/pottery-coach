@@ -1,17 +1,21 @@
 import type { DimensionReading, ProfileSample, StableDimensionReading } from "./types";
+import { median } from "../shared/stats";
+import { epochNow } from "../platform/clock";
 
 const WINDOW_SIZE = 5;
 const EMA_TIME_CONSTANT_MS = 400;
 
 export class TemporalFilter {
   private readings: DimensionReading[] = [];
+  private outliers: DimensionReading[] = [];
   private smoothed: StableDimensionReading | null = null;
 
-  constructor(private readonly now: () => number = () => performance.now()) {}
+  constructor(private readonly now: () => number = epochNow) {}
 
   push(reading: DimensionReading): StableDimensionReading | null {
     if (reading.confidence.overall < 0.75 || reading.heightMm === null) return null;
-    if (this.isOutlier(reading.heightMm)) return this.buildStable(this.readings);
+    if (this.isOutlier(this.readings, reading.heightMm)) return this.handleOutlier(reading);
+    this.outliers = [];
     this.readings.push(reading);
     if (this.readings.length > WINDOW_SIZE) this.readings.shift();
     if (this.readings.length < WINDOW_SIZE) return null;
@@ -22,12 +26,27 @@ export class TemporalFilter {
 
   reset(_reason: string): void {
     this.readings = [];
+    this.outliers = [];
     this.smoothed = null;
   }
 
-  private isOutlier(value: number): boolean {
-    if (this.readings.length < WINDOW_SIZE) return false;
-    const values = this.readings.map((reading) => reading.heightMm!).sort((a, b) => a - b);
+  // A run of mutually consistent outliers means the vessel really changed (for example, the walls
+  // were pulled up while hands blocked the view), so the window restarts from the new level.
+  private handleOutlier(reading: DimensionReading): StableDimensionReading | null {
+    const consistent = this.outliers.length < 2 || !this.isOutlier(this.outliers, reading.heightMm!, 2);
+    this.outliers = consistent ? [...this.outliers, reading] : [reading];
+    if (this.outliers.length < WINDOW_SIZE) return this.buildStable(this.readings);
+    this.readings = this.outliers;
+    this.outliers = [];
+    this.smoothed = null;
+    const stable = this.buildStable(this.readings);
+    this.smoothed = stable;
+    return stable;
+  }
+
+  private isOutlier(window: DimensionReading[], value: number, minimumSize = WINDOW_SIZE): boolean {
+    if (window.length < minimumSize) return false;
+    const values = window.map((reading) => reading.heightMm!);
     const center = median(values);
     const mad = median(values.map((item) => Math.abs(item - center)));
     return Math.abs(value - center) > Math.max(5, 3 * 1.4826 * mad);
@@ -76,8 +95,3 @@ export class TemporalFilter {
   }
 }
 
-function median(values: number[]): number {
-  const sorted = [...values].sort((left, right) => left - right);
-  const middle = Math.floor(sorted.length / 2);
-  return sorted.length % 2 === 0 ? (sorted[middle - 1]! + sorted[middle]!) / 2 : sorted[middle]!;
-}

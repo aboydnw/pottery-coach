@@ -9,10 +9,10 @@ Per the 2026-10-09 scope decision, implementation may continue through the remai
 | Benchmark | Status | Pre-registered pass condition | Harness/plan |
 |---|---|---|---|
 | 1 camera throughput | Desktop harness validated; physical gate not run | preview >=24 fps; vision >=10 fps; no monotonic memory growth/20 min | Plan 1 `benchmarks/camera` |
-| 2 dimensions | Synthetic harness implemented; physical locked set pending | median abs <=5 mm; p95 <=10 mm; bias <=5 mm; unsupported pose rejection >=95% | Plan 2 `benchmarks/dimensions` |
-| 3 profile similarity | Seeded analytic harness implemented | analytic MAE within 0.5 mm; direction correct; >=70% regional coverage | Plan 3 `benchmarks/profile` |
-| 4 wobble | 50-case synthetic generator implemented; physical rig pending | significant precision >=90%; <=1 false/10 min; <=3 rev delay; >=90% recall at 10 mm; camera negatives >=95% suppressed | Plan 4 `benchmarks/wobble` |
-| 5 voice latency | Deterministic mock runner implemented; paid-provider runs pending | response p50 <=1.5 s; barge-in <=300 ms; local urgent <=500 ms; reconnect measured | Plan 5 `benchmarks/voice` |
+| 2 dimensions | Synthetic scenes run through `segmentVessel` + `extractDimensions`; physical locked set pending | median abs <=5 mm; p95 <=10 mm; bias <=5 mm; unsupported pose rejection >=95% | Plan 2 `benchmarks/dimensions` |
+| 3 profile similarity | Seeded analytic profiles run through `compareProfiles` | analytic MAE within 0.5 mm; direction correct; >=70% regional coverage | Plan 3 `benchmarks/profile` |
+| 4 wobble | 50 synthetic series run through period estimation, fit, classification and persistence; physical rig pending | significant precision >=90%; <=1 false/10 min; <=3 rev delay; >=90% recall at 10 mm; camera negatives >=95% suppressed | Plan 4 `benchmarks/wobble` |
+| 5 voice latency | Not run: placeholder runner only; paid-provider runs pending | response p50 <=1.5 s; barge-in <=300 ms; local urgent <=500 ms; reconnect measured | Plan 5 `benchmarks/voice` |
 | 6 restraint | 54-scenario deterministic mock corpus implemented; instructor review pending | zero invented/stale/low-confidence claims; zero cooldown duplicates | Plan 6 `benchmarks/coaching` |
 | 7 end-to-end | Browser journeys implemented; phone/novice runs pending | >=80% unassisted completion in first 10 users; report CI/failures; uncertainty comprehension >=80% | Plans 8–9 |
 
@@ -27,3 +27,18 @@ Every run writes JSONL with `benchmarkVersion`, git commit, fixture/session ID, 
 ## Camera harness development result — 2026-10-09
 
 The 60-second Chromium fake-camera `camera-worker` run produced [`benchmarks/camera/artifacts/2026-10-09T17-36-27.959Z-camera-worker.jsonl`](../../benchmarks/camera/artifacts/2026-10-09T17-36-27.959Z-camera-worker.jsonl). It recorded preview 20 fps, processed 9 fps, p95 frame age 8.9 ms, and zero dropped frames. Preview and processed rates are below the provisional targets. This run validates artifact production only: it is short, uses fake media, has no mobile thermal behavior, and cannot pass or narrow Gate 1. Gate 1 remains closed pending the physical runs in `docs/device-test-protocol.md`.
+
+## Synthetic harness results — 2026-10-14
+
+Until this date the dimension, segmentation, wobble, voice and integrated runners wrote numbers generated from fixed formulas (for example, wobble predictions were copied from the expected labels), so their artifacts measured nothing. Those artifacts were removed. The dimension, segmentation, wobble and profile runners now execute the product code on rendered synthetic scenes; voice and integrated print a placeholder notice and write no artifact until a provider or device harness exists.
+
+| Benchmark | Result on synthetic scenes | Gates failing |
+|---|---|---|
+| 2 dimensions | height median abs 0.7 mm, p95 1.2 mm, bias +0.6 mm | unsupported-pose rejection 0%: tilted views are measured instead of rejected |
+| Segmentation | width median abs 1 mm, p95 1 mm; occluded scenes flagged unmeasurable 100% | none |
+| 3 profile | max regional error 0.1 mm | none |
+| 4 wobble | recall at 10 mm 100%; precision 40%; 9 false alerts per 10 min; camera-motion suppression 40% | precision, false alerts, delay, camera suppression |
+
+These are synthetic results and cannot pass any gate. They show two real gaps: the worker never estimates camera pose or motion (`cameraMotionRmsMm` is always null and `estimateCameraTransform` is unused), so neither pose rejection nor camera-motion suppression can work yet.
+
+The 2026-10-09 camera harness result above reported zero dropped frames because the dropped-frame counter could never increase; it now counts frames the worker refused.

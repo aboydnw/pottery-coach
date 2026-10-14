@@ -26,7 +26,7 @@ describe("detectCapabilities", () => {
 
   it("does not mistake track processing support for camera support", () => {
     vi.stubGlobal("navigator", {});
-    vi.stubGlobal("MediaStreamTrackProcessor", class MediaStreamTrackProcessor {});
+    vi.stubGlobal("MediaStreamTrackProcessor", function MediaStreamTrackProcessor() {});
 
     const capabilities = detectCapabilities();
 

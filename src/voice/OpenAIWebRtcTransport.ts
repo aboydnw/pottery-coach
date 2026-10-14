@@ -5,6 +5,7 @@ type Dependencies = {
   getUserMedia(constraints: MediaStreamConstraints): Promise<MediaStream>;
   createAudio(): HTMLAudioElement;
   fetch: typeof globalThis.fetch;
+  getAccessToken?(): string;
 };
 
 const defaults: Dependencies = {
@@ -18,6 +19,7 @@ export class OpenAIWebRtcTransport implements RealtimeCoachTransport {
   private peer: RTCPeerConnection | null = null;
   private channel: RTCDataChannel | null = null;
   private localStream: MediaStream | null = null;
+  private audioSender: RTCRtpSender | null = null;
   private audio: HTMLAudioElement | null = null;
   private listeners = new Set<(event: RealtimeEvent) => void>();
   private usage: ProviderUsage | null = null;
@@ -28,33 +30,45 @@ export class OpenAIWebRtcTransport implements RealtimeCoachTransport {
   async connect(_config: RealtimeSessionConfig): Promise<void> {
     this.closed = false;
     const peer = this.dependencies.createPeer();
-    const stream = await this.dependencies.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true }, video: false });
-    stream.getAudioTracks().forEach((track) => peer.addTrack(track, stream));
-    const channel = peer.createDataChannel("oai-events");
-    channel.addEventListener("message", this.onMessage);
-    const audio = this.dependencies.createAudio();
-    audio.autoplay = true;
-    peer.addEventListener("track", (event: RTCTrackEvent) => {
-      audio.srcObject = event.streams[0] ?? new MediaStream([event.track]);
-      void audio.play().catch(() => undefined);
-    });
-    peer.addEventListener("connectionstatechange", () => {
-      if (["failed", "disconnected", "closed"].includes(peer.connectionState)) this.emit({ type: "closed", reason: peer.connectionState });
-    });
-    const offer = await peer.createOffer();
-    await peer.setLocalDescription(offer);
-    const response = await this.dependencies.fetch("/api/realtime/session", {
-      method: "POST",
-      headers: { "content-type": "application/json", "x-csrf-token": readCsrfToken() },
-      credentials: "same-origin",
-      body: JSON.stringify({ sdp: offer.sdp, sessionId: crypto.randomUUID(), clientConfigVersion: "voice-v1" }),
-    });
-    if (!response.ok) throw new Error(`Realtime session failed (${response.status})`);
-    await peer.setRemoteDescription({ type: "answer", sdp: await response.text() });
-    this.peer = peer; this.channel = channel; this.localStream = stream; this.audio = audio;
+    let stream: MediaStream | null = null;
+    let channel: RTCDataChannel | null = null;
+    try {
+      stream = await this.dependencies.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true }, video: false });
+      const audioTrack = stream.getAudioTracks()[0];
+      this.audioSender = audioTrack ? peer.addTrack(audioTrack, stream) : null;
+      channel = peer.createDataChannel("oai-events");
+      channel.addEventListener("message", this.onMessage);
+      const audio = this.dependencies.createAudio();
+      audio.autoplay = true;
+      peer.addEventListener("track", (event: RTCTrackEvent) => {
+        audio.srcObject = event.streams[0] ?? new MediaStream([event.track]);
+        void audio.play().catch(() => undefined);
+      });
+      peer.addEventListener("connectionstatechange", () => {
+        if (peer.connectionState === "failed" || peer.connectionState === "closed") this.emit({ type: "closed", reason: peer.connectionState });
+      });
+      const offer = await peer.createOffer();
+      await peer.setLocalDescription(offer);
+      const accessToken = this.dependencies.getAccessToken?.() ?? "";
+      const response = await this.dependencies.fetch("/api/realtime/session", {
+        method: "POST",
+        headers: { "content-type": "application/json", ...(accessToken ? { authorization: `Bearer ${accessToken}` } : {}) },
+        credentials: "same-origin",
+        body: JSON.stringify({ sdp: offer.sdp, sessionId: crypto.randomUUID(), clientConfigVersion: "voice-v1" }),
+      });
+      if (!response.ok) throw new Error(`Realtime session failed (${response.status})`);
+      await peer.setRemoteDescription({ type: "answer", sdp: await response.text() });
+      this.peer = peer; this.channel = channel; this.localStream = stream; this.audio = audio;
+    } catch (error) {
+      channel?.removeEventListener("message", this.onMessage);
+      stream?.getTracks().forEach((track) => track.stop());
+      channel?.close();
+      peer.close();
+      this.audioSender = null;
+      throw error;
+    }
     this.emit({ type: "connected" });
   }
-
   async sendToolResult(callId: string, result: unknown): Promise<void> {
     this.send({ type: "conversation.item.create", item: { type: "function_call_output", call_id: callId, output: JSON.stringify(result) } });
     this.send({ type: "response.create" });
@@ -72,9 +86,10 @@ export class OpenAIWebRtcTransport implements RealtimeCoachTransport {
   async resumeInput(): Promise<void> {
     const tracks = this.localStream?.getAudioTracks() ?? [];
     if (tracks.some((track) => track.readyState === "ended")) {
-      const replacement = await this.dependencies.getUserMedia({ audio: true, video: false });
+      const replacement = await this.dependencies.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true }, video: false });
+      await this.audioSender?.replaceTrack(replacement.getAudioTracks()[0] ?? null);
+      this.localStream?.getTracks().forEach((track) => track.stop());
       this.localStream = replacement;
-      replacement.getAudioTracks().forEach((track) => this.peer?.addTrack(track, replacement));
     } else tracks.forEach((track) => { track.enabled = true; });
   }
   async close(): Promise<{ usage: ProviderUsage | null }> {
@@ -117,4 +132,3 @@ function mapProviderEvent(raw: Record<string, unknown>): RealtimeEvent | null {
   return null;
 }
 
-function readCsrfToken(): string { return document.querySelector<HTMLMetaElement>('meta[name="csrf-token"]')?.content ?? ""; }

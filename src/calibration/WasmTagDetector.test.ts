@@ -30,6 +30,7 @@ it("maps a worker detection response to the TagDetector contract", async () => {
   ], decisionMargin: 52 }]);
   expect(worker.postMessage).toHaveBeenCalledWith(
     expect.objectContaining({ width: 2, height: 2 }),
+    expect.any(Array),
   );
 });
 
@@ -40,4 +41,13 @@ it("terminates the isolated detector worker when disposed", () => {
   detector.dispose();
 
   expect(worker.terminate).toHaveBeenCalledOnce();
+});
+
+it("rejects pending detections when the worker fails to load", async () => {
+  const worker = new FakeWorker();
+  worker.postMessage = vi.fn();
+  const detector = new WasmTagDetector(() => worker as unknown as Worker);
+  const pending = detector.detect({ width: 1, height: 1, data: new Uint8ClampedArray(4) } as ImageData);
+  worker.dispatchEvent(new Event("error"));
+  await expect(pending).rejects.toThrow();
 });

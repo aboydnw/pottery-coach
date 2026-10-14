@@ -1,8 +1,8 @@
 import type { CueCandidate } from "./types";
+import PROHIBITED from "./prohibited-language.json";
 
 export type ClaimValidation = { valid: boolean; violations: string[]; disableProactiveCloudSpeech: boolean };
 
-const PROHIBITED = ["press harder", "too wet", "moisture", "thickness", "perfectly centered", "internally", "internal centering", "collapse"];
 
 export function validateSpokenClaim(transcript: string, cue: CueCandidate, toolResults: Array<Record<string, unknown>>): ClaimValidation {
   const lower = transcript.toLowerCase();

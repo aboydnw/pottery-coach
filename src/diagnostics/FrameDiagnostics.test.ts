@@ -30,12 +30,31 @@ describe("FrameDiagnostics", () => {
     expect(sample.frameAgeMsP95).toBe(190);
   });
 
-  it("counts missing acquired frame ids as dropped", () => {
+  it("counts frames the worker refused as dropped", () => {
     const diagnostics = new FrameDiagnostics();
-    diagnostics.record("acquired", 100, 1);
-    diagnostics.record("acquired", 200, 4);
+    diagnostics.recordDropped();
+    diagnostics.recordDropped(2);
 
-    expect(diagnostics.snapshot(300).droppedFrames).toBe(2);
+    expect(diagnostics.snapshot(300).droppedFrames).toBe(3);
+  });
+
+  it("computes latency percentiles over the recent window only", () => {
+    const diagnostics = new FrameDiagnostics(1000);
+    diagnostics.record("acquired", 0, 1);
+    diagnostics.record("rendered", 900, 1);
+    diagnostics.record("acquired", 4_000, 2);
+    diagnostics.record("rendered", 4_050, 2);
+
+    expect(diagnostics.snapshot(4_500).frameAgeMsP95).toBe(50);
+  });
+
+  it("flags a rate drop relative to the current processing target", () => {
+    const diagnostics = new FrameDiagnostics(1000);
+    diagnostics.setTargetFps(5);
+    for (let frameId = 1; frameId <= 5; frameId += 1) diagnostics.record("processed", frameId * 150, frameId);
+    expect(diagnostics.snapshot(1000).thermalSignal).toBe("none");
+    diagnostics.setTargetFps(10);
+    expect(diagnostics.snapshot(1000).thermalSignal).toBe("rate-drop");
   });
 
   it("clears rates and ages after an interruption reset", () => {

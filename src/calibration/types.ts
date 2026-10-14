@@ -28,7 +28,7 @@ export type CalibrationResult = {
   roiClipped: boolean;
 };
 
-export type PointCorrespondence = { image: Point2; boardMm: Point2 };
+export type PointCorrespondence = { tagId: number; image: Point2; boardMm: Point2 };
 
 export type CalibrationBoard = {
   revision: string;

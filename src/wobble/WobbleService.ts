@@ -1,4 +1,5 @@
 import type { WobbleReading } from "./types";
+import { epochNow } from "../platform/clock";
 
 export const WOBBLE_PROACTIVE = false;
 
@@ -22,7 +23,7 @@ export class WobbleService {
     this.latest = { ...reading, sourceFrameIds: [...reading.sourceFrameIds], reasons: [...reading.reasons] };
   }
 
-  getLatest(nowMs = performance.now()): WobbleReading {
+  getLatest(nowMs = epochNow()): WobbleReading {
     if (this.latest.lastReliableTimestampMs !== null && nowMs - this.latest.lastReliableTimestampMs > 1500) {
       return { ...this.latest, classification: "unmeasurable", amplitudeMm: null, periodMs: null, reasons: [...this.latest.reasons, "STALE"] };
     }

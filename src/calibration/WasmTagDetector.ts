@@ -15,13 +15,11 @@ export class WasmTagDetector implements TagDetector {
   }>();
 
   constructor(
-    workerFactory: () => Worker = () => new Worker(
-      new URL("./tag-detector.worker.ts", import.meta.url),
-      { type: "module" },
-    ),
+    workerFactory: () => Worker = () => new Worker(new URL("./tag-detector.worker.ts", import.meta.url)),
   ) {
     this.worker = workerFactory();
     this.worker.addEventListener("message", this.onMessage);
+    this.worker.addEventListener("error", this.onError);
   }
 
   detect(frame: ImageData): Promise<TagDetection[]> {
@@ -29,17 +27,14 @@ export class WasmTagDetector implements TagDetector {
     const result = new Promise<TagDetection[]>((resolve, reject) => {
       this.pending.set(requestId, { resolve, reject });
     });
-    this.worker.postMessage({
-      requestId,
-      width: frame.width,
-      height: frame.height,
-      rgba: frame.data,
-    });
+    const rgba = new Uint8ClampedArray(frame.data);
+    this.worker.postMessage({ requestId, width: frame.width, height: frame.height, rgba }, [rgba.buffer]);
     return result;
   }
 
   dispose(): void {
     this.worker.removeEventListener("message", this.onMessage);
+    this.worker.removeEventListener("error", this.onError);
     this.worker.postMessage({ type: "dispose" });
     this.worker.terminate();
     for (const request of this.pending.values()) {
@@ -54,5 +49,12 @@ export class WasmTagDetector implements TagDetector {
     this.pending.delete(event.data.requestId);
     if (event.data.error) request.reject(new Error(event.data.error));
     else request.resolve(event.data.detections ?? []);
+  };
+
+  private readonly onError = (event: Event): void => {
+    const detail = (event as Partial<ErrorEvent>).message;
+    const message = typeof detail === "string" && detail ? detail : "AprilTag detector worker failed";
+    for (const request of this.pending.values()) request.reject(new Error(message));
+    this.pending.clear();
   };
 }

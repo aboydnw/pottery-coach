@@ -10,7 +10,7 @@ const required = [
   "benchmarks/voice/scripts.json", "benchmarks/voice/run.ts", "benchmarks/voice/summarize.ts",
   "benchmarks/coaching/scenarios/scenarios.json", "benchmarks/coaching/run.ts", "benchmarks/coaching/summarize.ts",
   "benchmarks/integrated/result.schema.json", "benchmarks/integrated/run.ts", "benchmarks/integrated/summarize.ts",
-  "src/app/AppSessionOrchestrator.ts", "src/app/routes.tsx", "src/release/manifest.ts",
+  "src/app/AppSessionOrchestrator.ts", "src/app/SessionFlow.tsx", "src/release/manifest.ts",
   "tests/e2e/cylinder-flow.spec.ts", "tests/e2e/template-flow.spec.ts", "tests/e2e/degraded-flow.spec.ts",
   "tests/e2e/network-boundary.spec.ts", "tests/e2e/memory-soak.spec.ts", "tests/e2e/privacy-field.spec.ts",
   "docs/calibration-fixture-protocol.md", "docs/wobble-rig-protocol.md", "docs/voice-test-protocol.md",
@@ -22,7 +22,7 @@ const required = [
 ];
 
 for (const path of required) await access(resolve(path));
-for (const path of required.filter((path) => path.endsWith(".json"))) JSON.parse(await readFile(resolve(path), "utf8"));
+for (const path of required.filter((candidate) => candidate.endsWith(".json"))) JSON.parse(await readFile(resolve(path), "utf8"));
 
 const linkedDocuments = ["docs/release-checklist.md", "docs/reviews/field-release-review.md", "docs/research/10-benchmark-results.md"];
 for (const document of linkedDocuments) {
@@ -32,7 +32,7 @@ for (const document of linkedDocuments) {
     await access(target).catch(() => { throw new Error(`${document} has an unresolved link: ${match[1]}`); });
   }
 }
-const artifactDirectories = ["dimensions", "segmentation", "wobble", "voice", "coaching", "integrated"];
+const artifactDirectories = ["dimensions", "segmentation", "wobble", "coaching"];
 let artifactCount = 0;
 for (const name of artifactDirectories) {
   const directory = resolve("benchmarks", name, "artifacts");

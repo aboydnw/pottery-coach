@@ -5,7 +5,23 @@ import { defineConfig } from "vitest/config";
 export default defineConfig({
   plugins: [react(), VitePWA({ manifest: false })],
   test: {
-    environment: "jsdom",
-    exclude: ["tests/e2e/**", "node_modules/**", "dist/**"],
+    projects: [
+      {
+        extends: true,
+        test: {
+          name: "unit",
+          environment: "node",
+          include: ["{src,api,benchmarks,research}/**/*.test.ts"],
+        },
+      },
+      {
+        extends: true,
+        test: {
+          name: "dom",
+          environment: "jsdom",
+          include: ["src/**/*.test.tsx"],
+        },
+      },
+    ],
   },
 });

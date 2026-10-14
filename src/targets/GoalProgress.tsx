@@ -1,15 +1,14 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useState } from "react";
 import type { ProfileComparison } from "./types";
 import { MilestoneTracker } from "./milestones";
 
 export function GoalProgress({ comparison, heightProgress, milestones = [0.8, 0.95, 1], onMilestone }:
   { comparison: ProfileComparison; heightProgress: number; milestones?: number[]; onMilestone?: (percent: number, evidenceId: string) => void }) {
-  const tracker = useRef<MilestoneTracker | null>(null);
-  if (!tracker.current) tracker.current = new MilestoneTracker(milestones);
+  const [tracker] = useState(() => new MilestoneTracker(milestones));
   useEffect(() => {
     if (comparison.confidence.overall >= 0.8 && comparison.confidence.freshnessMs <= 750)
-      tracker.current!.update(heightProgress).forEach((percent) => onMilestone?.(percent, comparison.readingId));
-  }, [comparison, heightProgress, onMilestone]);
+      tracker.update(heightProgress).forEach((percent) => onMilestone?.(percent, comparison.readingId));
+  }, [comparison, heightProgress, onMilestone, tracker]);
   const eligible = comparison.confidence.overall >= 0.8 && comparison.confidence.freshnessMs <= 750;
   const deviations = comparison.regions
     .filter((region) => region.coverage >= 0.7 && region.confidence >= 0.75 && region.signedMedianRadiusErrorMm !== null)

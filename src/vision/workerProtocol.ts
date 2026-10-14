@@ -9,6 +9,8 @@ export type FrameRequest = {
   capturedAtMs: number;
   droppedBefore: number;
   bitmap: ImageBitmap;
+  /** Source video pixels per bitmap pixel. */
+  scale: number;
 };
 
 export type DiagnosticResponse = {
@@ -16,10 +18,12 @@ export type DiagnosticResponse = {
   frameId: number;
   processingMs: number;
   droppedBefore: number;
+  /** Present when the worker could not process the frame; the pipeline keeps running. */
+  error?: string;
 };
 
 export type MeasurementWorkerRequest =
-  | { type: "configure"; calibration: CalibrationResult }
+  | { type: "configure"; calibration: CalibrationResult | null }
   | FrameRequest
   | { type: "reset"; reason: string };
 
@@ -29,6 +33,10 @@ export type MeasurementWorkerEvent =
   | DiagnosticResponse
   | { type: "invalidated"; reason: string };
 
+/**
+ * Keeps at most one frame in flight to the measurement worker. Frames offered while the worker is
+ * busy are refused so the producer can close them, which bounds memory and keeps readings fresh.
+ */
 export class BoundedWorkerSink {
   private pending = false;
   private dropped = 0;
@@ -38,6 +46,11 @@ export class BoundedWorkerSink {
     private readonly onDiagnostic?: (diagnostic: DiagnosticResponse) => void,
   ) {
     worker.addEventListener("message", this.onMessage);
+    worker.addEventListener("error", this.onError);
+  }
+
+  get droppedFrames(): number {
+    return this.dropped;
   }
 
   submit(frame: AcquiredFrame): "accepted" | "busy" {
@@ -45,7 +58,6 @@ export class BoundedWorkerSink {
       this.dropped += 1;
       return "busy";
     }
-
     this.pending = true;
     const request: FrameRequest = {
       type: "frame",
@@ -53,6 +65,7 @@ export class BoundedWorkerSink {
       capturedAtMs: frame.capturedAtMs,
       droppedBefore: this.dropped,
       bitmap: frame.bitmap,
+      scale: frame.scale,
     };
     this.worker.postMessage(request, [frame.bitmap]);
     return "accepted";
@@ -60,11 +73,16 @@ export class BoundedWorkerSink {
 
   dispose(): void {
     this.worker.removeEventListener("message", this.onMessage);
+    this.worker.removeEventListener("error", this.onError);
   }
 
   private readonly onMessage = (event: MessageEvent<DiagnosticResponse>): void => {
     if (event.data?.type !== "diagnostic") return;
     this.pending = false;
     this.onDiagnostic?.(event.data);
+  };
+
+  private readonly onError = (): void => {
+    this.pending = false;
   };
 }

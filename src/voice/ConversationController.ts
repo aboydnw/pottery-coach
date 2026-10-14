@@ -15,6 +15,7 @@ export class ConversationController {
   private config: RealtimeSessionConfig | null = null;
   private reconnectAttempt = 0;
   private intentionallyClosed = false;
+  private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
   private compactContext: CompactContext = { goalId: null, phase: "setup", policyRevision: 1 };
   private ephemeralReadingId: string | null = null;
   private proactiveCloudSpeechEnabled = true;
@@ -39,42 +40,58 @@ export class ConversationController {
   async connect(config: RealtimeSessionConfig): Promise<void> {
     this.config = config;
     this.intentionallyClosed = false;
+    this.reconnectAttempt = 0;
     this.state = "connecting";
     await this.openTransport();
-    this.reconnectAttempt = 0;
   }
-
   async pause(): Promise<void> { await this.transport?.pauseInput(); this.state = "paused"; }
   async resume(): Promise<void> { await this.transport?.resumeInput(); this.state = "connected"; }
-
   async close(): Promise<void> {
     this.intentionallyClosed = true;
-    this.unsubscribe?.(); this.unsubscribe = null;
-    await this.transport?.close(); this.transport = null;
+    this.cancelReconnect();
+    await this.disposeTransport();
     this.state = "closed";
   }
-
   private async openTransport(): Promise<void> {
-    if (!this.config) return;
-    this.unsubscribe?.();
+    if (!this.config || this.intentionallyClosed) return;
+    await this.disposeTransport();
     const transport = this.createTransport();
     this.transport = transport;
-    this.unsubscribe = transport.onEvent((event) => this.handleEvent(event));
-    try { await transport.connect(this.config); this.state = "connected"; }
-    catch { this.scheduleReconnect(); }
+    this.unsubscribe = transport.onEvent((event) => this.handleEvent(transport, event));
+    try {
+      await transport.connect(this.config);
+      if (this.transport !== transport) return;
+      this.state = "connected";
+      this.reconnectAttempt = 0;
+    } catch {
+      if (this.transport === transport) this.scheduleReconnect();
+    }
   }
-
-  private handleEvent(event: RealtimeEvent): void {
+  private async disposeTransport(): Promise<void> {
+    const transport = this.transport;
+    this.unsubscribe?.();
+    this.unsubscribe = null;
+    this.transport = null;
+    await transport?.close();
+  }
+  private handleEvent(transport: RealtimeCoachTransport, event: RealtimeEvent): void {
+    if (transport !== this.transport) return;
     if (event.type === "connected") this.state = "connected";
     if (event.type === "closed" && !this.intentionallyClosed) this.scheduleReconnect();
-    if (event.type === "error") this.scheduleReconnect();
   }
-
   private scheduleReconnect(): void {
+    if (this.reconnectTimer !== null || this.intentionallyClosed) return;
     const delay = reconnectDelayMs(this.reconnectAttempt++);
     if (delay === null) { this.state = "failed"; return; }
     this.state = "reconnecting";
     this.ephemeralReadingId = null;
-    setTimeout(() => { void this.openTransport(); }, delay);
+    this.reconnectTimer = setTimeout(() => {
+      this.reconnectTimer = null;
+      void this.openTransport();
+    }, delay);
+  }
+  private cancelReconnect(): void {
+    if (this.reconnectTimer !== null) clearTimeout(this.reconnectTimer);
+    this.reconnectTimer = null;
   }
 }

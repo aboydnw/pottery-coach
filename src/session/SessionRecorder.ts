@@ -8,7 +8,7 @@ type QueueItem =
 
 export class SessionRecorder {
   private queue: QueueItem[] = [];
-  private flushing: Promise<void> | null = null;
+  private flushing: Promise<void> = Promise.resolve();
   private lastReadingAt = -Infinity;
   private lastDiagnosticAt = -Infinity;
   readonly dropped = { diagnostic: 0, evidence: 0 };
@@ -50,12 +50,11 @@ export class SessionRecorder {
     if (this.options.autoFlush !== false) void this.flush();
   }
 
-  async flush() {
-    if (this.flushing) await this.flushing;
-    this.flushing = this.drain();
-    try { await this.flushing; } finally { this.flushing = null; }
+  /** Writes queued items in order; concurrent calls share one serialized write chain. */
+  flush(): Promise<void> {
+    this.flushing = this.flushing.then(() => this.drain());
+    return this.flushing;
   }
-
   private async drain() {
     try {
       while (this.queue.length) {

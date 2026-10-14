@@ -65,12 +65,14 @@ describe("SessionRepository", () => {
     }, new Blob(["still"]))).rejects.toThrow(/snapshot/i);
   });
 
-  it("expires ended records at the boundary while preserving active sessions", async () => {
+  it("expires ended and abandoned records at the boundary while preserving recent sessions", async () => {
     const repository = new SessionRepository(`test-${crypto.randomUUID()}`); databases.push(repository);
+    const day = 86_400_000;
     await repository.create({ ...record("old"), startedAtMs: 0, endedAtMs: 0, outcome: "completed" });
-    await repository.create({ ...record("recently-ended"), startedAtMs: 0, endedAtMs: 30 * 86_400_000 - 1, outcome: "completed" });
-    await repository.create({ ...record("active"), startedAtMs: 0 });
-    expect(await repository.expire(30 * 86_400_000, 30 * 86_400_000)).toEqual(["old"]);
+    await repository.create({ ...record("recently-ended"), startedAtMs: 0, endedAtMs: 30 * day - 1, outcome: "completed" });
+    await repository.create({ ...record("abandoned"), startedAtMs: 0 });
+    await repository.create({ ...record("active"), startedAtMs: 30 * day - 1 });
+    expect((await repository.expire(30 * day, 30 * day)).sort()).toEqual(["abandoned", "old"]);
     expect(await repository.get("active")).toBeDefined();
     expect(await repository.get("recently-ended")).toBeDefined();
   });

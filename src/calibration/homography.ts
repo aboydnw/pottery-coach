@@ -1,3 +1,5 @@
+import { solveLinearSystem } from "../shared/linearAlgebra";
+import { percentile } from "../shared/stats";
 import { validateCalibration } from "./quality";
 import type { CalibrationBoard, CalibrationFrame, CalibrationResult, Point2, PointCorrespondence } from "./types";
 
@@ -34,7 +36,7 @@ export function solveCalibration(
     roiImage: frame.roi,
     markerPlaneOffsetToleranceMm: board.markerPlaneOffsetToleranceMm,
     quality: {
-      tagCount: Math.min(4, corners.length),
+      tagCount: new Set(corners.map((corner) => corner.tagId)).size,
       reprojectionErrorPx95: percentile(residuals, 0.95),
       scaleVariationFraction: scaleVariation,
       estimatedErrorMm95: percentile(residuals, 0.95) * meanScale,
@@ -64,49 +66,41 @@ export function applyHomography(matrix: readonly number[], point: Point2): Point
 }
 
 function solveHomography(points: PointCorrespondence[]): Matrix3 {
-  const rows: number[][] = [];
-  const values: number[] = [];
-  for (const { image: { x, y }, boardMm: { x: u, y: v } } of points) {
-    rows.push([x, y, 1, 0, 0, 0, -u * x, -u * y]);
-    values.push(u);
-    rows.push([0, 0, 0, x, y, 1, -v * x, -v * y]);
-    values.push(v);
-  }
+  const imageNormalization = normalization(points.map((point) => point.image));
+  const boardNormalization = normalization(points.map((point) => point.boardMm));
   const normal = Array.from({ length: 8 }, () => Array(8).fill(0) as number[]);
   const rhs = Array(8).fill(0) as number[];
-  for (let row = 0; row < rows.length; row += 1) {
-    for (let column = 0; column < 8; column += 1) {
-      rhs[column]! += rows[row]![column]! * values[row]!;
-      for (let inner = 0; inner < 8; inner += 1) {
-        normal[column]![inner]! += rows[row]![column]! * rows[row]![inner]!;
+  for (const point of points) {
+    const { x, y } = applyHomography(imageNormalization, point.image);
+    const { x: u, y: v } = applyHomography(boardNormalization, point.boardMm);
+    for (const [row, value] of [[[x, y, 1, 0, 0, 0, -u * x, -u * y], u], [[0, 0, 0, x, y, 1, -v * x, -v * y], v]] as const) {
+      for (let column = 0; column < 8; column += 1) {
+        rhs[column]! += row[column]! * value;
+        for (let inner = 0; inner < 8; inner += 1) normal[column]![inner]! += row[column]! * row[inner]!;
       }
     }
   }
-  const solved = gaussianSolve(normal, rhs);
-  return [...solved, 1] as Matrix3;
+  const normalized = [...solveLinearSystem(normal, rhs, 1e-9), 1] as Matrix3;
+  const homography = multiply(invertHomography(boardNormalization), multiply(normalized, imageNormalization));
+  return homography.map((value) => value / homography[8]) as Matrix3;
 }
 
-function gaussianSolve(matrix: number[][], values: number[]): number[] {
-  const size = values.length;
-  const augmented = matrix.map((row, index) => [...row, values[index]!]);
-  for (let column = 0; column < size; column += 1) {
-    let pivot = column;
-    for (let row = column + 1; row < size; row += 1) {
-      if (Math.abs(augmented[row]![column]!) > Math.abs(augmented[pivot]![column]!)) pivot = row;
-    }
-    if (Math.abs(augmented[pivot]![column]!) < 1e-9) throw new Error("Degenerate calibration geometry");
-    [augmented[column], augmented[pivot]] = [augmented[pivot]!, augmented[column]!];
-    const divisor = augmented[column]![column]!;
-    for (let index = column; index <= size; index += 1) augmented[column]![index]! /= divisor;
-    for (let row = 0; row < size; row += 1) {
-      if (row === column) continue;
-      const factor = augmented[row]![column]!;
-      for (let index = column; index <= size; index += 1) {
-        augmented[row]![index]! -= factor * augmented[column]![index]!;
-      }
-    }
-  }
-  return augmented.map((row) => row[size]!);
+/** Hartley normalization: moves points to their centroid and scales their mean distance to √2. */
+function normalization(points: Point2[]): Matrix3 {
+  const centerX = points.reduce((sum, point) => sum + point.x, 0) / points.length;
+  const centerY = points.reduce((sum, point) => sum + point.y, 0) / points.length;
+  const meanDistance = points.reduce((sum, point) => sum + Math.hypot(point.x - centerX, point.y - centerY), 0) / points.length;
+  if (meanDistance === 0) throw new Error("Degenerate calibration geometry");
+  const scale = Math.SQRT2 / meanDistance;
+  return [scale, 0, -scale * centerX, 0, scale, -scale * centerY, 0, 0, 1];
+}
+
+function multiply(left: Matrix3, right: Matrix3): Matrix3 {
+  return Array.from({ length: 9 }, (_, index) => {
+    const row = Math.floor(index / 3);
+    const column = index % 3;
+    return left[row * 3]! * right[column]! + left[row * 3 + 1]! * right[3 + column]! + left[row * 3 + 2]! * right[6 + column]!;
+  }) as Matrix3;
 }
 
 function invertHomography(matrix: Matrix3): Matrix3 {
@@ -132,9 +126,4 @@ function localScale(matrix: Matrix3, point: Point2): number {
   const alongY = applyHomography(matrix, { x: point.x, y: point.y + 1 });
   return (Math.hypot(alongX.x - origin.x, alongX.y - origin.y) +
     Math.hypot(alongY.x - origin.x, alongY.y - origin.y)) / 2;
-}
-
-function percentile(values: number[], fraction: number): number {
-  const sorted = [...values].sort((left, right) => left - right);
-  return sorted[Math.max(0, Math.ceil(sorted.length * fraction) - 1)] ?? 0;
 }

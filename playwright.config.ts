@@ -1,43 +1,50 @@
 import { defineConfig, devices } from "@playwright/test";
+import { BOARD_VIDEO_PATH } from "./tests/e2e/support/boardVideo";
+
+const fakeCamera = ["--use-fake-device-for-media-stream", "--use-fake-ui-for-media-stream"];
+// E2E_PREVIEW=1 runs the suite against a production build (served by `vite preview`) with demo
+// shortcuts compiled in, which catches bundling differences such as how workers are emitted.
+const preview = process.env.E2E_PREVIEW === "1";
 
 export default defineConfig({
   testDir: "./tests/e2e",
+  globalSetup: "./tests/e2e/support/globalSetup.ts",
   use: {
     baseURL: "http://127.0.0.1:4173",
     trace: "retain-on-failure",
   },
   webServer: {
-    command: "pnpm dev --host 127.0.0.1 --port 4173",
+    command: preview
+      ? "VITE_ENABLE_DEMO=true pnpm exec vite build && pnpm exec vite preview --host 127.0.0.1 --port 4173 --strictPort"
+      : "pnpm dev --host 127.0.0.1 --port 4173 --strictPort",
     url: "http://127.0.0.1:4173",
-    reuseExistingServer: true,
+    reuseExistingServer: !process.env.CI,
+    timeout: 120_000,
   },
   projects: [
     {
       name: "chromium",
-      use: {
-        ...devices["Desktop Chrome"],
-        permissions: ["camera"],
-        launchOptions: {
-          args: [
-            "--use-fake-device-for-media-stream",
-            "--use-fake-ui-for-media-stream",
-          ],
-        },
-      },
+      testIgnore: /calibration-board\.spec\.ts/,
+      use: { ...devices["Desktop Chrome"], permissions: ["camera"], launchOptions: { args: fakeCamera } },
     },
     {
       name: "mobile-chromium",
+      testIgnore: /calibration-board\.spec\.ts/,
+      use: { ...devices["Pixel 7"], permissions: ["camera"], launchOptions: { args: fakeCamera } },
+    },
+    {
+      name: "chromium-board-camera",
+      testMatch: /calibration-board\.spec\.ts/,
       use: {
-        ...devices["Pixel 7"], permissions: ["camera"],
-        launchOptions: { args: ["--use-fake-device-for-media-stream", "--use-fake-ui-for-media-stream"] },
+        ...devices["Desktop Chrome"],
+        permissions: ["camera"],
+        launchOptions: { args: [...fakeCamera, `--use-file-for-fake-video-capture=${BOARD_VIDEO_PATH}`] },
       },
     },
     {
       name: "mobile-webkit",
       testMatch: /accessibility\.spec\.ts/,
-      use: {
-        ...devices["iPhone 15"],
-      },
+      use: { ...devices["iPhone 15"] },
     },
   ],
 });

@@ -13,12 +13,14 @@ function session(id: string, startedAtMs: number, active = false): SessionRecord
 }
 afterEach(async () => repository?.destroy());
 
-it("expires sessions at the 30-day boundary but excludes active sessions", async () => {
+it("expires sessions at the 30-day boundary, including abandoned ones, but keeps a session in progress", async () => {
   repository = new SessionRepository(`test-${crypto.randomUUID()}`);
   const day = 86_400_000;
   await repository.create(session("old", 0));
-  await repository.create(session("active", 0, true));
+  await repository.create(session("abandoned", 0, true));
+  await repository.create(session("active", 30 * day - 60_000, true));
   await new RetentionService(repository).expire(30 * day);
   expect(await repository.get("old")).toBeUndefined();
+  expect(await repository.get("abandoned")).toBeUndefined();
   expect(await repository.get("active")).toBeDefined();
 });

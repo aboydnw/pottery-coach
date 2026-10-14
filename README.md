@@ -1,44 +1,74 @@
-# Pottery Coach Controlled Web Prototype
+# Pottery Coach
 
-This repository contains the responsive web implementation and evidence package for a privacy-first, hands-free AI pottery coach. It is a controlled research prototype, not production or safety equipment.
+A hands-free practice coach for throwing pottery on the wheel. A phone or laptop camera watches the vessel from the side, measures its height and profile against a target shape, and flags visible wobble, all on the device. Raw video never leaves it. An optional voice coach answers questions such as "how tall is it?" using only measurements the camera can support.
 
-Plans 1–9 have implementation scaffolding and automated contracts. Physical-device, real-clay, paid-provider, accessibility assistive-technology, instructor, novice, and privacy-review gates remain explicitly pending until the consolidated field test.
+This is a controlled research prototype, not production software or safety equipment. Every gate that needs real phones, real clay, a paid voice provider, accessibility testing with assistive technology, or a pottery instructor is still open. The release manifest keeps numeric measurement, proactive wobble alerts, cloud voice and mobile support switched off until those gates pass. Research finished on 2026-10-08; see [`docs/research/10-benchmark-results.md`](docs/research/10-benchmark-results.md) for what has and hasn't been measured.
 
-Research was completed on 2026-10-08. Claims based on documentation are cited inline. Physical-device, real-object, paid-API, and instructor gates remain explicitly unpassed because the research environment had no phones, calibration objects, pottery footage, provider credentials, or recruited instructor.
+## Quick start
 
-Start with `docs/runbook.md`, `docs/release-checklist.md`, and `research/field/protocol.md` before running the consolidated test.
-
-## Document map
-
-- `docs/research/`: evidence, decisions, benchmark status, risks, and open questions.
-- `docs/specs/`: normative product and subsystem contracts.
-- `docs/plans/`: test-driven, independently reviewable implementation sequences.
-- `docs/reviews/`: adversarial reviews and residual objections.
-
-## Evidence labels
-
-- **Verified-doc:** supported by a cited primary or authoritative source.
-- **Measured:** produced by a named reproducible harness. No mobile or physical measurements have this label yet.
-- **Engineering inference:** a design judgment awaiting a gate.
-- **Domain hypothesis:** requires pottery-instructor review.
-
-## Local development
-
-Use Node 24 and pnpm 10:
+You need Node 24 and pnpm 10.
 
 ```sh
 pnpm install
 pnpm dev
 ```
 
-Camera access requires HTTPS except on `localhost`. The app never requests camera or microphone access on page load; a user gesture is required. Raw camera frames remain on the device and are neither persisted nor sent over the network by default.
+Open the printed URL. Camera access needs HTTPS except on `localhost`, and the app only asks for it after you click **Start camera**. To walk through the whole flow without a printed board or a pot, open `/?mode=demo`. Demo mode loads a fixed calibration and reading, and only exists in development builds (or builds made with `VITE_ENABLE_DEMO=true`).
 
-Run the current verification suite with:
+To calibrate for real, print [`public/calibration/board-v1.svg`](public/calibration/board-v1.svg) at 100% scale and check that the reference line measures 100 mm.
 
-```sh
-pnpm test
-pnpm typecheck
-pnpm build
+## Checks
+
+| Command | What it does |
+|---|---|
+| `pnpm lint` | oxlint (TypeScript, React hooks, accessibility, Vitest rules) |
+| `pnpm typecheck` | Type-checks the app (`tsconfig.json`) and the Node code in `api/`, `benchmarks/`, `scripts/` and `tests/` (`tsconfig.node.json`) |
+| `pnpm test` | Vitest unit and component tests |
+| `pnpm e2e` | Playwright journeys in Chromium (fake camera), mobile Chromium and WebKit. One project feeds a rendered calibration board to the real tag detector |
+| `E2E_PREVIEW=1 pnpm e2e` | The same journeys against a production build |
+| `pnpm verify` | Everything above plus the build and evidence-manifest checks |
+
+After changing `src/calibration/boardV1.ts`, regenerate the printable board with `pnpm calibration:board`. A unit test fails if the SVG and the definition drift apart.
+
+## How it fits together
+
+```text
+camera ──▶ CanvasFrameSource ──▶ measurement worker ──▶ stable readings ──▶ target comparison, wobble status
+ (useCamera)   (≤10 fps, 320 px)   segmentation, profile,    (temporal filter)        │
+                                   wobble fit                                         ▼
+                                                                         IndexedDB session ──▶ review / delete
 ```
 
-Run Chromium fake-camera checks with `pnpm e2e`. Run a diagnostic desktop harness session with `pnpm benchmark:camera -- --duration=60 --mode=camera-worker`. Physical-device runs must follow [`docs/device-test-protocol.md`](docs/device-test-protocol.md). No browser or device is considered supported until its linked 20-minute camera-only and camera-worker artifacts satisfy Gate 1; fake media never establishes support.
+- `src/app/` holds the session state machine (`AppSessionOrchestrator.ts`), the top-level flow and session recording.
+- `src/camera/`, `src/vision/`, `src/measurement/` and `src/wobble/` hold the camera, the worker pipeline, dimension extraction and oscillation detection.
+- `src/calibration/` holds the board definition, the AprilTag worker (vendored WebAssembly in `public/vendor/apriltag`) and the homography.
+- `src/session/`, `src/privacy/` and `src/review/` hold local storage, retention and deletion, and the post-session review.
+- `api/realtime/session.ts` exchanges a WebRTC offer with the voice provider. It returns 503 until its secrets are configured (see [`deploy/config.md`](deploy/config.md)).
+
+### Built but not yet wired into the app
+
+These modules are tested and kept for the next milestones, but the running app doesn't use them yet:
+
+- **Cloud voice:** `src/voice/OpenAIWebRtcTransport.ts`, `ConversationController.ts`, `TranscriptStore.ts` and `tools/registry.ts`. The app offers an offline mock voice only.
+- **Coaching engine:** everything in `src/coaching/`, which covers cue policies, arbitration, phase tracking and spoken-claim validation.
+- **Other pieces:** spoken goals (`src/goals/parseSpokenGoal.ts`), session export and summary (`src/review/exportSession.ts`, `buildSummary.ts`), camera-motion estimation (`src/wobble/cameraMotion.ts`) and field-study analysis (`src/research/`).
+
+## Documentation
+
+- `docs/specs/` holds the product and subsystem contracts.
+- `docs/plans/` holds the original implementation plans, kept as a historical record.
+- `docs/research/` and `docs/reviews/` hold the evidence, decisions, risks and adversarial reviews.
+- [`docs/runbook.md`](docs/runbook.md), [`docs/release-checklist.md`](docs/release-checklist.md) and [`research/field/protocol.md`](research/field/protocol.md) cover the consolidated field test.
+
+Claims in the docs carry one of four labels:
+
+- **Verified-doc:** backed by a cited primary source.
+- **Measured:** produced by a named harness.
+- **Engineering inference:** a design judgement that is still waiting on a gate.
+- **Domain hypothesis:** needs review by a pottery instructor.
+
+## Contributing
+
+See [CONTRIBUTING.md](CONTRIBUTING.md).
+
+The AprilTag detector and tag patterns come from [AprilRobotics](https://github.com/AprilRobotics/apriltag) via [apriltag-js](https://github.com/AliAlimohamad/apriltag-js), under the BSD-2-Clause license (see [`third_party/apriltag`](third_party/apriltag)).

@@ -14,15 +14,21 @@ export class CameraController {
   private stream: MediaStream | null = null;
   private listeners = new Set<(event: CameraEvent) => void>();
   private listeningForVisibility = false;
+  private generation = 0;
 
   async start(
     constraints: MediaStreamConstraints = DEFAULT_CONSTRAINTS,
   ): Promise<CameraStartResult> {
     this.stop();
+    const generation = this.generation;
     this.listenForVisibility();
 
     try {
       const stream = await navigator.mediaDevices.getUserMedia(constraints);
+      if (generation !== this.generation) {
+        stream.getTracks().forEach((item) => item.stop());
+        throw new DOMException("A newer camera request replaced this one", "AbortError");
+      }
       const track = stream.getVideoTracks()[0];
       if (!track) {
         stream.getTracks().forEach((item) => item.stop());
@@ -45,9 +51,19 @@ export class CameraController {
     }
   }
 
+  /** Stops the active stream and invalidates any start() still waiting for permission. */
   stop(): void {
+    this.generation += 1;
     this.stream?.getTracks().forEach((track) => track.stop());
     this.stream = null;
+  }
+
+  /** Stops the camera and detaches document listeners; the controller should not be reused. */
+  dispose(): void {
+    this.stop();
+    this.listeners.clear();
+    if (this.listeningForVisibility) document.removeEventListener("visibilitychange", this.onVisibilityChange);
+    this.listeningForVisibility = false;
   }
 
   switchDevice(deviceId: string): Promise<CameraStartResult> {
@@ -99,6 +115,7 @@ export class CameraController {
     if (error.name === "NotAllowedError") return "permission-denied";
     if (error.name === "NotFoundError") return "camera-not-found";
     if (error.name === "NotReadableError") return "camera-in-use";
+    if (error.name === "AbortError") return "superseded";
     return "unknown";
   }
 }
