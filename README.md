@@ -22,6 +22,7 @@ To calibrate for real, print [`public/calibration/board-v1.svg`](public/calibrat
 | Command                  | What it does                                                                                                                                       |
 | ------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `pnpm lint`              | oxlint (TypeScript, React hooks, accessibility, Vitest rules)                                                                                      |
+| `pnpm format`            | Formats with Prettier; CI runs `pnpm format:check`                                                                                                 |
 | `pnpm typecheck`         | Type-checks the app (`tsconfig.json`) and the Node code in `api/`, `benchmarks/`, `scripts/` and `tests/` (`tsconfig.node.json`)                   |
 | `pnpm test`              | Vitest unit and component tests                                                                                                                    |
 | `pnpm e2e`               | Playwright journeys in Chromium (fake camera), mobile Chromium and WebKit. One project feeds a rendered calibration board to the real tag detector |

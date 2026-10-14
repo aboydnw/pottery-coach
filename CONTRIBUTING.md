@@ -11,7 +11,7 @@ Use Node 24 and pnpm 10, then run `pnpm install`. `pnpm verify` runs every check
 1. Branch from `main` and open a pull request. PRs are squash-merged, so you don't need to tidy individual commits.
 2. Write commit messages and PR titles as [Conventional Commits](https://www.conventionalcommits.org/), for example `fix(vision): …` or `docs: …`.
 3. Add or update tests with the change. Name a test after the behaviour it checks, and don't assert on error message text.
-4. Run `pnpm lint`, `pnpm typecheck` and `pnpm test` before pushing. If you touched the camera, workers or calibration, also run `pnpm e2e`. Those paths only fail in a real browser.
+4. Run `pnpm format`, `pnpm lint`, `pnpm typecheck` and `pnpm test` before pushing. If you touched the camera, workers or calibration, also run `pnpm e2e`. Those paths only fail in a real browser.
 
 ## Ground rules
 
