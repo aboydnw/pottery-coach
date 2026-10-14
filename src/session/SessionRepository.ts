@@ -95,8 +95,9 @@ export class SessionRepository {
     await this.requireSession(id);
     await this.db.sessions.update(id, structuredClone(patch));
   }
+  /** Deletes sessions whose end (or, for abandoned sessions, start) is older than the retention window. */
   async expire(now = Date.now(), retentionMs = 30 * 86_400_000) {
-    const expired = (await this.list()).filter((session) => session.endedAtMs !== null && now - session.endedAtMs >= retentionMs);
+    const expired = (await this.list()).filter((session) => now - (session.endedAtMs ?? session.startedAtMs) >= retentionMs);
     await Promise.all(expired.map((session) => this.delete(session.id)));
     return expired.map((session) => session.id);
   }
