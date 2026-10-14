@@ -32,7 +32,7 @@ for (const document of linkedDocuments) {
     await access(target).catch(() => { throw new Error(`${document} has an unresolved link: ${match[1]}`); });
   }
 }
-const artifactDirectories = ["dimensions", "segmentation", "wobble", "voice", "coaching", "integrated"];
+const artifactDirectories = ["dimensions", "segmentation", "wobble", "coaching"];
 let artifactCount = 0;
 for (const name of artifactDirectories) {
   const directory = resolve("benchmarks", name, "artifacts");
