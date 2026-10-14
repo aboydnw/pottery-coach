@@ -22,7 +22,7 @@ const required = [
 ];
 
 for (const path of required) await access(resolve(path));
-for (const path of required.filter((path) => path.endsWith(".json"))) JSON.parse(await readFile(resolve(path), "utf8"));
+for (const path of required.filter((candidate) => candidate.endsWith(".json"))) JSON.parse(await readFile(resolve(path), "utf8"));
 
 const linkedDocuments = ["docs/release-checklist.md", "docs/reviews/field-release-review.md", "docs/research/10-benchmark-results.md"];
 for (const document of linkedDocuments) {

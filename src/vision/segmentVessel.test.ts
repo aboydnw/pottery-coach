@@ -12,7 +12,7 @@ it("selects the clay component connected to the wheel band and excludes a detach
 
   const result = segmentVessel(
     { width, height, lab },
-    { width, height, medianLab: new Float32Array(Array(width * height).fill([10, 0, 0]).flat()), distanceThreshold: 15 },
+    { width, height, medianLab: new Float32Array(Array.from({ length: width * height }, () => [10, 0, 0]).flat()), distanceThreshold: 15 },
     [],
   );
 
