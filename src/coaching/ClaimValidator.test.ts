@@ -19,3 +19,8 @@ it("rejects a number backed only by stale or low-confidence tool evidence", () =
   expect(result.valid).toBe(false);
   expect(result.violations).toContain("INELIGIBLE_EVIDENCE:r1");
 });
+
+it("rejects every phrase in the shared prohibited-language list", async () => {
+  const { default: phrases } = await import("./prohibited-language.json");
+  for (const phrase of phrases) expect(validateSpokenClaim(`The clay ${phrase} now`, cue, []).valid).toBe(false);
+});
