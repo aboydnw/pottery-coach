@@ -10,7 +10,7 @@ import { SessionRepository } from "../session/SessionRepository";
 import type { SessionBundle } from "../session/types";
 import { createSessionState, restoreSessionShell, serializeSessionShell, transition } from "./AppSessionOrchestrator";
 import { isCameraOnlyMode, isDemoMode } from "./demoMode";
-import { deriveGatedFeatureFlags } from "./featureFlags";
+import { deriveGatedFeatureFlags, UNVERIFIED_MEASUREMENTS } from "./featureFlags";
 import { useSessionRecording } from "./useSessionRecording";
 
 const SHELL_KEY = "pottery-coach-session-shell";
@@ -93,7 +93,9 @@ export function SessionFlow() {
       )}
       <CameraSetup
         step={state.step}
-        numericEnabled={flags.numericMeasurement || demoMode}
+        numericEnabled={flags.numericMeasurement || demoMode || UNVERIFIED_MEASUREMENTS}
+        measurementsUnverified={!flags.numericMeasurement && UNVERIFIED_MEASUREMENTS}
+        shapeOnly={!state.modes.numeric}
         demoMode={demoMode}
         cameraOnly={cameraOnly}
         onCameraReady={() => {
@@ -103,6 +105,8 @@ export function SessionFlow() {
         onCameraDenied={() => dispatch({ type: "CAMERA_DENIED" })}
         onCameraStopped={() => dispatch({ type: "CAMERA_STOPPED" })}
         onCalibrated={() => dispatch({ type: "CALIBRATED" })}
+        onSkipCalibration={() => dispatch({ type: "SKIP_CALIBRATION" })}
+        onStartShapeOnly={() => dispatch({ type: "START_LIVE" })}
         onRecalibrate={() => dispatch({ type: "RECALIBRATE" })}
         onAudioDecided={() => dispatch({ type: "AUDIO_DECIDED" })}
         onGoalSet={(goal) => {

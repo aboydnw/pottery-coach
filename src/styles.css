@@ -81,6 +81,10 @@ button:focus-visible {
   object-fit: contain;
 }
 
+.camera-setup video.mirrored {
+  transform: scaleX(-1);
+}
+
 .session-review {
   width: min(100%, 52rem);
   overflow-wrap: anywhere;

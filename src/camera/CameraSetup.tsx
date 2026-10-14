@@ -5,6 +5,7 @@ import { demoCalibration, demoReading } from "../app/demoFixtures";
 import { CalibrationFlow } from "../calibration/CalibrationFlow";
 import { calibrateFromVideo } from "../calibration/calibrateFromVideo";
 import type { CalibrationResult } from "../calibration/types";
+import { uncalibratedCalibration } from "../calibration/uncalibrated";
 import { WasmTagDetector } from "../calibration/WasmTagDetector";
 import { DiagnosticsPanel } from "../diagnostics/DiagnosticsPanel";
 import type { GoalConfirmation } from "../goals/types";
@@ -27,16 +28,22 @@ export type CameraSetupProps = {
   /** Current step from the session state machine; it decides which panels are shown. */
   step?: SessionStep;
   numericEnabled?: boolean;
+  /** Measurements are shown without a passed release gate; the UI labels them as unverified. */
+  measurementsUnverified?: boolean;
+  /** The session continued without calibration: show shapes and proportions, never sizes. */
+  shapeOnly?: boolean;
   demoMode?: boolean;
   cameraOnly?: boolean;
   onCameraReady?(): void;
   onCameraDenied?(): void;
   onCameraStopped?(): void;
   onCalibrated?(): void;
+  onSkipCalibration?(): void;
   onRecalibrate?(): void;
   onAudioDecided?(enabled: boolean): void;
   onGoalSet?(goal: GoalConfirmation): void;
   onGoalCleared?(): void;
+  onStartShapeOnly?(): void;
   onReading?(reading: StableDimensionReading): void;
   onWobble?(reading: WobbleReading): void;
   onMilestone?(percent: number, evidenceId: string): void;
@@ -50,12 +57,22 @@ const CALIBRATED_STEPS: readonly SessionStep[] = ["audio-consent", "goal", "live
 
 /** The live camera journey: camera, calibration, voice choice, target, and the live session view. */
 export function CameraSetup(props: CameraSetupProps) {
-  const { step = "camera", numericEnabled = true, demoMode = false, cameraOnly = false } = props;
+  const {
+    step = "camera",
+    numericEnabled = true,
+    measurementsUnverified = false,
+    shapeOnly: shapeOnlySession = false,
+    demoMode = false,
+    cameraOnly = false,
+  } = props;
+  // Without a passed (or unverified-override) measurement gate, sizes are never shown, so the
+  // session behaves as shape-only whatever the calibration state.
+  const shapeOnly = shapeOnlySession || !numericEnabled;
   const videoRef = useRef<HTMLVideoElement>(null);
   const camera = useCamera(videoRef, { onDenied: props.onCameraDenied });
   const pipeline = useMeasurementPipeline({
-    onReading: props.onReading,
-    onWobble: props.onWobble,
+    onReading: shapeOnly ? undefined : props.onReading,
+    onWobble: shapeOnly ? undefined : props.onWobble,
     onProcessingModeChange: props.onProcessingModeChange,
   });
   const [detector, setDetector] = useState<WasmTagDetector | null>(null);
@@ -67,7 +84,7 @@ export function CameraSetup(props: CameraSetupProps) {
   const [goal, setGoal] = useState<GoalConfirmation | null>(null);
   const [demoAnswer, setDemoAnswer] = useState<string | null>(null);
   const [momentMarked, setMomentMarked] = useState(false);
-  const processing = numericEnabled && !cameraOnly;
+  const processing = !cameraOnly;
 
   const selectedTarget = TARGET_TEMPLATES.find((template) => template.id === targetId) ?? TARGET_TEMPLATES[0]!;
   const scaledTarget = useMemo(
@@ -88,6 +105,19 @@ export function CameraSetup(props: CameraSetupProps) {
     if (!settings) return;
     if (step === "camera") props.onCameraReady?.();
     if (processing && videoRef.current) pipeline.start(videoRef.current, settings);
+  }
+
+  async function switchCamera(): Promise<void> {
+    const settings = await camera.switchFacing();
+    if (!settings) return;
+    if (processing && videoRef.current) pipeline.start(videoRef.current, settings);
+    // A different lens sees the wheel from a different place, so a board calibration no longer applies.
+    if (CALIBRATED_STEPS.includes(step) && !shapeOnly) recalibrate();
+  }
+
+  function skipCalibration(): void {
+    pipeline.configure(uncalibratedCalibration(camera.settings?.width ?? 640, camera.settings?.height ?? 360));
+    props.onSkipCalibration?.();
   }
 
   function stopCamera(): void {
@@ -175,7 +205,8 @@ export function CameraSetup(props: CameraSetupProps) {
   }
 
   const calibrated = CALIBRATED_STEPS.includes(step);
-  const live = step === "live" && goal !== null;
+  const live = step === "live" && (goal !== null || shapeOnly);
+  const mirrored = camera.facing === "user" && camera.settings?.facingMode !== "environment";
 
   return (
     <section className="camera-setup" aria-labelledby="camera-title">
@@ -186,7 +217,14 @@ export function CameraSetup(props: CameraSetupProps) {
         separately, later.
       </p>
 
-      <video ref={videoRef} autoPlay muted playsInline aria-label="Rear camera preview" />
+      <video
+        ref={videoRef}
+        className={mirrored ? "mirrored" : undefined}
+        autoPlay
+        muted
+        playsInline
+        aria-label={camera.facing === "user" ? "Front camera preview" : "Rear camera preview"}
+      />
 
       {camera.error && <p role="alert">{camera.error}</p>}
       {calibrationError && <p role="alert">{calibrationError}</p>}
@@ -207,6 +245,14 @@ export function CameraSetup(props: CameraSetupProps) {
       {camera.active && !numericEnabled && (
         <p>Numeric measurements are disabled until the signed physical calibration gate passes.</p>
       )}
+      {camera.active && numericEnabled && measurementsUnverified && !shapeOnly && (
+        <p className="stale-banner">Prototype: measurements are unverified and may be wrong.</p>
+      )}
+      {camera.active && (
+        <button type="button" className="secondary" disabled={camera.starting} onClick={() => void switchCamera()}>
+          {camera.facing === "user" ? "Use rear camera" : "Use front camera"}
+        </button>
+      )}
       {camera.interrupted && (
         <div role="status" className="stale-banner">
           Camera was interrupted. Readings are stale until you resume.
@@ -218,26 +264,35 @@ export function CameraSetup(props: CameraSetupProps) {
 
       {camera.active && <DiagnosticsPanel sample={pipeline.sample} />}
       {camera.active && step === "calibration" && !candidate && (
-        <div className="calibration-actions">
-          <a href="/calibration/board-v1.svg" target="_blank" rel="noreferrer">
-            Open printable calibration board
-          </a>
-          <button type="button" className="secondary" disabled={calibrating} onClick={() => void runCalibration()}>
+        <section className="calibration-actions" aria-labelledby="calibration-step-title">
+          <h2 id="calibration-step-title">Calibrate for sizes</h2>
+          <p>
+            To measure in millimetres, print the{" "}
+            <a href="/calibration/board-v1.svg" target="_blank" rel="noreferrer">
+              calibration board
+            </a>{" "}
+            at 100% scale, stand it beside the pot facing the camera, then calibrate. Without it you can still continue
+            and coach on shape and proportions.
+          </p>
+          <button type="button" disabled={calibrating} onClick={() => void runCalibration()}>
             {calibrating ? "Detecting board…" : "Calibrate printed board"}
+          </button>
+          <button type="button" className="secondary" disabled={calibrating} onClick={skipCalibration}>
+            Continue without calibration
           </button>
           {demoMode && (
             <button type="button" className="secondary" onClick={loadDemoCalibration}>
               Load deterministic demo calibration
             </button>
           )}
-        </div>
+        </section>
       )}
       {candidate && (
         <CalibrationFlow result={candidate} onAccepted={acceptCalibration} onRecalibrate={() => setCandidate(null)} />
       )}
       {camera.active && calibrated && (
         <button type="button" className="secondary" onClick={recalibrate}>
-          Recalibrate
+          {shapeOnlySession ? "Calibrate for sizes" : "Recalibrate"}
         </button>
       )}
       {camera.active && step === "audio-consent" && (
@@ -249,9 +304,22 @@ export function CameraSetup(props: CameraSetupProps) {
           targetId={targetId}
           onTargetChange={changeTarget}
           onGoalConfirmed={confirmGoal}
+          shapeOnly={shapeOnly}
+          started={step === "live"}
+          onStartShapeOnly={() => props.onStartShapeOnly?.()}
         />
       )}
-      {live && reading && comparison && (
+      {live && shapeOnly && (
+        <section className="live-target" aria-label="Live shape comparison">
+          {reading ? (
+            <ProfileOverlay target={selectedTarget} reading={reading} mode="normalized" />
+          ) : (
+            <p>Waiting for a clear view of the pot…</p>
+          )}
+          <p>Shape-only session: outlines show proportions. Sizes and wobble need a calibrated camera.</p>
+        </section>
+      )}
+      {live && !shapeOnly && goal && reading && comparison && (
         <section className="live-target" aria-label="Live target comparison">
           <ProfileOverlay target={scaledTarget} reading={reading} mode="millimetres" />
           <GoalProgress
@@ -261,7 +329,7 @@ export function CameraSetup(props: CameraSetupProps) {
           />
         </section>
       )}
-      {live && pipeline.wobbleReading && <StabilityStatus reading={pipeline.wobbleReading} />}
+      {live && !shapeOnly && pipeline.wobbleReading && <StabilityStatus reading={pipeline.wobbleReading} />}
       {voiceTransport && <VoiceControls transport={voiceTransport} connectionLabel="local mock (no provider audio)" />}
       {demoMode && live && reading && (
         <section aria-label="Demo evidence question">

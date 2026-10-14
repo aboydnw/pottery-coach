@@ -28,3 +28,16 @@ test("calibrates from the printed board with the real AprilTag detector and keep
   }
   expect(samples.every((fps) => fps > 0)).toBe(true);
 });
+
+test("the printable board opens as an SVG even after the offline cache is installed", async ({ page, context }) => {
+  await page.goto("/");
+  await page.evaluate(async () => {
+    const registration = await navigator.serviceWorker?.getRegistration();
+    if (registration) await navigator.serviceWorker.ready;
+  });
+  await page.reload();
+  const board = await context.newPage();
+  const response = await board.goto("/calibration/board-v1.svg");
+  expect(response?.headers()["content-type"]).toContain("image/svg+xml");
+  await expect(board.locator("svg[data-revision='board-v1']")).toHaveCount(1);
+});
