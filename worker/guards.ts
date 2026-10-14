@@ -22,25 +22,7 @@ export function isSameOrigin(request: Request, allowedOrigins: readonly string[]
   return origin === new URL(request.url).origin || allowedOrigins.includes(origin);
 }
 
-/** Returns the caller's address from proxy headers, falling back to a shared bucket. */
+/** Returns the caller's address as reported by Cloudflare, falling back to a shared bucket. */
 export function clientAddress(request: Request): string {
-  return request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || request.headers.get("x-real-ip") || "unknown";
-}
-
-/**
- * Creates a fixed-window rate limiter keyed by caller. State lives in memory, so limits apply per
- * server instance; use a shared store before opening the endpoint beyond a controlled test.
- */
-export function createRateLimiter(options: { limit: number; windowMs: number; now?: () => number }) {
-  const now = options.now ?? Date.now;
-  const windows = new Map<string, { startedAtMs: number; count: number }>();
-  return (key: string): boolean => {
-    const current = now();
-    for (const [existingKey, window] of windows)
-      if (current - window.startedAtMs >= options.windowMs) windows.delete(existingKey);
-    const window = windows.get(key) ?? { startedAtMs: current, count: 0 };
-    window.count += 1;
-    windows.set(key, window);
-    return window.count <= options.limit;
-  };
+  return request.headers.get("cf-connecting-ip") || "unknown";
 }

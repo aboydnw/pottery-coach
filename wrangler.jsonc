@@ -1,0 +1,34 @@
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "pottery-coach",
+  "main": "worker/index.ts",
+  "compatibility_date": "2026-10-14",
+  "workers_dev": false,
+  "preview_urls": false,
+  "routes": [
+    {
+      "pattern": "potterycoach.anthonynboyd.com",
+      "custom_domain": true,
+    },
+  ],
+  "assets": {
+    "directory": "./dist",
+    "binding": "ASSETS",
+    "not_found_handling": "single-page-application",
+    "run_worker_first": ["/api/*"],
+  },
+  "vars": {
+    "VOICE_MODEL": "gpt-realtime-2.1-mini",
+    "REALTIME_ALLOWED_ORIGINS": "",
+  },
+  "ratelimits": [
+    {
+      "name": "REALTIME_RATE_LIMITER",
+      "namespace_id": "1001",
+      "simple": { "limit": 10, "period": 60 },
+    },
+  ],
+  "observability": {
+    "enabled": true,
+  },
+}
