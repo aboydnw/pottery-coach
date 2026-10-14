@@ -1,4 +1,5 @@
 import type { DimensionReading, MeasurementConfidence, ProfileSample } from "./types";
+import { median, percentile } from "../shared/stats";
 
 type ExtractionContext = {
   width: number; height: number; mmPerPixel: number; centerlineX: number;
@@ -45,5 +46,3 @@ function defaultConfidence(score: number): MeasurementConfidence {
   const component = { score, reasons: score ? [] : ["NO_RELIABLE_ROWS"] };
   return { overall: score, calibration: component, segmentation: component, occlusion: component, temporalStability: component, freshnessMs: 0, estimatedErrorMm95: null };
 }
-function median(values: number[]): number { const sorted = [...values].sort((a, b) => a - b); return sorted[Math.floor(sorted.length / 2)] ?? 0; }
-function percentile(values: number[], fraction: number): number { const sorted = [...values].sort((a, b) => a - b); return sorted[Math.max(0, Math.ceil(sorted.length * fraction) - 1)] ?? 0; }

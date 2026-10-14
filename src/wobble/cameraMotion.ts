@@ -1,4 +1,5 @@
 import type { Point2 } from "../calibration/types";
+import { median } from "../shared/stats";
 
 export type StaticFeature = { from: Point2; to: Point2 };
 export type CameraTransformEstimate = { dxMm: number; dyMm: number; rotationRad: number; confidence: number; residualMm: number };
@@ -32,4 +33,3 @@ function estimateRotation(features: StaticFeature[], dx: number, dy: number): nu
   }));
 }
 
-function median(values: number[]): number { if (!values.length) return 0; const sorted = [...values].sort((a, b) => a - b); return sorted[Math.floor(sorted.length / 2)]!; }

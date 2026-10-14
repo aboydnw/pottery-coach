@@ -1,5 +1,6 @@
 import type { StableDimensionReading } from "../measurement/types";
 import type { ProfileComparison, ProfileRegion, RegionalProfileError, TargetProfile } from "./types";
+import { mean, median } from "../shared/stats";
 
 const REGION_RANGES: Array<{ region: ProfileRegion; start: number; end: number }> = [
   { region: "base", start: 0, end: 0.1 },
@@ -51,9 +52,3 @@ export function compareProfiles(reading: StableDimensionReading, target: TargetP
   };
 }
 
-function mean(values: number[]): number { return values.length ? values.reduce((sum, value) => sum + value, 0) / values.length : 0; }
-function median(values: number[]): number {
-  const sorted = [...values].sort((left, right) => left - right);
-  const middle = Math.floor(sorted.length / 2);
-  return sorted.length % 2 ? sorted[middle]! : (sorted[middle - 1]! + sorted[middle]!) / 2;
-}

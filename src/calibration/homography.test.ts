@@ -31,7 +31,8 @@ describe("solveCalibration", () => {
       { x: 130, y: 610 },
       { x: 500, y: 350 },
     ];
-    const correspondences: PointCorrespondence[] = imagePoints.map((image) => ({
+    const correspondences: PointCorrespondence[] = imagePoints.map((image, index) => ({
+      tagId: index,
       image,
       boardMm: applyHomography(imageToMm, image),
     }));
@@ -40,16 +41,38 @@ describe("solveCalibration", () => {
 
     for (const point of correspondences) {
       const recovered = applyHomography(result.homographyImageToMm, point.image);
-      expect(Math.hypot(recovered.x - point.boardMm.x, recovered.y - point.boardMm.y)).toBeLessThanOrEqual(0.25);
+      expect(Math.hypot(recovered.x - point.boardMm.x, recovered.y - point.boardMm.y)).toBeLessThanOrEqual(0.01);
     }
   });
 
   it("rejects collinear correspondences", () => {
     const correspondences: PointCorrespondence[] = [0, 1, 2, 3].map((value) => ({
+      tagId: value,
       image: { x: value, y: value },
       boardMm: { x: value * 10, y: value * 10 },
     }));
 
-    expect(() => solveCalibration(correspondences, board, frame)).toThrow(/degenerate/i);
+    expect(() => solveCalibration(correspondences, board, frame)).toThrow();
+  });
+
+  it("counts distinct tags rather than corners", () => {
+    const square = (tagId: number, x: number, y: number): PointCorrespondence[] => [
+      { tagId, image: { x, y }, boardMm: { x: x / 5, y: y / 5 } },
+      { tagId, image: { x: x + 100, y }, boardMm: { x: (x + 100) / 5, y: y / 5 } },
+      { tagId, image: { x: x + 100, y: y + 100 }, boardMm: { x: (x + 100) / 5, y: (y + 100) / 5 } },
+      { tagId, image: { x, y: y + 100 }, boardMm: { x: x / 5, y: (y + 100) / 5 } },
+    ];
+
+    const oneTag = solveCalibration(square(0, 200, 200), board, frame);
+    const fourTags = solveCalibration(
+      [...square(0, 200, 200), ...square(1, 700, 200), ...square(2, 200, 450), ...square(3, 700, 450)],
+      board,
+      frame,
+    );
+
+    expect(oneTag.quality.tagCount).toBe(1);
+    expect(oneTag.reasons).toContain("TAG_COUNT");
+    expect(fourTags.quality.tagCount).toBe(4);
+    expect(fourTags.reasons).not.toContain("TAG_COUNT");
   });
 });

@@ -1,4 +1,5 @@
 import type { DimensionReading, ProfileSample, StableDimensionReading } from "./types";
+import { median } from "../shared/stats";
 
 const WINDOW_SIZE = 5;
 const EMA_TIME_CONSTANT_MS = 400;
@@ -76,8 +77,3 @@ export class TemporalFilter {
   }
 }
 
-function median(values: number[]): number {
-  const sorted = [...values].sort((left, right) => left - right);
-  const middle = Math.floor(sorted.length / 2);
-  return sorted.length % 2 === 0 ? (sorted[middle - 1]! + sorted[middle]!) / 2 : sorted[middle]!;
-}
