@@ -17,6 +17,10 @@ Open the printed URL. Camera access needs HTTPS except on `localhost`, and the a
 
 To calibrate for real, print [`public/calibration/board-v1.svg`](public/calibration/board-v1.svg) at 100% scale and check that the reference line measures 100 mm.
 
+## Deployment
+
+The app runs on Cloudflare Workers at **https://potterycoach.anthonynboyd.com**, and every push to `main` deploys through Workers Builds. [`deploy/config.md`](deploy/config.md) covers setup, secrets and rollback. `pnpm deploy:dry-run` validates the bundle locally.
+
 ## Checks
 
 | Command                  | What it does                                                                                                                                       |
@@ -44,7 +48,7 @@ camera ──▶ CanvasFrameSource ──▶ measurement worker ──▶ stable
 - `src/camera/`, `src/vision/`, `src/measurement/` and `src/wobble/` hold the camera, the worker pipeline, dimension extraction and oscillation detection.
 - `src/calibration/` holds the board definition, the AprilTag worker (vendored WebAssembly in `public/vendor/apriltag`) and the homography.
 - `src/session/`, `src/privacy/` and `src/review/` hold local storage, retention and deletion, and the post-session review.
-- `api/realtime/session.ts` exchanges a WebRTC offer with the voice provider. It returns 503 until its secrets are configured (see [`deploy/config.md`](deploy/config.md)).
+- `worker/` is the Cloudflare Worker. It serves the built app and exchanges a WebRTC offer with the voice provider at `/api/realtime/session`, which returns 503 until its secrets are configured.
 
 ### Built but not yet wired into the app
 

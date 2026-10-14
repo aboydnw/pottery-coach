@@ -20,5 +20,13 @@
     "vitest/require-mock-type-parameters": "off",
     "vitest/require-to-throw-message": "off"
   },
-  "ignorePatterns": ["dist", "public/vendor", "benchmarks/**/artifacts", "test-results", "playwright-report"]
+  "ignorePatterns": [
+    "dist",
+    "worker-configuration.d.ts",
+    ".wrangler",
+    "public/vendor",
+    "benchmarks/**/artifacts",
+    "test-results",
+    "playwright-report"
+  ]
 }

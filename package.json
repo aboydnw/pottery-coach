@@ -13,6 +13,9 @@
     "dev": "vite",
     "build": "tsc --noEmit -p tsconfig.json && vite build",
     "calibration:board": "tsx scripts/generate-calibration-board.ts",
+    "deploy": "pnpm build && wrangler deploy",
+    "deploy:dry-run": "pnpm build && wrangler deploy --dry-run",
+    "preview:worker": "pnpm build && wrangler dev",
     "benchmark:camera": "tsx benchmarks/camera/run.ts",
     "benchmark:tags": "tsx benchmarks/tags/run.ts",
     "benchmark:dimensions": "tsx benchmarks/dimensions/run.ts",
@@ -29,7 +32,7 @@
     "format:check": "prettier --check .",
     "e2e": "playwright test",
     "test": "vitest run",
-    "typecheck": "tsc --noEmit --pretty false -p tsconfig.json && tsc --noEmit --pretty false -p tsconfig.node.json",
+    "typecheck": "wrangler types && tsc --noEmit --pretty false -p tsconfig.json && tsc --noEmit --pretty false -p tsconfig.node.json && tsc --noEmit --pretty false -p tsconfig.worker.json",
     "verify": "pnpm lint && pnpm format:check && pnpm test && pnpm typecheck && pnpm build && pnpm e2e && pnpm benchmark:verify-manifests"
   },
   "dependencies": {
@@ -56,6 +59,7 @@
     "typescript": "~7.0.2",
     "vite": "~7.1.3",
     "vite-plugin-pwa": "~1.1.0",
-    "vitest": "~5.0.3"
+    "vitest": "~5.0.3",
+    "wrangler": "~4.151.0"
   }
 }

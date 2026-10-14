@@ -1,0 +1,4 @@
+# Copy to .dev.vars for `wrangler dev`. Never commit real values.
+# Cloud voice returns 503 VOICE_DISABLED until both secrets are set.
+OPENAI_API_KEY=
+REALTIME_ACCESS_TOKEN=

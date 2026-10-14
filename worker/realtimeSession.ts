@@ -1,6 +1,6 @@
-import { realtimeSessionRequestSchema } from "../../src/voice/sessionSchema";
-import { COACH_INSTRUCTIONS } from "../../src/voice/instructions";
-import { REALTIME_TOOL_DEFINITIONS } from "../../src/voice/tools/definitions";
+import { realtimeSessionRequestSchema } from "../src/voice/sessionSchema";
+import { COACH_INSTRUCTIONS } from "../src/voice/instructions";
+import { REALTIME_TOOL_DEFINITIONS } from "../src/voice/tools/definitions";
 
 const VOICE = "marin";
 const MAX_BODY_BYTES = 200_000;
@@ -13,7 +13,7 @@ export type RealtimeSessionDependencies = {
   fetch: typeof globalThis.fetch;
   authenticate(request: Request): Promise<boolean>;
   verifyOrigin(request: Request): boolean;
-  allowRequest(request: Request): boolean;
+  allowRequest(request: Request): boolean | Promise<boolean>;
   log(event: { requestId: string; status: string }): void;
 };
 
@@ -29,7 +29,7 @@ export async function handleRealtimeSession(
   if (request.method !== "POST") return error("VOICE_PROVIDER_ERROR", 405);
   if (!(await dependencies.authenticate(request))) return error("VOICE_PROVIDER_ERROR", 401);
   if (!dependencies.verifyOrigin(request)) return error("VOICE_PROVIDER_ERROR", 403);
-  if (!dependencies.allowRequest(request)) return error("VOICE_RATE_LIMITED", 429);
+  if (!(await dependencies.allowRequest(request))) return error("VOICE_RATE_LIMITED", 429);
   if (!request.headers.get("content-type")?.toLowerCase().startsWith("application/json"))
     return error("VOICE_PROVIDER_ERROR", 415);
   if (Number(request.headers.get("content-length") ?? 0) > MAX_BODY_BYTES) return error("VOICE_PROVIDER_ERROR", 413);
