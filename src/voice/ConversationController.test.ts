@@ -49,3 +49,46 @@ it("disables proactive cloud speech and audits a claim violation", () => {
   expect(controller.isProactiveCloudSpeechEnabled()).toBe(false);
   expect(controller.getClaimAudit()).toHaveLength(1);
 });
+
+it("does not reconnect after close cancels a pending retry", async () => {
+  vi.useFakeTimers();
+  const transports: MockRealtimeTransport[] = [];
+  const controller = new ConversationController(() => {
+    const transport = new MockRealtimeTransport(); transports.push(transport); return transport;
+  });
+  await controller.connect(config);
+  transports[0]!.emit({ type: "closed", reason: "network" });
+  await controller.close();
+  await vi.runAllTimersAsync();
+  expect(transports).toHaveLength(1);
+  expect(controller.getState()).toBe("closed");
+});
+
+it("treats provider error events as non-fatal", async () => {
+  const transports: MockRealtimeTransport[] = [];
+  const controller = new ConversationController(() => {
+    const transport = new MockRealtimeTransport(); transports.push(transport); return transport;
+  });
+  await controller.connect(config);
+  transports[0]!.emit({ type: "error", code: "response_cancel_not_active", message: "nothing to cancel" });
+  expect(transports).toHaveLength(1);
+  expect(controller.getState()).toBe("connected");
+});
+
+it("closes the previous transport before reconnecting and resets the retry budget once connected", async () => {
+  vi.useFakeTimers();
+  const transports: MockRealtimeTransport[] = [];
+  const controller = new ConversationController(() => {
+    const transport = new MockRealtimeTransport(); transports.push(transport); return transport;
+  });
+  await controller.connect(config);
+  for (let drop = 0; drop < 6; drop += 1) {
+    const current = transports.at(-1)!;
+    const close = vi.spyOn(current, "close");
+    current.emit({ type: "closed", reason: "network" });
+    await vi.runAllTimersAsync();
+    expect(close).toHaveBeenCalled();
+  }
+  expect(transports).toHaveLength(7);
+  expect(controller.getState()).toBe("connected");
+});
