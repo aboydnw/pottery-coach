@@ -9,7 +9,10 @@ function acceptedResult(): CalibrationResult {
     createdAtMs: 1,
     status: "accepted",
     homographyImageToMm: [1, 0, 0, 0, 1, 0, 0, 0, 1],
-    wheelBaseline: [{ x: 0, y: 0 }, { x: 100, y: 0 }],
+    wheelBaseline: [
+      { x: 0, y: 0 },
+      { x: 100, y: 0 },
+    ],
     wheelCenterlineXmm: 50,
     roiImage: { x: 1, y: 1, width: 100, height: 100 },
     markerPlaneOffsetToleranceMm: 30,
@@ -33,11 +36,41 @@ function acceptedResult(): CalibrationResult {
 
 describe("validateCalibration", () => {
   it.each([
-    ["pose yaw", (result: CalibrationResult) => { result.quality.poseYawDeg = 9; }, "POSE_YAW"],
-    ["scale variation", (result: CalibrationResult) => { result.quality.scaleVariationFraction = 0.021; }, "SCALE_VARIATION"],
-    ["reprojection residual", (result: CalibrationResult) => { result.quality.reprojectionErrorPx95 = 1.6; }, "REPROJECTION_ERROR"],
-    ["clipped ROI", (result: CalibrationResult) => { result.roiClipped = true; }, "ROI_CLIPPED"],
-    ["wrong revision", (result: CalibrationResult) => { result.boardRevision = "board-v0"; }, "BOARD_REVISION"],
+    [
+      "pose yaw",
+      (result: CalibrationResult) => {
+        result.quality.poseYawDeg = 9;
+      },
+      "POSE_YAW",
+    ],
+    [
+      "scale variation",
+      (result: CalibrationResult) => {
+        result.quality.scaleVariationFraction = 0.021;
+      },
+      "SCALE_VARIATION",
+    ],
+    [
+      "reprojection residual",
+      (result: CalibrationResult) => {
+        result.quality.reprojectionErrorPx95 = 1.6;
+      },
+      "REPROJECTION_ERROR",
+    ],
+    [
+      "clipped ROI",
+      (result: CalibrationResult) => {
+        result.roiClipped = true;
+      },
+      "ROI_CLIPPED",
+    ],
+    [
+      "wrong revision",
+      (result: CalibrationResult) => {
+        result.boardRevision = "board-v0";
+      },
+      "BOARD_REVISION",
+    ],
   ])("rejects %s with a stable reason code", (_name, mutate, reason) => {
     const result = acceptedResult();
     mutate(result);

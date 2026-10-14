@@ -34,8 +34,14 @@ export function useSessionRecording(repository: SessionRepository, onStorageFail
     if (session.created) return;
     const now = Date.now();
     const record: SessionRecord = {
-      id: session.id, schemaVersion: 1, startedAtMs: now, endedAtMs: null, goal: null,
-      deviceClass: navigator.userAgent.includes("Mobile") ? "phone" : "desktop", calibrationId: null, outcome: null,
+      id: session.id,
+      schemaVersion: 1,
+      startedAtMs: now,
+      endedAtMs: null,
+      goal: null,
+      deviceClass: navigator.userAgent.includes("Mobile") ? "phone" : "desktop",
+      calibrationId: null,
+      outcome: null,
       consent: emptyConsent(now),
     };
     try {
@@ -49,46 +55,99 @@ export function useSessionRecording(repository: SessionRepository, onStorageFail
 
   function recordReading(reading: StableDimensionReading): void {
     const session = current();
-    session.recorder?.recordReading({ id: reading.id, sessionId: session.id, timestampMs: reading.timestampMs, kind: "stable",
-      values: { heightMm: reading.heightMm, maximumWidthMm: reading.maximumWidthMm, rimWidthMm: reading.rimWidthMm, baseWidthMm: reading.baseWidthMm },
-      confidence: reading.confidence.overall });
+    session.recorder?.recordReading({
+      id: reading.id,
+      sessionId: session.id,
+      timestampMs: reading.timestampMs,
+      kind: "stable",
+      values: {
+        heightMm: reading.heightMm,
+        maximumWidthMm: reading.maximumWidthMm,
+        rimWidthMm: reading.rimWidthMm,
+        baseWidthMm: reading.baseWidthMm,
+      },
+      confidence: reading.confidence.overall,
+    });
   }
 
   function recordWobble(reading: WobbleReading): void {
     const session = current();
     const previous = session.lastWobble;
-    if (previous && previous.classification === reading.classification && reading.timestampMs - previous.recordedAtMs < WOBBLE_EVENT_INTERVAL_MS) return;
+    if (
+      previous &&
+      previous.classification === reading.classification &&
+      reading.timestampMs - previous.recordedAtMs < WOBBLE_EVENT_INTERVAL_MS
+    )
+      return;
     session.lastWobble = { classification: reading.classification, recordedAtMs: reading.timestampMs };
-    session.recorder?.recordEvent({ id: reading.id, sessionId: session.id, timestampMs: reading.timestampMs, type: "wobble-reading",
-      evidenceIds: [reading.id], payload: { classification: reading.classification, confidence: reading.confidence,
-        amplitudeMm: reading.amplitudeMm, periodMs: reading.periodMs, reasons: reading.reasons,
-        sourceFrameRange: reading.sourceFrameIds.length ? [reading.sourceFrameIds[0], reading.sourceFrameIds.at(-1)] : [] } });
+    session.recorder?.recordEvent({
+      id: reading.id,
+      sessionId: session.id,
+      timestampMs: reading.timestampMs,
+      type: "wobble-reading",
+      evidenceIds: [reading.id],
+      payload: {
+        classification: reading.classification,
+        confidence: reading.confidence,
+        amplitudeMm: reading.amplitudeMm,
+        periodMs: reading.periodMs,
+        reasons: reading.reasons,
+        sourceFrameRange: reading.sourceFrameIds.length
+          ? [reading.sourceFrameIds[0], reading.sourceFrameIds.at(-1)]
+          : [],
+      },
+    });
   }
 
   function recordMilestone(percent: number, evidenceId: string): void {
     const session = current();
-    session.recorder?.recordEvent({ id: newId("event"), sessionId: session.id, timestampMs: Date.now(), type: "goal-milestone",
-      evidenceIds: [evidenceId], payload: { percent } });
+    session.recorder?.recordEvent({
+      id: newId("event"),
+      sessionId: session.id,
+      timestampMs: Date.now(),
+      type: "goal-milestone",
+      evidenceIds: [evidenceId],
+      payload: { percent },
+    });
   }
 
   function recordProcessingMode(mode: AdaptiveMode): void {
     const session = current();
-    session.recorder?.recordEvent({ id: newId("event"), sessionId: session.id, timestampMs: Date.now(), type: "processing-mode-change",
-      evidenceIds: [], payload: mode });
+    session.recorder?.recordEvent({
+      id: newId("event"),
+      sessionId: session.id,
+      timestampMs: Date.now(),
+      type: "processing-mode-change",
+      evidenceIds: [],
+      payload: mode,
+    });
   }
 
   async function setGoal(confirmation: GoalConfirmation): Promise<void> {
     const session = current();
     if (!session.created) return;
-    try { await repository.update(session.id, { goal: confirmation.goal }); } catch { onStorageFailed(); }
+    try {
+      await repository.update(session.id, { goal: confirmation.goal });
+    } catch {
+      onStorageFailed();
+    }
   }
 
   async function markMoment(): Promise<void> {
     const session = current();
     if (!session.created) return;
     try {
-      await repository.markMoment({ id: newId("moment"), sessionId: session.id, timestampMs: Date.now(), label: "User marked moment", stillBlobId: null, localOnly: true });
-    } catch { onStorageFailed(); }
+      await repository.markMoment({
+        id: newId("moment"),
+        sessionId: session.id,
+        timestampMs: Date.now(),
+        label: "User marked moment",
+        stillBlobId: null,
+        localOnly: true,
+      });
+    } catch {
+      onStorageFailed();
+    }
   }
 
   /** Flushes and closes the session, returning what was stored (or an empty bundle if storage failed). */
@@ -108,8 +167,20 @@ export function useSessionRecording(repository: SessionRepository, onStorageFail
     return emptyBundle(session.id, now);
   }
 
-  return { sessionId: () => current().id, begin, recordReading, recordWobble, recordMilestone, recordProcessingMode, setGoal, markMoment, end,
-    reset: () => { sessionRef.current = null; } };
+  return {
+    sessionId: () => current().id,
+    begin,
+    recordReading,
+    recordWobble,
+    recordMilestone,
+    recordProcessingMode,
+    setGoal,
+    markMoment,
+    end,
+    reset: () => {
+      sessionRef.current = null;
+    },
+  };
 }
 
 function newId(prefix: string): string {
@@ -117,12 +188,34 @@ function newId(prefix: string): string {
 }
 
 function emptyConsent(now: number): SessionRecord["consent"] {
-  return { cameraLocal: true, cloudAudio: false, transcriptRetention: false, snapshotUpload: false, researchMedia: false,
-    policyRevision: POLICY_REVISION, grantedAtMs: now };
+  return {
+    cameraLocal: true,
+    cloudAudio: false,
+    transcriptRetention: false,
+    snapshotUpload: false,
+    researchMedia: false,
+    policyRevision: POLICY_REVISION,
+    grantedAtMs: now,
+  };
 }
 
 function emptyBundle(id: string, now: number): SessionBundle {
-  return { session: { id, schemaVersion: 1, startedAtMs: now, endedAtMs: now, goal: null, deviceClass: "unknown",
-    calibrationId: null, outcome: "completed", consent: emptyConsent(now) },
-    readings: [], diagnostics: [], events: [], moments: [], transcripts: [] };
+  return {
+    session: {
+      id,
+      schemaVersion: 1,
+      startedAtMs: now,
+      endedAtMs: now,
+      goal: null,
+      deviceClass: "unknown",
+      calibrationId: null,
+      outcome: "completed",
+      consent: emptyConsent(now),
+    },
+    readings: [],
+    diagnostics: [],
+    events: [],
+    moments: [],
+    transcripts: [],
+  };
 }

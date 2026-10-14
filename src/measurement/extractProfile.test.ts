@@ -11,7 +11,13 @@ it("extracts analytic dimensions and preserves unreliable rows as null profile g
   reliability[10] = 0;
 
   const reading = extractDimensions(mask, reliability, {
-    width, height, mmPerPixel: 2, centerlineX: 9.5, calibrationId: "cal-1", frameId: 7, timestampMs: 100,
+    width,
+    height,
+    mmPerPixel: 2,
+    centerlineX: 9.5,
+    calibrationId: "cal-1",
+    frameId: 7,
+    timestampMs: 100,
   });
 
   expect(reading.heightMm).toBe(28);

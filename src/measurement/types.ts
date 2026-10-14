@@ -10,11 +10,21 @@ export type MeasurementConfidence = {
 };
 export type ProfileSample = { heightRatio: number; radiusMm: number | null; confidence: number };
 export type DimensionReading = {
-  id: string; timestampMs: number; sourceFrameId: number; calibrationId: string;
-  heightMm: number | null; maximumWidthMm: number | null; rimWidthMm: number | null;
-  baseWidthMm: number | null; centerlineOffsetMm: number | null; profile: ProfileSample[];
-  visibleAsymmetryMm: number | null; confidence: MeasurementConfidence;
+  id: string;
+  timestampMs: number;
+  sourceFrameId: number;
+  calibrationId: string;
+  heightMm: number | null;
+  maximumWidthMm: number | null;
+  rimWidthMm: number | null;
+  baseWidthMm: number | null;
+  centerlineOffsetMm: number | null;
+  profile: ProfileSample[];
+  visibleAsymmetryMm: number | null;
+  confidence: MeasurementConfidence;
 };
 export type StableDimensionReading = DimensionReading & {
-  windowStartMs: number; contributingFrameCount: number; lastReliableTimestampMs: number | null;
+  windowStartMs: number;
+  contributingFrameCount: number;
+  lastReliableTimestampMs: number | null;
 };

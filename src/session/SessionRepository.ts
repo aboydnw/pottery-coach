@@ -1,7 +1,13 @@
 import Dexie, { type EntityTable } from "dexie";
 import type {
-  MarkedMoment, RecordedReading, SessionBundle, SessionDiagnostic, SessionEvent,
-  SessionRecord, StoredBlob, TranscriptEntry,
+  MarkedMoment,
+  RecordedReading,
+  SessionBundle,
+  SessionDiagnostic,
+  SessionEvent,
+  SessionRecord,
+  StoredBlob,
+  TranscriptEntry,
 } from "./types";
 
 class SessionDatabase extends Dexie {
@@ -30,9 +36,13 @@ class SessionDatabase extends Dexie {
 export class SessionRepository {
   private readonly db: SessionDatabase;
 
-  constructor(name = "pottery-coach") { this.db = new SessionDatabase(name); }
+  constructor(name = "pottery-coach") {
+    this.db = new SessionDatabase(name);
+  }
 
-  async create(record: SessionRecord) { await this.db.sessions.add(structuredClone(record)); }
+  async create(record: SessionRecord) {
+    await this.db.sessions.add(structuredClone(record));
+  }
 
   private async requireSession(sessionId: string) {
     const session = await this.db.sessions.get(sessionId);
@@ -72,7 +82,8 @@ export class SessionRepository {
     if (!moment.localOnly && !session.consent.snapshotUpload) throw new Error("Snapshot upload consent is not enabled");
     await this.db.transaction("rw", this.db.moments, this.db.blobs, async () => {
       await this.db.moments.add(structuredClone(moment));
-      if (still && moment.stillBlobId) await this.db.blobs.add({ id: moment.stillBlobId, sessionId: moment.sessionId, blob: still });
+      if (still && moment.stillBlobId)
+        await this.db.blobs.add({ id: moment.stillBlobId, sessionId: moment.sessionId, blob: still });
     });
   }
 
@@ -89,15 +100,21 @@ export class SessionRepository {
     return { session, readings, diagnostics, events, moments, transcripts };
   }
 
-  async listEvents(sessionId: string) { return this.db.events.where("sessionId").equals(sessionId).sortBy("timestampMs"); }
-  async list() { return this.db.sessions.orderBy("startedAtMs").reverse().toArray(); }
+  async listEvents(sessionId: string) {
+    return this.db.events.where("sessionId").equals(sessionId).sortBy("timestampMs");
+  }
+  async list() {
+    return this.db.sessions.orderBy("startedAtMs").reverse().toArray();
+  }
   async update(id: string, patch: Partial<Pick<SessionRecord, "endedAtMs" | "goal" | "outcome" | "calibrationId">>) {
     await this.requireSession(id);
     await this.db.sessions.update(id, structuredClone(patch));
   }
   /** Deletes sessions whose end (or, for abandoned sessions, start) is older than the retention window. */
   async expire(now = Date.now(), retentionMs = 30 * 86_400_000) {
-    const expired = (await this.list()).filter((session) => now - (session.endedAtMs ?? session.startedAtMs) >= retentionMs);
+    const expired = (await this.list()).filter(
+      (session) => now - (session.endedAtMs ?? session.startedAtMs) >= retentionMs,
+    );
     await Promise.all(expired.map((session) => this.delete(session.id)));
     return expired.map((session) => session.id);
   }
@@ -117,5 +134,8 @@ export class SessionRepository {
     });
     return true;
   }
-  async destroy() { this.db.close(); await Dexie.delete(this.db.name); }
+  async destroy() {
+    this.db.close();
+    await Dexie.delete(this.db.name);
+  }
 }

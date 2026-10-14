@@ -60,10 +60,17 @@ describe("CanvasFrameSource", () => {
     const source = new CanvasFrameSource();
     const sink = vi.fn((_frame: AcquiredFrame) => "accepted" as const);
 
-    source.start({} as HTMLVideoElement, { targetFps: 10, roi: { x: 0, y: 0, width: 1280, height: 720 }, maxOutputWidth: 320 }, sink);
+    source.start(
+      {} as HTMLVideoElement,
+      { targetFps: 10, roi: { x: 0, y: 0, width: 1280, height: 720 }, maxOutputWidth: 320 },
+      sink,
+    );
     await vi.advanceTimersByTimeAsync(110);
 
-    expect((createImageBitmap as ReturnType<typeof vi.fn>).mock.calls[0]?.[5]).toMatchObject({ resizeWidth: 320, resizeHeight: 180 });
+    expect((createImageBitmap as ReturnType<typeof vi.fn>).mock.calls[0]?.[5]).toMatchObject({
+      resizeWidth: 320,
+      resizeHeight: 180,
+    });
     expect(sink.mock.calls[0]![0]).toMatchObject({ scale: 4, sourceRoi: { width: 1280, height: 720 } });
   });
 
@@ -81,7 +88,9 @@ describe("CanvasFrameSource", () => {
   it("keeps sampling after a frame cannot be captured", async () => {
     const source = new CanvasFrameSource();
     const sink = vi.fn(() => "accepted" as const);
-    (createImageBitmap as ReturnType<typeof vi.fn>).mockRejectedValueOnce(new DOMException("not ready", "InvalidStateError"));
+    (createImageBitmap as ReturnType<typeof vi.fn>).mockRejectedValueOnce(
+      new DOMException("not ready", "InvalidStateError"),
+    );
 
     source.start({} as HTMLVideoElement, { targetFps: 10, roi: { x: 0, y: 0, width: 10, height: 10 } }, sink);
     await vi.advanceTimersByTimeAsync(500);

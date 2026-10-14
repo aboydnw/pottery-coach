@@ -23,13 +23,30 @@ export class ConversationController {
 
   constructor(private readonly createTransport: () => RealtimeCoachTransport) {}
 
-  getState(): ConversationState { return this.state; }
-  setCompactContext(context: CompactContext): void { this.compactContext = { ...context }; }
-  getCompactContext(): CompactContext { return { ...this.compactContext }; }
-  setEphemeralReadingId(id: string | null): void { this.ephemeralReadingId = id; }
-  getEphemeralReadingId(): string | null { return this.ephemeralReadingId; }
-  isProactiveCloudSpeechEnabled(): boolean { return this.proactiveCloudSpeechEnabled; }
-  getClaimAudit() { return this.claimAudit.map((entry) => ({ ...entry, validation: { ...entry.validation, violations: [...entry.validation.violations] } })); }
+  getState(): ConversationState {
+    return this.state;
+  }
+  setCompactContext(context: CompactContext): void {
+    this.compactContext = { ...context };
+  }
+  getCompactContext(): CompactContext {
+    return { ...this.compactContext };
+  }
+  setEphemeralReadingId(id: string | null): void {
+    this.ephemeralReadingId = id;
+  }
+  getEphemeralReadingId(): string | null {
+    return this.ephemeralReadingId;
+  }
+  isProactiveCloudSpeechEnabled(): boolean {
+    return this.proactiveCloudSpeechEnabled;
+  }
+  getClaimAudit() {
+    return this.claimAudit.map((entry) => ({
+      ...entry,
+      validation: { ...entry.validation, violations: [...entry.validation.violations] },
+    }));
+  }
   validateFinalClaim(transcript: string, cue: CueCandidate, toolResults: Array<Record<string, unknown>>) {
     const validation = validateSpokenClaim(transcript, cue, toolResults);
     this.claimAudit.push({ policyId: cue.policyId, validation });
@@ -44,8 +61,14 @@ export class ConversationController {
     this.state = "connecting";
     await this.openTransport();
   }
-  async pause(): Promise<void> { await this.transport?.pauseInput(); this.state = "paused"; }
-  async resume(): Promise<void> { await this.transport?.resumeInput(); this.state = "connected"; }
+  async pause(): Promise<void> {
+    await this.transport?.pauseInput();
+    this.state = "paused";
+  }
+  async resume(): Promise<void> {
+    await this.transport?.resumeInput();
+    this.state = "connected";
+  }
   async close(): Promise<void> {
     this.intentionallyClosed = true;
     this.cancelReconnect();
@@ -82,7 +105,10 @@ export class ConversationController {
   private scheduleReconnect(): void {
     if (this.reconnectTimer !== null || this.intentionallyClosed) return;
     const delay = reconnectDelayMs(this.reconnectAttempt++);
-    if (delay === null) { this.state = "failed"; return; }
+    if (delay === null) {
+      this.state = "failed";
+      return;
+    }
     this.state = "reconnecting";
     this.ephemeralReadingId = null;
     this.reconnectTimer = setTimeout(() => {

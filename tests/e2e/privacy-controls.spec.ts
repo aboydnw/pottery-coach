@@ -2,7 +2,8 @@ import { expect, test } from "@playwright/test";
 import { beginDemoSession, chooseNoVoiceAndConfirmWetGoal } from "./fixtures/session-streams";
 
 test("ending stops capture and deletion displays every local inventory class", async ({ page }) => {
-  await beginDemoSession(page); await chooseNoVoiceAndConfirmWetGoal(page);
+  await beginDemoSession(page);
+  await chooseNoVoiceAndConfirmWetGoal(page);
   await expect(page.getByText(/camera active.*frames stay/i)).toBeVisible();
   await page.getByRole("button", { name: /end session and review/i }).click();
   await expect(page.getByText(/camera active.*frames stay/i)).toHaveCount(0);

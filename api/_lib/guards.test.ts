@@ -1,7 +1,8 @@
 import { expect, it } from "vitest";
 import { clientAddress, createRateLimiter, hasBearerToken, isSameOrigin } from "./guards";
 
-const request = (headers: Record<string, string>) => new Request("https://coach.example/api/realtime/session", { method: "POST", headers });
+const request = (headers: Record<string, string>) =>
+  new Request("https://coach.example/api/realtime/session", { method: "POST", headers });
 
 it("accepts only the exact bearer token", async () => {
   expect(await hasBearerToken(request({ authorization: "Bearer field-token" }), "field-token")).toBe(true);

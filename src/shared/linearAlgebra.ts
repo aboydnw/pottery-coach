@@ -2,7 +2,11 @@
  * Solves the square linear system `matrix · x = values` with Gauss-Jordan elimination and partial pivoting.
  * Throws when a pivot falls below `tolerance`, which signals a singular or near-singular system.
  */
-export function solveLinearSystem(matrix: readonly (readonly number[])[], values: readonly number[], tolerance = 1e-12): number[] {
+export function solveLinearSystem(
+  matrix: readonly (readonly number[])[],
+  values: readonly number[],
+  tolerance = 1e-12,
+): number[] {
   const size = values.length;
   const augmented = matrix.map((row, index) => [...row, values[index]!]);
   for (let column = 0; column < size; column += 1) {
@@ -17,7 +21,8 @@ export function solveLinearSystem(matrix: readonly (readonly number[])[], values
     for (let row = 0; row < size; row += 1) {
       if (row === column) continue;
       const factor = augmented[row]![column]!;
-      for (let index = column; index <= size; index += 1) augmented[row]![index]! -= factor * augmented[column]![index]!;
+      for (let index = column; index <= size; index += 1)
+        augmented[row]![index]! -= factor * augmented[column]![index]!;
     }
   }
   return augmented.map((row) => row[size]!);

@@ -2,7 +2,9 @@
 export async function hasBearerToken(request: Request, expected: string): Promise<boolean> {
   const supplied = request.headers.get("authorization")?.match(/^Bearer\s+(.+)$/i)?.[1] ?? "";
   const encoder = new TextEncoder();
-  const [left, right] = await Promise.all([supplied, expected].map((value) => crypto.subtle.digest("SHA-256", encoder.encode(value))));
+  const [left, right] = await Promise.all(
+    [supplied, expected].map((value) => crypto.subtle.digest("SHA-256", encoder.encode(value))),
+  );
   const leftBytes = new Uint8Array(left!);
   const rightBytes = new Uint8Array(right!);
   let difference = supplied.length === 0 ? 1 : 0;
@@ -34,7 +36,8 @@ export function createRateLimiter(options: { limit: number; windowMs: number; no
   const windows = new Map<string, { startedAtMs: number; count: number }>();
   return (key: string): boolean => {
     const current = now();
-    for (const [existingKey, window] of windows) if (current - window.startedAtMs >= options.windowMs) windows.delete(existingKey);
+    for (const [existingKey, window] of windows)
+      if (current - window.startedAtMs >= options.windowMs) windows.delete(existingKey);
     const window = windows.get(key) ?? { startedAtMs: current, count: 0 };
     window.count += 1;
     windows.set(key, window);

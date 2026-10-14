@@ -11,7 +11,10 @@ const STORAGE_KEY = "pottery-coach-transcript-v1";
 export class TranscriptStore {
   private entries = new Map<string, TranscriptEntry>();
 
-  constructor(private readonly storage: Storage, private retentionConsent: boolean) {}
+  constructor(
+    private readonly storage: Storage,
+    private retentionConsent: boolean,
+  ) {}
 
   add(entry: TranscriptEntry): void {
     this.entries.set(entry.eventId, { ...entry });
@@ -19,7 +22,9 @@ export class TranscriptStore {
   }
 
   list(): TranscriptEntry[] {
-    return [...this.entries.values()].sort((left, right) => left.timestampMs - right.timestampMs).map((entry) => ({ ...entry }));
+    return [...this.entries.values()]
+      .sort((left, right) => left.timestampMs - right.timestampMs)
+      .map((entry) => ({ ...entry }));
   }
 
   setRetentionConsent(consented: boolean): void {

@@ -6,11 +6,30 @@ import type { DimensionReading } from "./types";
 function reading(frame: number, height = 100, overall = 0.9): DimensionReading {
   const component = { score: overall, reasons: [] };
   return {
-    id: `r-${frame}`, timestampMs: frame * 100, sourceFrameId: frame, calibrationId: "cal-1",
-    heightMm: height, maximumWidthMm: 50, rimWidthMm: 45, baseWidthMm: 48,
-    centerlineOffsetMm: 0, visibleAsymmetryMm: 0,
-    profile: Array.from({ length: 64 }, (_, index) => ({ heightRatio: index / 63, radiusMm: index === 10 ? null : 25, confidence: index === 10 ? 0 : 1 })),
-    confidence: { overall, calibration: component, segmentation: component, occlusion: component, temporalStability: component, freshnessMs: 0, estimatedErrorMm95: 5 },
+    id: `r-${frame}`,
+    timestampMs: frame * 100,
+    sourceFrameId: frame,
+    calibrationId: "cal-1",
+    heightMm: height,
+    maximumWidthMm: 50,
+    rimWidthMm: 45,
+    baseWidthMm: 48,
+    centerlineOffsetMm: 0,
+    visibleAsymmetryMm: 0,
+    profile: Array.from({ length: 64 }, (_, index) => ({
+      heightRatio: index / 63,
+      radiusMm: index === 10 ? null : 25,
+      confidence: index === 10 ? 0 : 1,
+    })),
+    confidence: {
+      overall,
+      calibration: component,
+      segmentation: component,
+      occlusion: component,
+      temporalStability: component,
+      freshnessMs: 0,
+      estimatedErrorMm95: 5,
+    },
   };
 }
 

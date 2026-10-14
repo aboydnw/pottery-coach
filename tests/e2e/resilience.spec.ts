@@ -14,7 +14,8 @@ test("camera interruption is explicit and requires user resume", async ({ page }
 });
 
 test("orientation change and offline state preserve explicit controls", async ({ page, context }) => {
-  await page.goto("/"); await page.getByRole("button", { name: /begin private setup/i }).click();
+  await page.goto("/");
+  await page.getByRole("button", { name: /begin private setup/i }).click();
   await page.setViewportSize({ width: 844, height: 390 });
   await context.setOffline(true);
   await expect(page.getByRole("button", { name: /start camera/i })).toBeVisible();

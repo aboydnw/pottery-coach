@@ -9,14 +9,32 @@ afterEach(cleanup);
 
 function result(status: CalibrationResult["status"], reasons: string[] = []): CalibrationResult {
   return {
-    id: "cal-1", createdAtMs: 1, status,
+    id: "cal-1",
+    createdAtMs: 1,
+    status,
     homographyImageToMm: [1, 0, 0, 0, 1, 0, 0, 0, 1],
-    wheelBaseline: [{ x: 0, y: 0 }, { x: 100, y: 0 }],
+    wheelBaseline: [
+      { x: 0, y: 0 },
+      { x: 100, y: 0 },
+    ],
     wheelCenterlineXmm: 50,
     roiImage: { x: 0, y: 0, width: 100, height: 100 },
     markerPlaneOffsetToleranceMm: 30,
-    quality: { tagCount: 4, reprojectionErrorPx95: 1, scaleVariationFraction: 0.01, estimatedErrorMm95: 5, poseYawDeg: 0, posePitchDeg: 0, blurScore: 1, contrastScore: 1 },
-    reasons, provenance: "automatic", boardRevision: "board-v1", supportedBoardRevision: "board-v1", roiClipped: false,
+    quality: {
+      tagCount: 4,
+      reprojectionErrorPx95: 1,
+      scaleVariationFraction: 0.01,
+      estimatedErrorMm95: 5,
+      poseYawDeg: 0,
+      posePitchDeg: 0,
+      blurScore: 1,
+      contrastScore: 1,
+    },
+    reasons,
+    provenance: "automatic",
+    boardRevision: "board-v1",
+    supportedBoardRevision: "board-v1",
+    roiClipped: false,
   };
 }
 

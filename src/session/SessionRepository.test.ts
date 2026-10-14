@@ -46,10 +46,16 @@ describe("SessionRepository", () => {
     const repository = new SessionRepository(`test-${crypto.randomUUID()}`);
     databases.push(repository);
 
-    await expect(repository.appendEvent({
-      id: "event-1", sessionId: "missing", timestampMs: 2_000,
-      type: "cue", evidenceIds: [], payload: {},
-    })).rejects.toThrow(/session/i);
+    await expect(
+      repository.appendEvent({
+        id: "event-1",
+        sessionId: "missing",
+        timestampMs: 2_000,
+        type: "cue",
+        evidenceIds: [],
+        payload: {},
+      }),
+    ).rejects.toThrow(/session/i);
     expect(await repository.listEvents("missing")).toEqual([]);
   });
 
@@ -59,17 +65,32 @@ describe("SessionRepository", () => {
     await repository.create(record());
 
     await expect(repository.appendTranscript("session-1", "hello", 2_000)).rejects.toThrow(/transcript/i);
-    await expect(repository.markMoment({
-      id: "moment-1", sessionId: "session-1", timestampMs: 2_000,
-      label: "rim", stillBlobId: "blob-1", localOnly: false,
-    }, new Blob(["still"]))).rejects.toThrow(/snapshot/i);
+    await expect(
+      repository.markMoment(
+        {
+          id: "moment-1",
+          sessionId: "session-1",
+          timestampMs: 2_000,
+          label: "rim",
+          stillBlobId: "blob-1",
+          localOnly: false,
+        },
+        new Blob(["still"]),
+      ),
+    ).rejects.toThrow(/snapshot/i);
   });
 
   it("expires ended and abandoned records at the boundary while preserving recent sessions", async () => {
-    const repository = new SessionRepository(`test-${crypto.randomUUID()}`); databases.push(repository);
+    const repository = new SessionRepository(`test-${crypto.randomUUID()}`);
+    databases.push(repository);
     const day = 86_400_000;
     await repository.create({ ...record("old"), startedAtMs: 0, endedAtMs: 0, outcome: "completed" });
-    await repository.create({ ...record("recently-ended"), startedAtMs: 0, endedAtMs: 30 * day - 1, outcome: "completed" });
+    await repository.create({
+      ...record("recently-ended"),
+      startedAtMs: 0,
+      endedAtMs: 30 * day - 1,
+      outcome: "completed",
+    });
     await repository.create({ ...record("abandoned"), startedAtMs: 0 });
     await repository.create({ ...record("active"), startedAtMs: 30 * day - 1 });
     expect((await repository.expire(30 * day, 30 * day)).sort()).toEqual(["abandoned", "old"]);

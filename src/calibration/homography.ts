@@ -19,10 +19,11 @@ export function solveCalibration(
   });
   const scales = corners.map(({ image }) => localScale(homography, image));
   const meanScale = scales.reduce((sum, value) => sum + value, 0) / scales.length;
-  const scaleVariation = meanScale === 0
-    ? Number.POSITIVE_INFINITY
-    : (Math.max(...scales) - Math.min(...scales)) / meanScale;
-  const roiClipped = frame.roi.x < 0 || frame.roi.y < 0 ||
+  const scaleVariation =
+    meanScale === 0 ? Number.POSITIVE_INFINITY : (Math.max(...scales) - Math.min(...scales)) / meanScale;
+  const roiClipped =
+    frame.roi.x < 0 ||
+    frame.roi.y < 0 ||
     frame.roi.x + frame.roi.width > frame.width ||
     frame.roi.y + frame.roi.height > frame.height;
 
@@ -73,7 +74,10 @@ function solveHomography(points: PointCorrespondence[]): Matrix3 {
   for (const point of points) {
     const { x, y } = applyHomography(imageNormalization, point.image);
     const { x: u, y: v } = applyHomography(boardNormalization, point.boardMm);
-    for (const [row, value] of [[[x, y, 1, 0, 0, 0, -u * x, -u * y], u], [[0, 0, 0, x, y, 1, -v * x, -v * y], v]] as const) {
+    for (const [row, value] of [
+      [[x, y, 1, 0, 0, 0, -u * x, -u * y], u],
+      [[0, 0, 0, x, y, 1, -v * x, -v * y], v],
+    ] as const) {
       for (let column = 0; column < 8; column += 1) {
         rhs[column]! += row[column]! * value;
         for (let inner = 0; inner < 8; inner += 1) normal[column]![inner]! += row[column]! * row[inner]!;
@@ -89,7 +93,8 @@ function solveHomography(points: PointCorrespondence[]): Matrix3 {
 function normalization(points: Point2[]): Matrix3 {
   const centerX = points.reduce((sum, point) => sum + point.x, 0) / points.length;
   const centerY = points.reduce((sum, point) => sum + point.y, 0) / points.length;
-  const meanDistance = points.reduce((sum, point) => sum + Math.hypot(point.x - centerX, point.y - centerY), 0) / points.length;
+  const meanDistance =
+    points.reduce((sum, point) => sum + Math.hypot(point.x - centerX, point.y - centerY), 0) / points.length;
   if (meanDistance === 0) throw new Error("Degenerate calibration geometry");
   const scale = Math.SQRT2 / meanDistance;
   return [scale, 0, -scale * centerX, 0, scale, -scale * centerY, 0, 0, 1];
@@ -99,7 +104,11 @@ function multiply(left: Matrix3, right: Matrix3): Matrix3 {
   return Array.from({ length: 9 }, (_, index) => {
     const row = Math.floor(index / 3);
     const column = index % 3;
-    return left[row * 3]! * right[column]! + left[row * 3 + 1]! * right[3 + column]! + left[row * 3 + 2]! * right[6 + column]!;
+    return (
+      left[row * 3]! * right[column]! +
+      left[row * 3 + 1]! * right[3 + column]! +
+      left[row * 3 + 2]! * right[6 + column]!
+    );
   }) as Matrix3;
 }
 
@@ -124,6 +133,7 @@ function localScale(matrix: Matrix3, point: Point2): number {
   const origin = applyHomography(matrix, point);
   const alongX = applyHomography(matrix, { x: point.x + 1, y: point.y });
   const alongY = applyHomography(matrix, { x: point.x, y: point.y + 1 });
-  return (Math.hypot(alongX.x - origin.x, alongX.y - origin.y) +
-    Math.hypot(alongY.x - origin.x, alongY.y - origin.y)) / 2;
+  return (
+    (Math.hypot(alongX.x - origin.x, alongX.y - origin.y) + Math.hypot(alongY.x - origin.x, alongY.y - origin.y)) / 2
+  );
 }

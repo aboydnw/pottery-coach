@@ -20,7 +20,11 @@ const WHEEL_BAND_FRACTION = 0.8;
  * Separates the vessel from a background model and keeps the largest foreground component that
  * reaches the wheel band (the bottom 20% of the frame), which excludes detached hands and tools.
  */
-export function segmentVessel(rectified: LabImage, model: BackgroundModel, exclusions: ExclusionRegion[]): SegmentationResult {
+export function segmentVessel(
+  rectified: LabImage,
+  model: BackgroundModel,
+  exclusions: ExclusionRegion[],
+): SegmentationResult {
   const { width, height } = rectified;
   if (model.width !== width || model.height !== height) throw new Error("Background dimensions do not match frame");
   const initial = new Uint8Array(width * height);
@@ -33,7 +37,8 @@ export function segmentVessel(rectified: LabImage, model: BackgroundModel, exclu
   }
   for (const region of exclusions) {
     for (let y = Math.max(0, region.y); y < Math.min(height, region.y + region.height); y += 1) {
-      for (let x = Math.max(0, region.x); x < Math.min(width, region.x + region.width); x += 1) initial[y * width + x] = 0;
+      for (let x = Math.max(0, region.x); x < Math.min(width, region.x + region.width); x += 1)
+        initial[y * width + x] = 0;
     }
   }
   const cleaned = closeMask(openMask(initial, width, height, 3), width, height, 5);
@@ -61,7 +66,13 @@ export function segmentVessel(rectified: LabImage, model: BackgroundModel, exclu
   }
   const spanRows = selected.bottom - selected.top + 1;
   if (reliableRows < spanRows) reasons.push("UNRELIABLE_ROWS");
-  return { mask, rowReliability, span: { top: selected.top, bottom: selected.bottom }, reliableFraction: reliableRows / spanRows, reasons };
+  return {
+    mask,
+    rowReliability,
+    span: { top: selected.top, bottom: selected.bottom },
+    reliableFraction: reliableRows / spanRows,
+    reasons,
+  };
 }
 
 function largestWheelComponent(mask: Uint8Array, width: number, height: number) {
@@ -85,10 +96,22 @@ function largestWheelComponent(mask: Uint8Array, width: number, height: number) 
       const y = (index - x) / width;
       if (y < top) top = y;
       if (y > bottom) bottom = y;
-      if (x > 0 && mask[index - 1] && !labels[index - 1]) { labels[index - 1] = nextLabel; queue[tail++] = index - 1; }
-      if (x < width - 1 && mask[index + 1] && !labels[index + 1]) { labels[index + 1] = nextLabel; queue[tail++] = index + 1; }
-      if (y > 0 && mask[index - width] && !labels[index - width]) { labels[index - width] = nextLabel; queue[tail++] = index - width; }
-      if (y < height - 1 && mask[index + width] && !labels[index + width]) { labels[index + width] = nextLabel; queue[tail++] = index + width; }
+      if (x > 0 && mask[index - 1] && !labels[index - 1]) {
+        labels[index - 1] = nextLabel;
+        queue[tail++] = index - 1;
+      }
+      if (x < width - 1 && mask[index + 1] && !labels[index + 1]) {
+        labels[index + 1] = nextLabel;
+        queue[tail++] = index + 1;
+      }
+      if (y > 0 && mask[index - width] && !labels[index - width]) {
+        labels[index - width] = nextLabel;
+        queue[tail++] = index - width;
+      }
+      if (y < height - 1 && mask[index + width] && !labels[index + width]) {
+        labels[index + width] = nextLabel;
+        queue[tail++] = index + width;
+      }
     }
     if (bottom >= wheelBandStart && (!best || tail > best.size)) best = { label: nextLabel, size: tail, top, bottom };
   }

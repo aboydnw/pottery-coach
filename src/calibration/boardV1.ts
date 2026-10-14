@@ -6,10 +6,50 @@ import type { CalibrationBoard, Point2 } from "./types";
  * the inner edge of the black ring, which spans modules 2–7.
  */
 const TAG_MODULES: Record<number, readonly string[]> = {
-  0: ["wwbwwwwbb", "bbbbbbbbb", "wbwwwwwbb", "bbwwwwwbw", "bbwbbwwbb", "bbwbwbwbw", "wbwwwwwbb", "bbbbbbbbb", "wwbwbbwbb"],
-  1: ["wwbwwwwbw", "bbbbbbbbb", "wbwwwwwbb", "bbwwwwwbb", "wbwbwwwbw", "wbwwbwwbb", "bbwwwwwbb", "wbbbbbbbw", "bwbwwwbbw"],
-  2: ["wwbwwwwbw", "wbbbbbbbw", "wbwwwwwbw", "bbwwwbwbw", "bbwwbbwbw", "wbwbwwwbw", "bbwwwwwbw", "bbbbbbbbw", "bwbwbwbbb"],
-  3: ["wwbwwwwwb", "wbbbbbbbw", "wbwwwwwbw", "bbwbbbwbw", "wbwwwbwbb", "bbwwwwwbw", "bbwwwwwbb", "wbbbbbbbb", "wwbwwbbbw"],
+  0: [
+    "wwbwwwwbb",
+    "bbbbbbbbb",
+    "wbwwwwwbb",
+    "bbwwwwwbw",
+    "bbwbbwwbb",
+    "bbwbwbwbw",
+    "wbwwwwwbb",
+    "bbbbbbbbb",
+    "wwbwbbwbb",
+  ],
+  1: [
+    "wwbwwwwbw",
+    "bbbbbbbbb",
+    "wbwwwwwbb",
+    "bbwwwwwbb",
+    "wbwbwwwbw",
+    "wbwwbwwbb",
+    "bbwwwwwbb",
+    "wbbbbbbbw",
+    "bwbwwwbbw",
+  ],
+  2: [
+    "wwbwwwwbw",
+    "wbbbbbbbw",
+    "wbwwwwwbw",
+    "bbwwwbwbw",
+    "bbwwbbwbw",
+    "wbwbwwwbw",
+    "bbwwwwwbw",
+    "bbbbbbbbw",
+    "bwbwbwbbb",
+  ],
+  3: [
+    "wwbwwwwwb",
+    "wbbbbbbbw",
+    "wbwwwwwbw",
+    "bbwbbbwbw",
+    "wbwwwbwbb",
+    "bbwwwwwbw",
+    "bbwwwwwbb",
+    "wbbbbbbbb",
+    "wwbwwbbbw",
+  ],
 };
 
 const MODULES_PER_TAG = 9;
@@ -33,7 +73,10 @@ export const BOARD_V1 = {
   calibration: {
     revision: "board-v1",
     supportedRevision: "board-v1",
-    wheelBaseline: [{ x: 45, y: 120 }, { x: 165, y: 120 }],
+    wheelBaseline: [
+      { x: 45, y: 120 },
+      { x: 165, y: 120 },
+    ],
     wheelCenterlineXmm: 105,
     markerPlaneOffsetToleranceMm: 30,
   } satisfies CalibrationBoard,
@@ -51,7 +94,12 @@ export function tagCornersMm(id: number): [Point2, Point2, Point2, Point2] | nul
   const right = tag.xMm + QUAD_END_MODULE * module;
   const top = tag.yMm + QUAD_START_MODULE * module;
   const bottom = tag.yMm + QUAD_END_MODULE * module;
-  return [{ x: left, y: bottom }, { x: right, y: bottom }, { x: right, y: top }, { x: left, y: top }];
+  return [
+    { x: left, y: bottom },
+    { x: right, y: bottom },
+    { x: right, y: top },
+    { x: left, y: top },
+  ];
 }
 
 /** Renders the printable board. `public/calibration/board-v1.svg` must equal this output. */
@@ -60,9 +108,15 @@ export function renderBoardV1Svg(): string {
   const module = board.tagSizeMm / MODULES_PER_TAG;
   const round = (value: number) => Number(value.toFixed(4));
   const tags = board.tags.map((tag) => {
-    const cells = TAG_MODULES[tag.id]!.flatMap((row, y) => [...row].flatMap((cell, x) => cell === "b"
-      ? [`<rect x="${round(tag.xMm + x * module)}" y="${round(tag.yMm + y * module)}" width="${round(module)}" height="${round(module)}"/>`]
-      : []));
+    const cells = TAG_MODULES[tag.id]!.flatMap((row, y) =>
+      [...row].flatMap((cell, x) =>
+        cell === "b"
+          ? [
+              `<rect x="${round(tag.xMm + x * module)}" y="${round(tag.yMm + y * module)}" width="${round(module)}" height="${round(module)}"/>`,
+            ]
+          : [],
+      ),
+    );
     return `    <g data-tag-id="${tag.id}" data-family="${board.family}">${cells.join("")}</g>`;
   });
   const labels = board.tags.map((tag) => {

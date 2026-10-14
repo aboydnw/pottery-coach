@@ -18,8 +18,9 @@ export function scoreConfidence(inputs: ConfidenceInputs): MeasurementConfidence
     inputs.occlusion.score,
     inputs.temporalStability.score,
   ];
-  const errors = [inputs.calibrationErrorMm95, inputs.segmentationErrorMm95]
-    .filter((value): value is number => value !== null);
+  const errors = [inputs.calibrationErrorMm95, inputs.segmentationErrorMm95].filter(
+    (value): value is number => value !== null,
+  );
   return {
     overall: Math.max(0, Math.min(1, Math.min(...criticalScores))),
     calibration: inputs.calibration,

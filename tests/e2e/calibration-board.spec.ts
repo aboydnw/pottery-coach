@@ -5,7 +5,9 @@ async function processedFps(page: Page): Promise<number> {
   return Number(/Processed\s+([\d.]+)/.exec(text)?.[1] ?? Number.NaN);
 }
 
-test("calibrates from the printed board with the real AprilTag detector and keeps processing frames", async ({ page }) => {
+test("calibrates from the printed board with the real AprilTag detector and keeps processing frames", async ({
+  page,
+}) => {
   await page.goto("/?mode=demo");
   await page.getByRole("button", { name: /begin private setup/i }).click();
   await page.getByRole("button", { name: /start camera/i }).click();

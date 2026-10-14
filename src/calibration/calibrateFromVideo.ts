@@ -21,7 +21,8 @@ export async function calibrateFromVideo(video: HTMLVideoElement, detector: TagD
       ? detection.corners.map((image, index) => ({ tagId: detection.id, image, boardMm: boardCorners[index]! }))
       : [];
   });
-  if (correspondences.length === 0) throw new Error("No calibration tags were found. Keep all four tags visible and retry.");
+  if (correspondences.length === 0)
+    throw new Error("No calibration tags were found. Keep all four tags visible and retry.");
   return solveCalibration(correspondences, BOARD_V1.calibration, {
     width,
     height,

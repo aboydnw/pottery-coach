@@ -9,13 +9,29 @@ afterEach(cleanup);
 
 function comparison(confidence = 0.9): ProfileComparison {
   const component = { score: confidence, reasons: [] };
-  return { id: "p", timestampMs: 1, readingId: "r", targetId: "t", meanAbsoluteRadiusErrorMm: 4, normalizedSilhouetteIoU: 0.9,
+  return {
+    id: "p",
+    timestampMs: 1,
+    readingId: "r",
+    targetId: "t",
+    meanAbsoluteRadiusErrorMm: 4,
+    normalizedSilhouetteIoU: 0.9,
     regions: [
       { region: "base", signedMedianRadiusErrorMm: 2, meanAbsoluteRadiusErrorMm: 2, coverage: 1, confidence },
       { region: "lower-body", signedMedianRadiusErrorMm: 6, meanAbsoluteRadiusErrorMm: 6, coverage: 1, confidence },
       { region: "upper-body", signedMedianRadiusErrorMm: -3, meanAbsoluteRadiusErrorMm: 3, coverage: 1, confidence },
       { region: "rim", signedMedianRadiusErrorMm: 1, meanAbsoluteRadiusErrorMm: 1, coverage: 1, confidence },
-    ], confidence: { overall: confidence, calibration: component, segmentation: component, occlusion: component, temporalStability: component, freshnessMs: 0, estimatedErrorMm95: 5 } };
+    ],
+    confidence: {
+      overall: confidence,
+      calibration: component,
+      segmentation: component,
+      occlusion: component,
+      temporalStability: component,
+      freshnessMs: 0,
+      estimatedErrorMm95: 5,
+    },
+  };
 }
 
 it("reports the largest eligible regional deviation with direction", () => {

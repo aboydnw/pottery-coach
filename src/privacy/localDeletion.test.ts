@@ -4,7 +4,10 @@ import { BrowserCacheDeletion, LocalStorageSyncQueueDeletion } from "./localDele
 
 it("deletes only caches scoped to the session", async () => {
   const remove = vi.fn(async () => true);
-  const adapter = new BrowserCacheDeletion({ keys: async () => ["app-shell", "pottery-coach-session-s"], delete: remove } as unknown as CacheStorage);
+  const adapter = new BrowserCacheDeletion({
+    keys: async () => ["app-shell", "pottery-coach-session-s"],
+    delete: remove,
+  } as unknown as CacheStorage);
   expect(await adapter.deleteSession("s")).toBe(true);
   expect(remove).toHaveBeenCalledWith("pottery-coach-session-s");
   expect(remove).not.toHaveBeenCalledWith("app-shell");

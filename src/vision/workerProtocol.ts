@@ -23,9 +23,7 @@ export type DiagnosticResponse = {
 };
 
 export type MeasurementWorkerRequest =
-  | { type: "configure"; calibration: CalibrationResult | null }
-  | FrameRequest
-  | { type: "reset"; reason: string };
+  { type: "configure"; calibration: CalibrationResult | null } | FrameRequest | { type: "reset"; reason: string };
 
 export type MeasurementWorkerEvent =
   | { type: "reading"; instantaneous: DimensionReading; stable: StableDimensionReading | null }

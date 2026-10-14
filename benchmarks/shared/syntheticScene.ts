@@ -46,7 +46,10 @@ function render(scene: VesselScene, frame: number, withVessel: boolean): LabImag
   for (let y = 0; y < height; y += 1) {
     const ratio = (scene.baseRow - y) / vesselRows;
     const radiusPx = scene.radiusMm(Math.min(1, Math.max(0, ratio))) / scene.mmPerPixel;
-    const center = width / 2 + scene.centerOffsetMm / scene.mmPerPixel + Math.tan((scene.shearDeg * Math.PI) / 180) * (scene.baseRow - y);
+    const center =
+      width / 2 +
+      scene.centerOffsetMm / scene.mmPerPixel +
+      Math.tan((scene.shearDeg * Math.PI) / 180) * (scene.baseRow - y);
     for (let x = 0; x < width; x += 1) {
       const gradient = (scene.sideLightGradient ?? 0) * (x / width - 0.5);
       let color: Lab = scene.background;
@@ -72,5 +75,5 @@ function render(scene: VesselScene, frame: number, withVessel: boolean): LabImag
 
 function seeded(seed: number) {
   let state = seed >>> 0;
-  return () => ((state = (1664525 * state + 1013904223) >>> 0) / 2 ** 32);
+  return () => (state = (1664525 * state + 1013904223) >>> 0) / 2 ** 32;
 }

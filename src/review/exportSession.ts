@@ -11,8 +11,16 @@ function cell(value: unknown) {
 }
 
 export function exportCsvReadings(bundle: SessionBundle) {
-  const rows = [["sessionId", "readingId", "timestampMs", "confidence", "heightMm", "maximumWidthMm"],
-    ...bundle.readings.map((reading) => [bundle.session.id, reading.id, reading.timestampMs, reading.confidence,
-      reading.values.heightMm ?? "", reading.values.maximumWidthMm ?? ""])];
+  const rows = [
+    ["sessionId", "readingId", "timestampMs", "confidence", "heightMm", "maximumWidthMm"],
+    ...bundle.readings.map((reading) => [
+      bundle.session.id,
+      reading.id,
+      reading.timestampMs,
+      reading.confidence,
+      reading.values.heightMm ?? "",
+      reading.values.maximumWidthMm ?? "",
+    ]),
+  ];
   return rows.map((row) => row.map(cell).join(",")).join("\n");
 }

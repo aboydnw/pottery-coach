@@ -53,7 +53,11 @@ export function CameraSetup(props: CameraSetupProps) {
   const { step = "camera", numericEnabled = true, demoMode = false, cameraOnly = false } = props;
   const videoRef = useRef<HTMLVideoElement>(null);
   const camera = useCamera(videoRef, { onDenied: props.onCameraDenied });
-  const pipeline = useMeasurementPipeline({ onReading: props.onReading, onWobble: props.onWobble, onProcessingModeChange: props.onProcessingModeChange });
+  const pipeline = useMeasurementPipeline({
+    onReading: props.onReading,
+    onWobble: props.onWobble,
+    onProcessingModeChange: props.onProcessingModeChange,
+  });
   const [detector, setDetector] = useState<WasmTagDetector | null>(null);
   const [candidate, setCandidate] = useState<CalibrationResult | null>(null);
   const [calibrating, setCalibrating] = useState(false);
@@ -66,9 +70,15 @@ export function CameraSetup(props: CameraSetupProps) {
   const processing = numericEnabled && !cameraOnly;
 
   const selectedTarget = TARGET_TEMPLATES.find((template) => template.id === targetId) ?? TARGET_TEMPLATES[0]!;
-  const scaledTarget = useMemo(() => goal ? { ...selectedTarget, intendedWetHeightMm: goal.wetHeightMm } : selectedTarget, [goal, selectedTarget]);
+  const scaledTarget = useMemo(
+    () => (goal ? { ...selectedTarget, intendedWetHeightMm: goal.wetHeightMm } : selectedTarget),
+    [goal, selectedTarget],
+  );
   const reading = pipeline.stableReading;
-  const comparison = useMemo(() => reading && goal ? compareProfiles(reading, scaledTarget) : null, [reading, goal, scaledTarget]);
+  const comparison = useMemo(
+    () => (reading && goal ? compareProfiles(reading, scaledTarget) : null),
+    [reading, goal, scaledTarget],
+  );
 
   useEffect(() => () => detector?.dispose(), [detector]);
   useEffect(() => () => void voiceTransport?.close(), [voiceTransport]);
@@ -100,7 +110,9 @@ export function CameraSetup(props: CameraSetupProps) {
       if (!detector) setDetector(active);
       setCandidate(await calibrateFromVideo(video, active));
     } catch (error) {
-      setCalibrationError(`Calibration failed: ${error instanceof Error ? error.message : "keep all four tags visible and retry."}`);
+      setCalibrationError(
+        `Calibration failed: ${error instanceof Error ? error.message : "keep all four tags visible and retry."}`,
+      );
     } finally {
       setCalibrating(false);
     }
@@ -125,7 +137,14 @@ export function CameraSetup(props: CameraSetupProps) {
 
   async function startMockVoice(): Promise<void> {
     const transport = new MockRealtimeTransport();
-    await transport.connect({ provider: "mock", model: "mock-v1", voice: "local", language: "en", instructionsRevision: "instructions-v1", toolsRevision: "tools-v1" });
+    await transport.connect({
+      provider: "mock",
+      model: "mock-v1",
+      voice: "local",
+      language: "en",
+      instructionsRevision: "instructions-v1",
+      toolsRevision: "tools-v1",
+    });
     setVoiceTransport(transport);
     props.onAudioDecided?.(true);
   }
@@ -163,8 +182,8 @@ export function CameraSetup(props: CameraSetupProps) {
       <p className="eyebrow">Private setup</p>
       <h1 id="camera-title">Set your camera beside the wheel.</h1>
       <p>
-        Video is processed locally on this device. Raw frames are not stored or
-        uploaded. Microphone access is requested separately, later.
+        Video is processed locally on this device. Raw frames are not stored or uploaded. Microphone access is requested
+        separately, later.
       </p>
 
       <video ref={videoRef} autoPlay muted playsInline aria-label="Rear camera preview" />
@@ -177,50 +196,93 @@ export function CameraSetup(props: CameraSetupProps) {
           {camera.settings.frameRate ? ` at ${Math.round(camera.settings.frameRate)} fps` : ""}.
         </p>
       )}
-      {camera.active && <p className="capture-indicator" role="status">Camera active · frames stay on this device</p>}
-      {camera.active && processing && <p>Vision processing target: {pipeline.processingHz} Hz. Preview quality is unchanged.</p>}
-      {camera.active && !numericEnabled && <p>Numeric measurements are disabled until the signed physical calibration gate passes.</p>}
+      {camera.active && (
+        <p className="capture-indicator" role="status">
+          Camera active · frames stay on this device
+        </p>
+      )}
+      {camera.active && processing && (
+        <p>Vision processing target: {pipeline.processingHz} Hz. Preview quality is unchanged.</p>
+      )}
+      {camera.active && !numericEnabled && (
+        <p>Numeric measurements are disabled until the signed physical calibration gate passes.</p>
+      )}
       {camera.interrupted && (
         <div role="status" className="stale-banner">
           Camera was interrupted. Readings are stale until you resume.
-          <button type="button" onClick={() => void startCamera()}>Resume camera</button>
+          <button type="button" onClick={() => void startCamera()}>
+            Resume camera
+          </button>
         </div>
       )}
 
       {camera.active && <DiagnosticsPanel sample={pipeline.sample} />}
       {camera.active && step === "calibration" && !candidate && (
         <div className="calibration-actions">
-          <a href="/calibration/board-v1.svg" target="_blank" rel="noreferrer">Open printable calibration board</a>
+          <a href="/calibration/board-v1.svg" target="_blank" rel="noreferrer">
+            Open printable calibration board
+          </a>
           <button type="button" className="secondary" disabled={calibrating} onClick={() => void runCalibration()}>
             {calibrating ? "Detecting board…" : "Calibrate printed board"}
           </button>
-          {demoMode && <button type="button" className="secondary" onClick={loadDemoCalibration}>Load deterministic demo calibration</button>}
+          {demoMode && (
+            <button type="button" className="secondary" onClick={loadDemoCalibration}>
+              Load deterministic demo calibration
+            </button>
+          )}
         </div>
       )}
-      {candidate && <CalibrationFlow result={candidate} onAccepted={acceptCalibration} onRecalibrate={() => setCandidate(null)} />}
-      {camera.active && calibrated && <button type="button" className="secondary" onClick={recalibrate}>Recalibrate</button>}
-      {camera.active && step === "audio-consent" && <VoiceChoice onMockVoice={() => void startMockVoice()} onNoVoice={() => props.onAudioDecided?.(false)} />}
+      {candidate && (
+        <CalibrationFlow result={candidate} onAccepted={acceptCalibration} onRecalibrate={() => setCandidate(null)} />
+      )}
+      {camera.active && calibrated && (
+        <button type="button" className="secondary" onClick={recalibrate}>
+          Recalibrate
+        </button>
+      )}
+      {camera.active && step === "audio-consent" && (
+        <VoiceChoice onMockVoice={() => void startMockVoice()} onNoVoice={() => props.onAudioDecided?.(false)} />
+      )}
       {camera.active && (step === "goal" || step === "live") && (
-        <TargetSetup templates={TARGET_TEMPLATES} targetId={targetId} onTargetChange={changeTarget} onGoalConfirmed={confirmGoal} />
+        <TargetSetup
+          templates={TARGET_TEMPLATES}
+          targetId={targetId}
+          onTargetChange={changeTarget}
+          onGoalConfirmed={confirmGoal}
+        />
       )}
       {live && reading && comparison && (
         <section className="live-target" aria-label="Live target comparison">
           <ProfileOverlay target={scaledTarget} reading={reading} mode="millimetres" />
-          <GoalProgress comparison={comparison} heightProgress={(reading.heightMm ?? 0) / goal.wetHeightMm} onMilestone={props.onMilestone} />
+          <GoalProgress
+            comparison={comparison}
+            heightProgress={(reading.heightMm ?? 0) / goal.wetHeightMm}
+            onMilestone={props.onMilestone}
+          />
         </section>
       )}
       {live && pipeline.wobbleReading && <StabilityStatus reading={pipeline.wobbleReading} />}
       {voiceTransport && <VoiceControls transport={voiceTransport} connectionLabel="local mock (no provider audio)" />}
       {demoMode && live && reading && (
         <section aria-label="Demo evidence question">
-          <button type="button" className="secondary" onClick={() => setDemoAnswer(`Height is ${reading.heightMm} mm · evidence ${reading.id}`)}>Ask “How tall is it?”</button>
+          <button
+            type="button"
+            className="secondary"
+            onClick={() => setDemoAnswer(`Height is ${reading.heightMm} mm · evidence ${reading.id}`)}
+          >
+            Ask “How tall is it?”
+          </button>
           {demoAnswer && <p role="status">{demoAnswer}</p>}
         </section>
       )}
       {live && (
         <div className="session-actions">
-          <button type="button" className="secondary" onClick={() => void markMoment()}>Mark this moment</button>
-          <button type="button" onClick={endSession}>End session and review</button>
+          <button type="button" className="secondary" onClick={() => void markMoment()}>
+            Mark this moment
+          </button>
+          <button type="button" onClick={endSession}>
+            End session and review
+          </button>
         </div>
       )}
       {momentMarked && <p role="status">Moment marked locally.</p>}
@@ -231,9 +293,15 @@ export function CameraSetup(props: CameraSetupProps) {
             {camera.starting ? "Starting camera…" : "Start camera"}
           </button>
         ) : (
-          <button type="button" onClick={stopCamera}>Stop camera</button>
+          <button type="button" onClick={stopCamera}>
+            Stop camera
+          </button>
         )}
-        {camera.error && <button type="button" className="secondary" onClick={() => void startCamera()}>Retry</button>}
+        {camera.error && (
+          <button type="button" className="secondary" onClick={() => void startCamera()}>
+            Retry
+          </button>
+        )}
       </div>
       {camera.active && (
         <button type="button" className="secondary" onClick={() => downloadDiagnostics(pipeline.sample)}>

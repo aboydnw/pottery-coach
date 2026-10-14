@@ -74,7 +74,13 @@ export class CanvasFrameSource implements FrameSource {
           bitmap.close();
           return;
         }
-        const result = this.sink({ frameId: ++this.frameId, capturedAtMs: toEpochMs(now), bitmap, sourceRoi: { ...roi }, scale });
+        const result = this.sink({
+          frameId: ++this.frameId,
+          capturedAtMs: toEpochMs(now),
+          bitmap,
+          sourceRoi: { ...roi },
+          scale,
+        });
         if (result === "busy") bitmap.close();
       } catch {
         // The video can briefly have no decodable frame (startup, device switch); skip this tick.

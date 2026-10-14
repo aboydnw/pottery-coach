@@ -58,15 +58,23 @@ export class TemporalFilter {
     const previous = this.smoothed;
     const dt = previous ? Math.max(0, latest.timestampMs - previous.timestampMs) : EMA_TIME_CONSTANT_MS;
     const alpha = previous ? dt / (EMA_TIME_CONSTANT_MS + dt) : 1;
-    const smooth = (key: keyof Pick<DimensionReading, "heightMm" | "maximumWidthMm" | "rimWidthMm" | "baseWidthMm" | "centerlineOffsetMm" | "visibleAsymmetryMm">): number | null => {
-      const values = readings.map((reading) => reading[key]).filter((value): value is number => typeof value === "number");
+    const smooth = (
+      key: keyof Pick<
+        DimensionReading,
+        "heightMm" | "maximumWidthMm" | "rimWidthMm" | "baseWidthMm" | "centerlineOffsetMm" | "visibleAsymmetryMm"
+      >,
+    ): number | null => {
+      const values = readings
+        .map((reading) => reading[key])
+        .filter((value): value is number => typeof value === "number");
       if (values.length < 3) return null;
       const current = median(values);
       const old = previous?.[key];
       return typeof old === "number" ? old + alpha * (current - old) : current;
     };
     const profile: ProfileSample[] = latest.profile.map((sample, index) => {
-      const values = readings.map((reading) => reading.profile[index]?.radiusMm)
+      const values = readings
+        .map((reading) => reading.profile[index]?.radiusMm)
         .filter((value): value is number => typeof value === "number");
       return {
         heightRatio: sample.heightRatio,
@@ -94,4 +102,3 @@ export class TemporalFilter {
     };
   }
 }
-
