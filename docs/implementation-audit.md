@@ -18,21 +18,20 @@ Status date: 2026-10-09. This audit separates implemented web software and autom
 Run:
 
 ```sh
+pnpm lint
 pnpm test
 pnpm typecheck
 pnpm build
 pnpm e2e
 pnpm benchmark:tags
 pnpm benchmark:profile
-pnpm benchmark:voice
 pnpm benchmark:coaching
-pnpm benchmark:integrated -- --duration=1200
 pnpm benchmark:verify-manifests
 node scripts/verify-calibration-board.mjs
 ```
 
-The dimension, segmentation, and wobble runners create immutable synthetic JSONL evidence but never pass their physical gates. Run them explicitly when regenerating synthetic artifacts. Strict field completion is checked with `node scripts/validate-field-manifests.mjs --require-complete` and is expected to fail until the consolidated study is populated.
+The dimension, segmentation, and wobble runners run the product code on synthetic scenes and write immutable JSONL evidence, but can never pass their physical gates. The voice and integrated runners are placeholders until a provider or device harness exists. Run them explicitly when regenerating synthetic artifacts. Strict field completion is checked with `node scripts/validate-field-manifests.mjs --require-complete` and is expected to fail until the consolidated study is populated.
 
 ## Fail-closed release posture
 
-The release manifest is unsigned and sets numeric production measurement, proactive wobble, cloud voice, and claimed mobile support to false. Demo mode is deterministic and visibly scoped to test evidence. `prototype-v1-rc1` must not be tagged until the linked physical, provider, privacy, accessibility, performance, architecture, and instructor artifacts are attached and the manifest is signed.
+The release manifest is unsigned and sets numeric production measurement, proactive wobble, cloud voice, and claimed mobile support to false. Demo mode is deterministic, visibly scoped to test evidence, and compiled out of production builds unless `VITE_ENABLE_DEMO=true`. `prototype-v1-rc1` must not be tagged until the linked physical, provider, privacy, accessibility, performance, architecture, and instructor artifacts are attached and the manifest is signed.
