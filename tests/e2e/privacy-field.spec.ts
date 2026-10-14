@@ -14,14 +14,14 @@ test("local databases hold measurements but no raw media after a session", async
       if (!name) continue;
       const database = await new Promise<IDBDatabase>((resolve, reject) => {
         const request = indexedDB.open(name);
-        request.onsuccess = () => resolve(request.result);
-        request.onerror = () => reject(request.error);
+        request.addEventListener("success", () => resolve(request.result));
+        request.addEventListener("error", () => reject(request.error));
       });
       for (const store of Array.from(database.objectStoreNames)) {
         const rows = await new Promise<unknown[]>((resolve, reject) => {
           const request = database.transaction(store).objectStore(store).getAll();
-          request.onsuccess = () => resolve(request.result);
-          request.onerror = () => reject(request.error);
+          request.addEventListener("success", () => resolve(request.result));
+          request.addEventListener("error", () => reject(request.error));
         });
         const isBinary = (value: unknown): boolean => value instanceof Blob || value instanceof ArrayBuffer || ArrayBuffer.isView(value)
           || (typeof value === "object" && value !== null && Object.values(value).some(isBinary));
