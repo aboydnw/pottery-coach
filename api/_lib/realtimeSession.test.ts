@@ -1,19 +1,19 @@
 import { expect, it, vi } from "vitest";
 
-import { handleRealtimeSession } from "./session";
+import { handleRealtimeSession } from "./realtimeSession";
 
 const body = { sdp: "v=0\r\no=- 1 1 IN IP4 127.0.0.1", sessionId: "550e8400-e29b-41d4-a716-446655440000", clientConfigVersion: "voice-v1" };
 
 function dependencies(overrides = {}) {
-  return { apiKey: "server-secret", fetch: vi.fn().mockResolvedValue(new Response("v=0 answer", { status: 200 })), authenticate: vi.fn().mockResolvedValue(true), verifyCsrf: vi.fn(() => true), allowRequest: vi.fn(() => true), log: vi.fn(), ...overrides };
+  return { apiKey: "server-secret", model: "gpt-realtime-2.1-mini", fetch: vi.fn().mockResolvedValue(new Response("v=0 answer", { status: 200 })), authenticate: vi.fn().mockResolvedValue(true), verifyOrigin: vi.fn(() => true), allowRequest: vi.fn(() => true), log: vi.fn(), ...overrides };
 }
 
-function requestBody(value = body) {
+function requestBody(value: Record<string, unknown> = body) {
   return new Request("http://local/api/realtime/session", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(value) });
 }
 
-it("rejects unauthenticated, CSRF, and rate-limited requests before provider access", async () => {
-  for (const overrides of [{ authenticate: vi.fn().mockResolvedValue(false) }, { verifyCsrf: vi.fn(() => false) }, { allowRequest: vi.fn(() => false) }]) {
+it("rejects unauthenticated, cross-origin, and rate-limited requests before provider access", async () => {
+  for (const overrides of [{ authenticate: vi.fn().mockResolvedValue(false) }, { verifyOrigin: vi.fn(() => false) }, { allowRequest: vi.fn(() => false) }]) {
     const deps = dependencies(overrides);
     const response = await handleRealtimeSession(requestBody(), deps);
     expect(response.ok).toBe(false); expect(deps.fetch).not.toHaveBeenCalled();

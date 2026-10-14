@@ -20,7 +20,7 @@
 
 **Files:** Create `api/realtime/session.ts`, `api/realtime/session.test.ts`, `src/voice/sessionSchema.ts`, `.test.ts`, `src/privacy/providers/openai.json`; modify deployment config and `.env.example`.
 
-**Interfaces:** `POST /api/realtime/session` accepts `{sdp,sessionId,clientConfigVersion}` with auth/CSRF; returns SDP answer content type; server injects model, voice, instructions, tools. Errors are stable `VOICE_RATE_LIMITED|VOICE_PROVIDER_ERROR|VOICE_CONFIG_MISMATCH`.
+**Interfaces:** `POST /api/realtime/session` accepts `{sdp,sessionId,clientConfigVersion}` with a bearer token and same-origin check; returns SDP answer content type; server injects model, voice, instructions, tools. Errors are stable `VOICE_RATE_LIMITED|VOICE_PROVIDER_ERROR|VOICE_CONFIG_MISMATCH`.
 
 - [ ] Write endpoint tests: unauthenticated/CSRF/rate-limit reject; client model/instructions ignored; provider Authorization server-only; SDP size/type validated; secrets absent from response/log spy.
 - [ ] Run endpoint tests; expect missing route.

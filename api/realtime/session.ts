@@ -1,53 +1,25 @@
-import { realtimeSessionRequestSchema } from "../../src/voice/sessionSchema";
-import { COACH_INSTRUCTIONS } from "../../src/voice/instructions";
-import { REALTIME_TOOL_DEFINITIONS } from "../../src/voice/tools/definitions";
+import { clientAddress, createRateLimiter, hasBearerToken, isSameOrigin } from "../_lib/guards";
+import { handleRealtimeSession } from "../_lib/realtimeSession";
 
-const MODEL = "gpt-realtime-2.1-mini";
-const VOICE = "marin";
+const DEFAULT_MODEL = "gpt-realtime-2.1-mini";
+const allow = createRateLimiter({ limit: 10, windowMs: 60_000 });
 
-type Dependencies = {
-  apiKey: string;
-  fetch: typeof globalThis.fetch;
-  authenticate(request: Request): Promise<boolean>;
-  verifyCsrf(request: Request): boolean;
-  allowRequest(sessionId: string): boolean;
-  log(event: { requestId: string; status: string }): void;
-};
-
-export async function handleRealtimeSession(request: Request, dependencies: Dependencies): Promise<Response> {
-  const requestId = crypto.randomUUID();
-  if (request.method !== "POST") return error("VOICE_PROVIDER_ERROR", 405);
-  if (!await dependencies.authenticate(request)) return error("VOICE_PROVIDER_ERROR", 401);
-  if (!dependencies.verifyCsrf(request)) return error("VOICE_PROVIDER_ERROR", 403);
-  if (!request.headers.get("content-type")?.toLowerCase().startsWith("application/json")) return error("VOICE_PROVIDER_ERROR", 415);
-  let parsed: ReturnType<typeof realtimeSessionRequestSchema.safeParse>;
-  try { parsed = realtimeSessionRequestSchema.safeParse(await request.json()); }
-  catch { return error("VOICE_PROVIDER_ERROR", 400); }
-  if (!parsed.success) return error(parsed.error.issues.some((issue) => issue.path[0] === "clientConfigVersion") ? "VOICE_CONFIG_MISMATCH" : "VOICE_PROVIDER_ERROR", 400);
-  if (!dependencies.allowRequest(parsed.data.sessionId)) return error("VOICE_RATE_LIMITED", 429);
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 10_000);
-  try {
-    const form = new FormData();
-    form.set("sdp", parsed.data.sdp);
-    form.set("session", JSON.stringify({ type: "realtime", model: MODEL, audio: { output: { voice: VOICE }, input: { turn_detection: { type: "server_vad" } } },
-      instructions: COACH_INSTRUCTIONS, tools: REALTIME_TOOL_DEFINITIONS }));
-    const provider = await dependencies.fetch("https://api.openai.com/v1/realtime/calls", {
-      method: "POST", headers: { Authorization: `Bearer ${dependencies.apiKey}` }, body: form, signal: controller.signal,
-    });
-    if (!provider.ok) {
-      dependencies.log({ requestId, status: "provider-error" });
-      return error(provider.status === 429 ? "VOICE_RATE_LIMITED" : "VOICE_PROVIDER_ERROR", provider.status === 429 ? 429 : 502);
-    }
-    const answer = await provider.text();
-    dependencies.log({ requestId, status: "connected" });
-    return new Response(answer, { status: 200, headers: { "content-type": "application/sdp", "x-request-id": requestId } });
-  } catch {
-    dependencies.log({ requestId, status: "provider-error" });
-    return error("VOICE_PROVIDER_ERROR", 502);
-  } finally { clearTimeout(timeout); }
-}
-
-function error(code: "VOICE_RATE_LIMITED" | "VOICE_PROVIDER_ERROR" | "VOICE_CONFIG_MISMATCH", status: number): Response {
-  return Response.json({ error: code }, { status });
+/**
+ * Vercel function for `POST /api/realtime/session`. Cloud voice stays disabled (503) until both
+ * `OPENAI_API_KEY` and `REALTIME_ACCESS_TOKEN` are configured in the host's secret store.
+ */
+export async function POST(request: Request): Promise<Response> {
+  const apiKey = process.env.OPENAI_API_KEY;
+  const accessToken = process.env.REALTIME_ACCESS_TOKEN;
+  if (!apiKey || !accessToken) return Response.json({ error: "VOICE_DISABLED" }, { status: 503, headers: { "cache-control": "no-store, private" } });
+  const allowedOrigins = (process.env.REALTIME_ALLOWED_ORIGINS ?? "").split(",").map((value) => value.trim()).filter(Boolean);
+  return handleRealtimeSession(request, {
+    apiKey,
+    model: process.env.VOICE_MODEL || DEFAULT_MODEL,
+    fetch: globalThis.fetch,
+    authenticate: (incoming) => hasBearerToken(incoming, accessToken),
+    verifyOrigin: (incoming) => isSameOrigin(incoming, allowedOrigins),
+    allowRequest: (incoming) => allow(clientAddress(incoming)),
+    log: (event) => console.info(JSON.stringify({ route: "realtime-session", ...event })),
+  });
 }
