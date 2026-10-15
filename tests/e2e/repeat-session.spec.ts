@@ -1,10 +1,9 @@
 import { expect, test, type Page } from "@playwright/test";
-import { beginDemoSession, chooseNoVoiceAndConfirmWetGoal } from "./fixtures/session-streams";
+import { beginDemoSession, confirmWetGoal, endSession, openSetup, startSession } from "./fixtures/session-streams";
 
 async function completeSession(page: Page) {
-  await chooseNoVoiceAndConfirmWetGoal(page);
-  await page.getByRole("button", { name: /end session and review/i }).click();
-  await expect(page.getByRole("heading", { name: /throw complete/i })).toBeVisible();
+  await confirmWetGoal(page);
+  await endSession(page);
 }
 
 test("a second session after deletion records and reviews normally", async ({ page }) => {
@@ -16,11 +15,9 @@ test("a second session after deletion records and reviews normally", async ({ pa
   await page.getByRole("button", { name: /confirm deletion/i }).click();
   await page.getByRole("button", { name: /start another session/i }).click();
 
-  await page.getByRole("button", { name: /begin private setup/i }).click();
-  await page.getByRole("button", { name: /start camera/i }).click();
+  await page.getByRole("button", { name: /start session/i }).click();
+  await openSetup(page);
   await page.getByRole("button", { name: /load deterministic demo calibration/i }).click();
-  await page.getByLabel(/100 mm line/i).check();
-  await page.getByRole("button", { name: /use calibration/i }).click();
   await completeSession(page);
 
   await expect(page.getByRole("table", { name: /measurement data/i })).toContainText("120 mm");
@@ -34,9 +31,14 @@ test("review times are relative to the session start", async ({ page }) => {
   expect(Number.parseFloat(firstTime)).toBeLessThan(3600);
 });
 
-test("the measurement worker keeps processing after the processing rate adapts", async ({ page }) => {
-  await beginDemoSession(page);
+test("measurement runs from the first tap, before calibration, even with the preview scrolled away", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 412, height: 500 });
+  await startSession(page, { demo: false });
   await page.locator("details.diagnostics summary").click();
+  await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
+  await expect(page.locator("video")).not.toBeInViewport();
   await page.waitForTimeout(6_000);
   const samples: number[] = [];
   for (let index = 0; index < 4; index += 1) {

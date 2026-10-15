@@ -21,6 +21,7 @@ function readingWithDelta(region: ProfileRegion, deltaMm: number, noiseMm: numbe
     timestampMs: 0,
     sourceFrameId: 0,
     calibrationId: "synthetic",
+    unit: "mm",
     height: target.intendedWetHeightMm,
     maximumWidth: null,
     rimWidth: null,

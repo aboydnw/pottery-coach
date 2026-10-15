@@ -14,11 +14,12 @@ export function resolveRecordedSizes(bundle: SessionBundle): SessionBundle {
 }
 
 function resolveReading(reading: RecordedReading, scale: SessionScale | null): RecordedReading {
-  if (reading.unit !== "px") return reading;
+  if (!reading.unit) return reading;
+  const factor = reading.unit === "mm" ? 1 : (scale?.mmPerPixel ?? null);
   const values: Record<string, number | null> = { ...reading.values };
   for (const key of LENGTH_KEYS) {
-    const pixels = reading.values[key];
-    values[`${key}Mm`] = pixels == null || !scale ? null : pixels * scale.mmPerPixel;
+    const length = reading.values[key];
+    values[`${key}Mm`] = length == null || factor === null ? null : length * factor;
   }
   return { ...reading, values };
 }

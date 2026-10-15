@@ -69,3 +69,21 @@ it("leaves sizes empty, rather than guessing, when the session never got a scale
   expect(resolveRecordedSizes(base).readings[0]!.values.heightMm).toBeNull();
   expect(sizesUnavailable(base)).toBe(true);
 });
+
+it("passes through readings that were already recorded in millimetres", () => {
+  const bundle = {
+    ...base,
+    readings: [
+      {
+        id: "m",
+        sessionId: "s",
+        timestampMs: 0,
+        kind: "stable" as const,
+        unit: "mm" as const,
+        values: { height: 120, maximumWidth: 92, rimWidth: null, baseWidth: null },
+        confidence: 0.95,
+      },
+    ],
+  };
+  expect(resolveRecordedSizes(bundle).readings[0]!.values).toMatchObject({ heightMm: 120, maximumWidthMm: 92 });
+});

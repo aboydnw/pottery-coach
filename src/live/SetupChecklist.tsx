@@ -33,7 +33,7 @@ export function SetupChecklist({ slots, templates, defaultOpen, calibration, onT
             : slots.calibration === "skipped"
               ? "skipped (shape only)"
               : "not set"}
-          {slots.calibration === "confirmed" && " · edges checked"}
+          {slots.calibration === "confirmed" && " · sizes calibrated"}
         </li>
         <li>
           <strong>Target:</strong> {TARGET_NAMES[slots.targetId.value]}

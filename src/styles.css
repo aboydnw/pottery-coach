@@ -62,7 +62,7 @@ button:focus-visible {
 
 .intro,
 .notice,
-.camera-setup {
+.live-session {
   width: min(100%, 40rem);
   border: 1px solid #c9bbaa;
   border-radius: 1.25rem;
@@ -71,7 +71,7 @@ button:focus-visible {
   box-shadow: 0 1rem 3rem rgb(73 53 39 / 10%);
 }
 
-.camera-setup video {
+.live-session video {
   display: block;
   width: 100%;
   min-height: 12rem;
@@ -81,7 +81,7 @@ button:focus-visible {
   object-fit: contain;
 }
 
-.camera-setup video.mirrored {
+.live-session video.mirrored {
   transform: scaleX(-1);
 }
 
@@ -111,7 +111,7 @@ button:focus-visible {
     align-items: start;
     padding: 0.75rem;
   }
-  .camera-setup,
+  .live-session,
   .notice,
   .intro {
     border-radius: 0.75rem;
@@ -322,4 +322,104 @@ button.link-button {
   background: transparent;
   font-weight: 600;
   text-decoration: underline;
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+.start-button {
+  width: 100%;
+  min-height: 64px;
+}
+
+.live-grid {
+  display: grid;
+  gap: 1rem;
+  align-items: center;
+}
+
+.live-grid video {
+  max-height: 40vh;
+  margin: 0;
+}
+
+@media (min-width: 640px) {
+  .live-grid {
+    grid-template-columns: 3fr 2fr;
+  }
+}
+
+.readouts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem 1.5rem;
+}
+
+.readout {
+  display: grid;
+}
+
+.readout-value {
+  font-size: clamp(2rem, 9vw, 3.5rem);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.05;
+}
+
+.readout-label,
+.readout-note,
+.readout-waiting {
+  color: #61574f;
+}
+
+.captions {
+  margin: 1rem 0;
+  border-left: 4px solid #245c65;
+  padding: 0.5rem 1rem;
+  background: #eef5f5;
+}
+
+.captions ol {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.caption-coach {
+  font-weight: 600;
+}
+
+.voice-status {
+  margin: 0 0 0.5rem;
+  color: #245c65;
+  font-weight: 700;
+}
+
+.setup-checklist {
+  margin: 1rem 0;
+  border: 1px solid #c9bbaa;
+  border-radius: 0.75rem;
+  padding: 0.75rem 1rem;
+}
+
+.setup-checklist summary {
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.slot-list {
+  padding-left: 1.25rem;
+}
+
+.session-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin: 1rem 0;
 }

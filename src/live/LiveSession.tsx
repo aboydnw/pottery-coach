@@ -9,6 +9,7 @@ import { detectWheelHead, toGray, wheelHeadCalibration, type WheelHeadDetection 
 import { WheelHeadConfirm } from "../calibration/WheelHeadConfirm";
 import { nudgeMarker, type WheelEdges } from "../calibration/wheelMarkers";
 import { WheelHeadStep } from "../calibration/WheelHeadStep";
+import { loadRememberedDiameterMm } from "../calibration/wheelSize";
 import { captureFrame } from "../camera/captureFrame";
 import { useCamera } from "../camera/useCamera";
 import { DiagnosticsPanel } from "../diagnostics/DiagnosticsPanel";
@@ -84,7 +85,6 @@ export function LiveSession(props: LiveSessionProps) {
   const [momentMarked, setMomentMarked] = useState(false);
   const plateRef = useRef<ImageData | null>(null);
   const wheelRef = useRef<WheelCheckState | null>(null);
-  const startedRef = useRef(false);
 
   const target = TEMPLATES.find((template) => template.id === slots.targetId.value) ?? TEMPLATES[0]!;
   const goal = useMemo<GoalConfirmation | null>(() => {
@@ -115,10 +115,9 @@ export function LiveSession(props: LiveSessionProps) {
   }, [goal]);
 
   useEffect(() => {
-    if (startedRef.current) return;
-    startedRef.current = true;
+    // Development mode mounts twice; the camera controller cancels the superseded first start.
     void startCamera();
-    // Start exactly once, right after the session's single tap.
+    // Start right after the session's single tap.
     // oxlint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -269,17 +268,7 @@ export function LiveSession(props: LiveSessionProps) {
   const calibrationArea = (
     <div className="calibration-area">
       {problem && <p role="alert">{problem}</p>}
-      {wheelCheck ? (
-        <WheelHeadConfirm
-          still={wheelCheck.image}
-          detection={wheelCheck.detection}
-          edges={wheelCheck.edges}
-          onEdgesChange={(edges) => updateWheel({ ...wheelCheck, edges, adjusted: true })}
-          mirrored={mirrored}
-          onConfirm={() => void confirmWheel()}
-          onRetry={() => updateWheel(null)}
-        />
-      ) : boardCandidate ? (
+      {wheelCheck ? null : boardCandidate ? (
         <CalibrationFlow
           result={boardCandidate}
           onAccepted={acceptBoard}
@@ -305,7 +294,7 @@ export function LiveSession(props: LiveSessionProps) {
         ) : (
           <section className="calibration-actions" aria-label="Wheel-head calibration">
             <WheelHeadStep
-              initialDiameterMm={slots.wheelHeadDiameterMm?.value ?? null}
+              initialDiameterMm={slots.wheelHeadDiameterMm?.value ?? loadRememberedDiameterMm()}
               busy={busy}
               onFind={(diameterMm) => {
                 setup.apply({ wheelHeadDiameter: { value: diameterMm, unit: "mm" } });
@@ -378,6 +367,18 @@ export function LiveSession(props: LiveSessionProps) {
         </section>
       )}
       {activeScale && pipeline.wobbleReading && <StabilityStatus reading={pipeline.wobbleReading} />}
+      {wheelCheck && (
+        // Shown in the main view, not the collapsible checklist: the coach asks about these lines.
+        <WheelHeadConfirm
+          still={wheelCheck.image}
+          detection={wheelCheck.detection}
+          edges={wheelCheck.edges}
+          onEdgesChange={(edges) => updateWheel({ ...wheelCheck, edges, adjusted: true })}
+          mirrored={mirrored}
+          onConfirm={() => void confirmWheel()}
+          onRetry={() => updateWheel(null)}
+        />
+      )}
       {voice.available && <Captions state={voice.state} captions={voice.captions} />}
 
       <SetupChecklist
