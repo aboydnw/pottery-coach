@@ -11,8 +11,15 @@ export type CalibrationQuality = {
   contrastScore: number;
 };
 
+export type CalibrationMethod = "board" | "wheel-head" | "none";
+
+/** Where the wheel head's edges were found, in full-resolution image pixels. */
+export type WheelHeadMeasurement = { leftX: number; rightX: number; row: number; diameterMm: number };
+
 export type CalibrationResult = {
   id: string;
+  /** How scale was established: printed board, wheel-head diameter, or none (shape-only). */
+  method: CalibrationMethod;
   createdAtMs: number;
   status: "accepted" | "manual-review" | "rejected";
   homographyImageToMm: [number, number, number, number, number, number, number, number, number];
@@ -26,6 +33,9 @@ export type CalibrationResult = {
   boardRevision: string;
   supportedBoardRevision: string;
   roiClipped: boolean;
+  /** Vertical axis of the wheel in full-resolution image pixels, when the method can locate it. */
+  imageCenterlineX?: number;
+  wheelHead?: WheelHeadMeasurement;
 };
 
 export type PointCorrespondence = { tagId: number; image: Point2; boardMm: Point2 };

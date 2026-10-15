@@ -20,6 +20,18 @@ export const REALTIME_TOOL_DEFINITIONS = [
   },
   {
     type: "function",
+    name: "setWheelHeadDiameter",
+    description:
+      "Record the diameter of the wheel head or bat the pot sits on, as the user stated it, converted to millimetres. Only call this with a size the user said; never estimate it.",
+    parameters: {
+      type: "object",
+      properties: { diameterMm: { type: "number", minimum: 200, maximum: 500 } },
+      required: ["diameterMm"],
+      additionalProperties: false,
+    },
+  },
+  {
+    type: "function",
     name: "getCurrentDimensions",
     description: "Read current eligible visible dimensions.",
     parameters: empty,

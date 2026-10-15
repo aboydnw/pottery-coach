@@ -31,6 +31,7 @@ export function solveCalibration(
     id: globalThis.crypto?.randomUUID?.() ?? `calibration-${Date.now()}`,
     createdAtMs: Date.now(),
     status: "accepted",
+    method: "board",
     homographyImageToMm: homography,
     wheelBaseline: board.wheelBaseline,
     wheelCenterlineXmm: board.wheelCenterlineXmm,

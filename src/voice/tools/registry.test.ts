@@ -54,6 +54,7 @@ it("rejects unknown/invalid calls and returns evidence-backed measurement facts"
     })),
     setPaused: vi.fn(),
     markMoment: vi.fn(async () => ({ id: "moment-1", timestampMs: 1000 })),
+    setWheelHeadDiameter: vi.fn(async (diameterMm: number) => ({ diameterMm })),
   });
   await expect(registry.call("unknown", {})).rejects.toThrow(/unknown tool/i);
   await expect(registry.call("setGoal", {})).rejects.toThrow(/invalid/i);
@@ -71,8 +72,26 @@ it("returns unmeasurable rather than stale numeric dimensions", async () => {
     setGoal: vi.fn(),
     setPaused: vi.fn(),
     markMoment: vi.fn(),
+    setWheelHeadDiameter: vi.fn(),
   });
   await expect(registry.call("getCurrentDimensions", {})).resolves.toEqual(
     expect.objectContaining({ measurable: false, reason: "NO_CURRENT_READING" }),
   );
+});
+
+it("records a stated wheel-head size and rejects implausible ones", async () => {
+  const setWheelHeadDiameter = vi.fn(async (diameterMm: number) => ({ diameterMm }));
+  const registry = createToolRegistry({
+    now: () => 0,
+    getDimensions: () => null,
+    getWobble: () => null,
+    getComparison: () => null,
+    setGoal: vi.fn(),
+    setPaused: vi.fn(),
+    markMoment: vi.fn(),
+    setWheelHeadDiameter,
+  });
+  await expect(registry.call("setWheelHeadDiameter", { diameterMm: 355.6 })).resolves.toEqual({ diameterMm: 355.6 });
+  await expect(registry.call("setWheelHeadDiameter", { diameterMm: 14 })).rejects.toThrow();
+  expect(setWheelHeadDiameter).toHaveBeenCalledOnce();
 });

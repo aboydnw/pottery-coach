@@ -13,6 +13,8 @@ const goalSchema = z.object({
 });
 const emptySchema = z.object({}).strict();
 
+const wheelHeadSchema = z.object({ diameterMm: z.number().min(200).max(500) }).strict();
+
 export function createToolRegistry(dependencies: ToolDependencies) {
   return {
     async call(name: string, input: unknown): Promise<unknown> {
@@ -87,6 +89,8 @@ export function createToolRegistry(dependencies: ToolDependencies) {
         dependencies.setPaused(false);
         return { paused: false, timestampMs: dependencies.now() };
       }
+      if (name === "setWheelHeadDiameter")
+        return dependencies.setWheelHeadDiameter(parse(wheelHeadSchema, input).diameterMm);
       if (name === "markMoment")
         return dependencies.markMoment(z.object({ label: z.string().max(100).optional() }).parse(input));
       throw new Error(`Unknown tool: ${name}`);

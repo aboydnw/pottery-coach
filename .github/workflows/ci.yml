@@ -31,7 +31,7 @@ jobs:
       - run: pnpm benchmark:verify-manifests
       - run: pnpm exec playwright install --with-deps chromium webkit
       - run: pnpm e2e
-      - run: E2E_PREVIEW=1 pnpm exec playwright test --project=chromium-board-camera
+      - run: E2E_PREVIEW=1 pnpm exec playwright test --project=chromium-board-camera --project=chromium-wheel-camera
       - uses: actions/upload-artifact@v4
         if: failure()
         with:

@@ -8,6 +8,7 @@ import type { CalibrationResult } from "./types";
 export function uncalibratedCalibration(width: number, height: number): CalibrationResult {
   return {
     id: "uncalibrated",
+    method: "none",
     createdAtMs: Date.now(),
     status: "accepted",
     homographyImageToMm: [1, 0, 0, 0, 1, 0, 0, 0, 1],

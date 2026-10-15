@@ -92,7 +92,7 @@ function processFrame(request: FrameRequest, active: CalibrationResult): void {
     width: image.width,
     height: image.height,
     mmPerPixel: estimateMmPerPixel(active) * request.scale,
-    centerlineX: image.width / 2,
+    centerlineX: active.imageCenterlineX === undefined ? image.width / 2 : active.imageCenterlineX / request.scale,
     calibrationId: active.id,
     frameId: request.frameId,
     timestampMs: request.capturedAtMs,

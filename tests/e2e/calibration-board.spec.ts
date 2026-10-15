@@ -11,6 +11,7 @@ test("calibrates from the printed board with the real AprilTag detector and keep
   await page.goto("/?mode=demo");
   await page.getByRole("button", { name: /begin private setup/i }).click();
   await page.getByRole("button", { name: /start camera/i }).click();
+  await page.getByRole("button", { name: /use a printed board instead/i }).click();
   await page.getByRole("button", { name: /calibrate printed board/i }).click();
 
   await expect(page.getByRole("heading", { name: /confirm calibration/i })).toBeVisible({ timeout: 20_000 });

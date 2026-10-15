@@ -4,4 +4,6 @@ Session deletion stops active media first and removes the session row, readings,
 
 The default web app has no backend session persistence. Its receipt therefore records a `provider-exception` instead of claiming provider-side deletion. If a backend adapter is configured, success or failure is recorded separately. Deletion is idempotent: repeating it reports local stores as `not-present`.
 
+One device setting sits outside sessions: the wheel-head diameter the user entered, stored in `localStorage` under `pottery-coach-wheel-head-mm` so setup can prefill it. It isn't linked to any session and isn't removed by session deletion. Clearing site data removes it.
+
 Structured session data expires after 30 days. Active sessions are excluded. Raw continuous camera and microphone media is never recorded.

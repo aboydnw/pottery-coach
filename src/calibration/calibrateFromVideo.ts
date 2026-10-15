@@ -1,3 +1,4 @@
+import { captureFrame } from "../camera/captureFrame";
 import { BOARD_V1, tagCornersMm } from "./boardV1";
 import { solveCalibration } from "./homography";
 import type { TagDetector } from "./TagDetector";
@@ -5,16 +6,9 @@ import type { CalibrationResult, PointCorrespondence } from "./types";
 
 /** Captures the current video frame, detects the board's AprilTags, and solves the image-to-board homography. */
 export async function calibrateFromVideo(video: HTMLVideoElement, detector: TagDetector): Promise<CalibrationResult> {
-  const width = video.videoWidth;
-  const height = video.videoHeight;
-  if (!width || !height) throw new Error("The camera has not delivered a frame yet.");
-  const canvas = document.createElement("canvas");
-  canvas.width = width;
-  canvas.height = height;
-  const context = canvas.getContext("2d", { willReadFrequently: true });
-  if (!context) throw new Error("Canvas capture is unavailable.");
-  context.drawImage(video, 0, 0, width, height);
-  const detections = await detector.detect(context.getImageData(0, 0, width, height));
+  const frame = captureFrame(video);
+  const { width, height } = frame;
+  const detections = await detector.detect(frame);
   const correspondences: PointCorrespondence[] = detections.flatMap((detection) => {
     const boardCorners = tagCornersMm(detection.id);
     return boardCorners

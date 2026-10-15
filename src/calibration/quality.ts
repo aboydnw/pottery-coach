@@ -11,9 +11,15 @@ export const CALIBRATION_REASON = {
   boardRevision: "BOARD_REVISION",
   blur: "BLUR",
   contrast: "CONTRAST",
+  wheelTooSmall: "WHEEL_TOO_SMALL",
+  wheelImplausible: "WHEEL_IMPLAUSIBLE",
 } as const;
 
+const MIN_WHEEL_SPAN_FRACTION = 0.25;
+
+/** Returns stable reason codes for every quality gate the calibration fails; empty means acceptable. */
 export function validateCalibration(result: CalibrationResult): string[] {
+  if (result.method === "wheel-head") return validateWheelHead(result);
   const reasons: string[] = [];
   const quality = result.quality;
   if (quality.tagCount < 3) reasons.push(CALIBRATION_REASON.tagCount);
@@ -26,5 +32,18 @@ export function validateCalibration(result: CalibrationResult): string[] {
   if (result.boardRevision !== result.supportedBoardRevision) reasons.push(CALIBRATION_REASON.boardRevision);
   if (quality.blurScore < 0.25) reasons.push(CALIBRATION_REASON.blur);
   if (quality.contrastScore < 0.25) reasons.push(CALIBRATION_REASON.contrast);
+  return reasons;
+}
+
+function validateWheelHead(result: CalibrationResult): string[] {
+  const reasons: string[] = [];
+  const wheel = result.wheelHead;
+  const span = wheel ? wheel.rightX - wheel.leftX : 0;
+  if (!wheel || span <= 0 || wheel.diameterMm <= 0 || wheel.leftX < 0 || wheel.rightX > result.roiImage.width) {
+    reasons.push(CALIBRATION_REASON.wheelImplausible);
+  } else if (span < result.roiImage.width * MIN_WHEEL_SPAN_FRACTION) {
+    reasons.push(CALIBRATION_REASON.wheelTooSmall);
+  }
+  if (result.quality.estimatedErrorMm95 > 10) reasons.push(CALIBRATION_REASON.estimatedError);
   return reasons;
 }
