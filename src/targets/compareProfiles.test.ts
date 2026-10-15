@@ -1,6 +1,6 @@
 import { expect, it } from "vitest";
 
-import { compareProfiles } from "./compareProfiles";
+import { compareProfiles, compareShape } from "./compareProfiles";
 import type { StableDimensionReading } from "../measurement/types";
 import type { TargetProfile } from "./types";
 
@@ -28,15 +28,16 @@ function reading(offset: number, missing: (ratio: number) => boolean = () => fal
     timestampMs: 100,
     sourceFrameId: 1,
     calibrationId: "cal",
-    heightMm: 100,
-    maximumWidthMm: 40,
-    rimWidthMm: 40,
-    baseWidthMm: 40,
-    centerlineOffsetMm: 0,
-    visibleAsymmetryMm: 0,
+    unit: "mm",
+    height: 100,
+    maximumWidth: 40,
+    rimWidth: 40,
+    baseWidth: 40,
+    centerlineOffset: 0,
+    visibleAsymmetry: 0,
     profile: Array.from({ length: 64 }, (_, index) => {
       const ratio = index / 63;
-      return { heightRatio: ratio, radiusMm: missing(ratio) ? null : 20 + offset, confidence: 0.9 };
+      return { heightRatio: ratio, radius: missing(ratio) ? null : 20 + offset, confidence: 0.9 };
     }),
     confidence: {
       overall: 0.9,
@@ -45,7 +46,7 @@ function reading(offset: number, missing: (ratio: number) => boolean = () => fal
       occlusion: component,
       temporalStability: component,
       freshnessMs: 100,
-      estimatedErrorMm95: 5,
+      estimatedError95: 5,
     },
     windowStartMs: 0,
     contributingFrameCount: 5,
@@ -67,4 +68,20 @@ it("suppresses a region below seventy percent coverage without bridging a long g
   const lower = comparison.regions.find((region) => region.region === "lower-body");
   expect(lower?.coverage).toBeLessThan(0.7);
   expect(lower?.signedMedianRadiusErrorMm).toBeNull();
+});
+
+it("compares shape without a scale by matching the target's height", () => {
+  const millimetres = reading(2);
+  const pixels: StableDimensionReading = {
+    ...millimetres,
+    unit: "px",
+    height: millimetres.height! * 4,
+    profile: millimetres.profile.map((sample) => ({
+      ...sample,
+      radius: sample.radius === null ? null : sample.radius * 4,
+    })),
+  };
+  const comparison = compareShape(pixels, target)!;
+  expect(comparison.regions.every((region) => Math.abs(region.signedMedianRadiusErrorMm! - 2) < 1e-9)).toBe(true);
+  expect(compareShape({ ...pixels, height: null }, target)).toBeNull();
 });

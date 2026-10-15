@@ -37,7 +37,7 @@ const records = cases.map((fixture, index) => {
   };
   const { reading, measurable } = measureScene(scene);
   const row: DimensionResult = {
-    errorMm: reading.heightMm === null ? null : reading.heightMm - fixture.sizeMm,
+    errorMm: reading.height === null ? null : reading.height - fixture.sizeMm,
     supported: fixture.angleDeg <= SUPPORTED_MAX_ANGLE_DEG,
     accepted: measurable,
   };

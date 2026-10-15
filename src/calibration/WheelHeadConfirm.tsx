@@ -1,28 +1,27 @@
 import { useEffect, useRef, useState, type KeyboardEvent, type PointerEvent } from "react";
 import { CONFIDENT_DETECTION, type WheelHeadDetection } from "./wheelHead";
+import { moveMarker, type WheelEdges } from "./wheelMarkers";
 
 type Edge = "left" | "right";
 
 type Props = {
   still: ImageData;
-  /** Detected edges in full-resolution image pixels. */
+  /** Detected edges in full-resolution image pixels; only the row and confidence are used here. */
   detection: WheelHeadDetection;
+  /** Current marker positions in image pixels; the parent owns them so voice and touch move the same markers. */
+  edges: WheelEdges;
+  onEdgesChange(edges: WheelEdges): void;
   /** Show the still mirrored to match a front-camera preview. Marker positions stay in image pixels. */
   mirrored: boolean;
-  onConfirm(edges: { leftX: number; rightX: number; row: number; adjustedByUser: boolean }): void;
+  onConfirm(): void;
   onRetry(): void;
 };
 
-const MIN_GAP_FRACTION = 0.05;
-
 /** Shows a still with draggable, keyboard-adjustable markers on the wheel head's edges. */
-export function WheelHeadConfirm({ still, detection, mirrored, onConfirm, onRetry }: Props) {
+export function WheelHeadConfirm({ still, detection, edges, onEdgesChange, mirrored, onConfirm, onRetry }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const [edges, setEdges] = useState({ left: detection.leftX, right: detection.rightX });
-  const [adjusted, setAdjusted] = useState(false);
   const [dragging, setDragging] = useState<Edge | null>(null);
   const { width, height } = still;
-  const minGap = width * MIN_GAP_FRACTION;
   const confident = detection.confidence >= CONFIDENT_DETECTION;
 
   useEffect(() => {
@@ -30,13 +29,7 @@ export function WheelHeadConfirm({ still, detection, mirrored, onConfirm, onRetr
   }, [still]);
 
   function move(edge: Edge, x: number): void {
-    setAdjusted(true);
-    setEdges((current) => {
-      const clamped = Math.round(Math.min(width - 1, Math.max(0, x)));
-      return edge === "left"
-        ? { ...current, left: Math.min(clamped, current.right - minGap) }
-        : { ...current, right: Math.max(clamped, current.left + minGap) };
-    });
+    onEdgesChange(moveMarker(edges, edge, x, width));
   }
 
   function pointerX(event: PointerEvent<SVGSVGElement>): number {
@@ -101,12 +94,7 @@ export function WheelHeadConfirm({ still, detection, mirrored, onConfirm, onRetr
         </svg>
       </div>
       <div className="actions">
-        <button
-          type="button"
-          onClick={() =>
-            onConfirm({ leftX: edges.left, rightX: edges.right, row: detection.row, adjustedByUser: adjusted })
-          }
-        >
+        <button type="button" onClick={() => onConfirm()}>
           Looks right
         </button>
         <button type="button" className="secondary" onClick={onRetry}>

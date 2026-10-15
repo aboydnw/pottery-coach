@@ -1,13 +1,21 @@
-import { useEffect, useReducer, useState } from "react";
-import { CameraSetup } from "../camera/CameraSetup";
+import { useEffect, useMemo, useReducer, useRef, useState } from "react";
+import { LiveSession } from "../live/LiveSession";
 import { DeleteSessionDialog } from "../privacy/DeleteSessionDialog";
 import { DeletionService } from "../privacy/DeletionService";
 import { RetentionService } from "../privacy/RetentionService";
 import { BrowserCacheDeletion, LocalStorageSyncQueueDeletion } from "../privacy/localDeletion";
 import { releaseManifest } from "../release/manifest";
+import { buildSummary } from "../review/buildSummary";
 import { SessionReview } from "../review/SessionReview";
+import { resolveRecordedSizes, sizesUnavailable } from "../session/recordedSizes";
 import { SessionRepository } from "../session/SessionRepository";
 import type { SessionBundle } from "../session/types";
+import { SetupStore } from "../setup/SetupStore";
+import { loadTemplates } from "../targets/loadTemplates";
+import { ScriptedVoice } from "../voice/scriptedVoice";
+import { createToolRegistry } from "../voice/tools/registry";
+import type { SpokenSummary, ToolDependencies } from "../voice/tools/types";
+import { useVoiceSession } from "../voice/useVoiceSession";
 import { createSessionState, restoreSessionShell, serializeSessionShell, transition } from "./AppSessionOrchestrator";
 import { isCameraOnlyMode, isDemoMode } from "./demoMode";
 import { deriveGatedFeatureFlags, UNVERIFIED_MEASUREMENTS } from "./featureFlags";
@@ -17,8 +25,12 @@ import { useSessionRecording } from "./useSessionRecording";
 const SHELL_KEY = "pottery-coach-session-shell";
 const repository = new SessionRepository();
 const flags = deriveGatedFeatureFlags(releaseManifest);
+const DEFAULT_TARGET = loadTemplates()[0]!;
 
-/** Top-level journey: privacy notice, live camera session, then review and deletion. */
+/**
+ * Top-level journey: one tap on the welcome screen starts a hands-free live session; ending it shows
+ * a review. The voice coach spans both, so it can give the spoken debrief after the camera stops.
+ */
 export function SessionFlow() {
   const [state, dispatch] = useReducer(transition, undefined, () =>
     typeof sessionStorage === "undefined"
@@ -28,12 +40,67 @@ export function SessionFlow() {
   const [bundle, setBundle] = useState<SessionBundle | null>(null);
   const [demoMode] = useState(() => isDemoMode());
   const [cameraOnly] = useState(() => isCameraOnlyMode());
+  const [setup, setSetup] = useState(() => new SetupStore());
+  const [scripted] = useState(() => (demoMode ? new ScriptedVoice() : null));
   const updated = useAppUpdate();
   const recording = useSessionRecording(repository, () => dispatch({ type: "STORAGE_FAILED" }));
+  const bridge = useRef<Partial<ToolDependencies>>({});
+  const bundleRef = useRef<SessionBundle | null>(null);
+  const setupRef = useRef(setup);
+  const sizesEnabled = flags.numericMeasurement || demoMode || UNVERIFIED_MEASUREMENTS;
+
+  const registry = useMemo(
+    () =>
+      createToolRegistry({
+        now: () => Date.now(),
+        getReading: () => bridge.current.getReading?.() ?? null,
+        getScale: () => bridge.current.getScale?.() ?? null,
+        getWobble: () => bridge.current.getWobble?.() ?? null,
+        getTarget: () => bridge.current.getTarget?.() ?? DEFAULT_TARGET,
+        getGoal: () => bridge.current.getGoal?.() ?? null,
+        get setup() {
+          return setupRef.current;
+        },
+        get wheel() {
+          return bridge.current.wheel;
+        },
+        setPaused: (paused) => bridge.current.setPaused?.(paused),
+        get markMoment() {
+          return bridge.current.markMoment;
+        },
+        get endSession() {
+          return bridge.current.endSession;
+        },
+        get getSessionSummary() {
+          const finished = bundleRef.current;
+          return finished ? async () => spokenSummary(finished) : undefined;
+        },
+        get deleteSession() {
+          return bundleRef.current ? async () => void (await deleteSession()) : undefined;
+        },
+      }),
+    // The registry reads everything through refs, so it is built once.
+    // oxlint-disable-next-line react-hooks/exhaustive-deps
+    [],
+  );
+  const voice = useVoiceSession(scripted ? () => scripted.transport : null, registry);
+
+  useEffect(() => {
+    setupRef.current = setup;
+  }, [setup]);
+
+  useEffect(() => {
+    if (!scripted) return;
+    window.__potteryVoice = scripted;
+    return () => {
+      delete window.__potteryVoice;
+    };
+  }, [scripted]);
 
   useEffect(() => {
     void new RetentionService(repository).expire().catch(() => undefined);
   }, []);
+
   useEffect(() => {
     sessionStorage.setItem(SHELL_KEY, serializeSessionShell(state));
     const path = state.step === "notice" ? "/" : `/session/${state.step}`;
@@ -54,8 +121,14 @@ export function SessionFlow() {
     </div>
   );
 
+  function startSession(): void {
+    dispatch({ type: "START_SESSION" });
+    void voice.start();
+  }
+
   async function endSession(): Promise<void> {
-    const stored = await recording.end();
+    const stored = resolveRecordedSizes(await recording.end());
+    bundleRef.current = stored;
     setBundle(stored);
     dispatch({ type: "END_SESSION" });
     void new RetentionService(repository).expire().catch(() => undefined);
@@ -71,21 +144,31 @@ export function SessionFlow() {
   }
 
   function startAnotherSession(): void {
+    void voice.stop();
     recording.reset();
+    bundleRef.current = null;
     setBundle(null);
+    setSetup(new SetupStore());
     dispatch({ type: "DELETE_SESSION" });
   }
 
   if (state.step === "notice") {
     return (
       <section className="notice" aria-labelledby="notice-title">
+        {updateBanner}
         <p className="eyebrow">Controlled prototype</p>
-        <h1 id="notice-title">Before you begin</h1>
+        <h1 id="notice-title">Ready when your hands are clean</h1>
         <p>
-          Pottery Coach processes camera frames on this device. It is not safety equipment. Raw video is not stored or
-          uploaded, and microphone access is a separate choice.
+          One tap starts the camera and, if it's set up, your voice coach. After that you won't need to touch the
+          screen: talk to the coach through your headphones.
         </p>
-        <button onClick={() => dispatch({ type: "ACCEPT_NOTICE" })}>Begin private setup</button>
+        <p>
+          Camera frames are processed on this phone and never stored or uploaded. It is not safety equipment.
+          {voice.available && " Your voice goes to the coach's speech service while the session runs."}
+        </p>
+        <button type="button" className="start-button" onClick={startSession}>
+          Start session
+        </button>
       </section>
     );
   }
@@ -94,6 +177,9 @@ export function SessionFlow() {
     return (
       <section className="review-shell">
         {updateBanner}
+        {sizesUnavailable(bundle) && (
+          <p className="stale-banner">This session had no wheel-head size, so only shapes were tracked.</p>
+        )}
         <SessionReview bundle={bundle} />
         <DeleteSessionDialog onDelete={deleteSession} onFinish={startAnotherSession} />
       </section>
@@ -105,40 +191,42 @@ export function SessionFlow() {
       {updateBanner}
       {!state.modes.storage && (
         <div className="stale-banner" role="alert">
-          Session storage is unavailable. Live coaching can continue ephemerally, but this session cannot be reviewed
-          later.
+          Session storage is unavailable. Live coaching can continue, but this session cannot be reviewed later.
         </div>
       )}
-      <CameraSetup
-        step={state.step}
-        numericEnabled={flags.numericMeasurement || demoMode || UNVERIFIED_MEASUREMENTS}
+      <LiveSession
+        setup={setup}
+        toolBridge={bridge}
+        voice={voice}
+        sizesEnabled={sizesEnabled}
         measurementsUnverified={!flags.numericMeasurement && UNVERIFIED_MEASUREMENTS}
-        shapeOnly={!state.modes.numeric}
         demoMode={demoMode}
         cameraOnly={cameraOnly}
-        onCameraReady={() => {
-          dispatch({ type: "CAMERA_READY" });
-          void recording.begin();
-        }}
+        onCameraReady={() => void recording.begin()}
         onCameraDenied={() => dispatch({ type: "CAMERA_DENIED" })}
-        onCameraStopped={() => dispatch({ type: "CAMERA_STOPPED" })}
-        onCalibrated={() => dispatch({ type: "CALIBRATED" })}
-        onSkipCalibration={() => dispatch({ type: "SKIP_CALIBRATION" })}
-        onStartShapeOnly={() => dispatch({ type: "START_LIVE" })}
-        onRecalibrate={() => dispatch({ type: "RECALIBRATE" })}
-        onAudioDecided={() => dispatch({ type: "AUDIO_DECIDED" })}
-        onGoalSet={(goal) => {
-          dispatch({ type: "GOAL_SET" });
-          void recording.setGoal(goal);
-        }}
-        onGoalCleared={() => dispatch({ type: "GOAL_CLEARED" })}
         onReading={recording.recordReading}
         onWobble={recording.recordWobble}
         onMilestone={recording.recordMilestone}
         onProcessingModeChange={recording.recordProcessingMode}
-        onMarkMoment={recording.markMoment}
-        onEnded={() => void endSession()}
+        onScale={(scale) => void recording.setScale(scale)}
+        onGoal={(goal) => void recording.setGoal(goal)}
+        onMarkMoment={() => recording.markMoment()}
+        onEnd={() => void endSession()}
       />
     </>
   );
+}
+
+function spokenSummary(bundle: SessionBundle): SpokenSummary {
+  const summary = buildSummary(bundle);
+  const endedAtMs = bundle.session.endedAtMs ?? bundle.session.startedAtMs;
+  return {
+    durationMinutes: Math.round(((endedAtMs - bundle.session.startedAtMs) / 60_000) * 10) / 10,
+    sizesAvailable: Boolean(bundle.session.scale) || bundle.readings.some((reading) => reading.unit !== "px"),
+    peakHeightMm: summary.peak.heightMm,
+    finalHeightMm: summary.final.heightMm,
+    finalMaximumWidthMm: summary.final.maximumWidthMm,
+    goalHeightMm: bundle.session.goal?.desiredHeightMm ?? null,
+    markedMoments: bundle.moments.length,
+  };
 }

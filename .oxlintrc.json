@@ -9,7 +9,13 @@
     "react-hooks/rules-of-hooks": "error",
     "react-hooks/exhaustive-deps": "warn",
     "react/react-in-jsx-scope": "off",
-    "no-unused-vars": ["error", { "argsIgnorePattern": "^_", "varsIgnorePattern": "^_" }],
+    "no-unused-vars": [
+      "error",
+      {
+        "argsIgnorePattern": "^_",
+        "varsIgnorePattern": "^_"
+      }
+    ],
     "import/no-unassigned-import": "off",
     "import/no-named-as-default": "off",
     "jsx-a11y/prefer-tag-over-role": "off",
@@ -18,7 +24,13 @@
     "unicorn/no-array-sort": "off",
     "unicorn/require-post-message-target-origin": "off",
     "vitest/require-mock-type-parameters": "off",
-    "vitest/require-to-throw-message": "off"
+    "vitest/require-to-throw-message": "off",
+    "no-underscore-dangle": [
+      "warn",
+      {
+        "allow": ["__potteryVoice"]
+      }
+    ]
   },
   "ignorePatterns": [
     "dist",

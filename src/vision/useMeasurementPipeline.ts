@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { CanvasFrameSource } from "../camera/CanvasFrameSource";
 import type { CameraSettings } from "../camera/types";
-import type { CalibrationResult } from "../calibration/types";
+import type { SessionScale } from "../measurement/scale";
 import { FrameDiagnostics, type DiagnosticSample } from "../diagnostics/FrameDiagnostics";
 import type { StableDimensionReading } from "../measurement/types";
 import { AdaptiveRateController, type AdaptiveMode, type ProcessingRate } from "../performance/AdaptiveRateController";
@@ -36,7 +36,7 @@ export function useMeasurementPipeline(callbacks: MeasurementCallbacks = {}) {
   const [wobbleReading, setWobbleReading] = useState<WobbleReading | null>(null);
   const [processingHz, setProcessingHz] = useState<ProcessingRate>(10);
   const pipelineRef = useRef<Pipeline | null>(null);
-  const calibrationRef = useRef<CalibrationResult | null>(null);
+  const scaleRef = useRef<{ scale: SessionScale | null; imageCenterlineX?: number }>({ scale: null });
   const pinnedRef = useRef(false);
   useEffect(() => {
     const adaptive = new AdaptiveRateController((mode) => {
@@ -111,7 +111,7 @@ export function useMeasurementPipeline(callbacks: MeasurementCallbacks = {}) {
       pipeline.previewHandle = video.requestVideoFrameCallback(tick);
     }
     pipelineRef.current = pipeline;
-    if (calibrationRef.current) post({ type: "configure", calibration: calibrationRef.current });
+    if (scaleRef.current.scale) post({ type: "scale", ...scaleRef.current });
   }
 
   function stop(): void {
@@ -123,14 +123,17 @@ export function useMeasurementPipeline(callbacks: MeasurementCallbacks = {}) {
     setWobbleReading(null);
   }
 
-  function configure(calibration: CalibrationResult | null): void {
-    calibrationRef.current = calibration;
-    if (!calibration) {
+  /**
+   * Sets (or clears) the session scale. Readings keep flowing in pixels either way; the worker only
+   * needs the scale for wobble, which is judged in millimetres, and the wheel centreline.
+   */
+  function setScale(scale: SessionScale | null, imageCenterlineX?: number): void {
+    scaleRef.current = { scale, imageCenterlineX };
+    if (!scale) {
       pinnedRef.current = false;
-      setStableReading(null);
       setWobbleReading(null);
     }
-    post({ type: "configure", calibration });
+    post({ type: "scale", scale, imageCenterlineX });
   }
 
   /** Shows a fixed reading (demo sessions) that live worker output will not replace until reset. */
@@ -144,7 +147,7 @@ export function useMeasurementPipeline(callbacks: MeasurementCallbacks = {}) {
     pipelineRef.current?.worker.postMessage(message);
   }
 
-  return { sample, stableReading, wobbleReading, processingHz, start, stop, configure, injectReading };
+  return { sample, stableReading, wobbleReading, processingHz, start, stop, setScale, injectReading };
 }
 
 function teardown(pipeline: Pipeline | null): void {

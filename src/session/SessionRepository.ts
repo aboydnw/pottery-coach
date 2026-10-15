@@ -106,7 +106,10 @@ export class SessionRepository {
   async list() {
     return this.db.sessions.orderBy("startedAtMs").reverse().toArray();
   }
-  async update(id: string, patch: Partial<Pick<SessionRecord, "endedAtMs" | "goal" | "outcome" | "calibrationId">>) {
+  async update(
+    id: string,
+    patch: Partial<Pick<SessionRecord, "endedAtMs" | "goal" | "outcome" | "calibrationId" | "scale">>,
+  ) {
     await this.requireSession(id);
     await this.db.sessions.update(id, structuredClone(patch));
   }

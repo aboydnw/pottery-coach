@@ -3,14 +3,14 @@ import { fireEvent, render, screen } from "@testing-library/react";
 import { beforeEach, expect, it, vi } from "vitest";
 import { SessionFlow } from "./SessionFlow";
 
-vi.mock("../camera/CameraSetup", () => ({ CameraSetup: () => <div>camera journey</div> }));
+vi.mock("../live/LiveSession", () => ({ LiveSession: () => <div>live session</div> }));
 beforeEach(() => sessionStorage.clear());
 
-it("starts at a plain-language notice and enters camera setup only by user action", () => {
+it("waits for one deliberate tap, then goes straight to the live session", () => {
   render(<SessionFlow />);
-  expect(screen.getByRole("heading", { name: /before you begin/i })).toBeInTheDocument();
-  expect(screen.queryByText("camera journey")).not.toBeInTheDocument();
-  fireEvent.click(screen.getByRole("button", { name: /begin private setup/i }));
-  expect(screen.getByText("camera journey")).toBeInTheDocument();
-  expect(window.location.pathname).toBe("/session/camera");
+  expect(screen.getByRole("heading", { name: /ready when your hands are clean/i })).toBeInTheDocument();
+  expect(screen.queryByText("live session")).not.toBeInTheDocument();
+  fireEvent.click(screen.getByRole("button", { name: /start session/i }));
+  expect(screen.getByText("live session")).toBeInTheDocument();
+  expect(window.location.pathname).toBe("/session/live");
 });

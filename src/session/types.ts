@@ -1,4 +1,5 @@
 import type { ThrowingGoal } from "../goals/types";
+import type { SessionScale } from "../measurement/scale";
 
 export type ConsentState = {
   cameraLocal: boolean;
@@ -12,7 +13,8 @@ export type ConsentState = {
 
 export type SessionRecord = {
   id: string;
-  schemaVersion: 1;
+  /** 2 records readings in camera pixels with a session scale; 1 recorded millimetres directly. */
+  schemaVersion: 1 | 2;
   startedAtMs: number;
   endedAtMs: number | null;
   goal: ThrowingGoal | null;
@@ -20,6 +22,8 @@ export type SessionRecord = {
   calibrationId: string | null;
   consent: ConsentState;
   outcome: "completed" | "abandoned" | "failed" | null;
+  /** Set whenever the potter calibrates, even after throwing; applies to every reading in the session. */
+  scale?: SessionScale | null;
 };
 
 export type SessionEvent = {
@@ -36,6 +40,8 @@ export type RecordedReading = {
   sessionId: string;
   timestampMs: number;
   kind: "stable" | "diagnostic";
+  /** Missing on schema 1 rows, which stored `heightMm`-style values. */
+  unit?: "px" | "mm";
   values: Record<string, number | null>;
   confidence: number;
 };

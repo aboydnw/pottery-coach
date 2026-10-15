@@ -1,5 +1,6 @@
 import { useRef } from "react";
 import type { GoalConfirmation } from "../goals/types";
+import type { SessionScale } from "../measurement/scale";
 import type { StableDimensionReading } from "../measurement/types";
 import type { AdaptiveMode } from "../performance/AdaptiveRateController";
 import { SessionRecorder } from "../session/SessionRecorder";
@@ -35,7 +36,7 @@ export function useSessionRecording(repository: SessionRepository, onStorageFail
     const now = Date.now();
     const record: SessionRecord = {
       id: session.id,
-      schemaVersion: 1,
+      schemaVersion: 2,
       startedAtMs: now,
       endedAtMs: null,
       goal: null,
@@ -60,11 +61,12 @@ export function useSessionRecording(repository: SessionRepository, onStorageFail
       sessionId: session.id,
       timestampMs: reading.timestampMs,
       kind: "stable",
+      unit: reading.unit,
       values: {
-        heightMm: reading.heightMm,
-        maximumWidthMm: reading.maximumWidthMm,
-        rimWidthMm: reading.rimWidthMm,
-        baseWidthMm: reading.baseWidthMm,
+        height: reading.height,
+        maximumWidth: reading.maximumWidth,
+        rimWidth: reading.rimWidth,
+        baseWidth: reading.baseWidth,
       },
       confidence: reading.confidence.overall,
     });
@@ -123,6 +125,17 @@ export function useSessionRecording(repository: SessionRepository, onStorageFail
     });
   }
 
+  /** Stores the session's scale; it applies to every reading, including ones recorded before it. */
+  async function setScale(scale: SessionScale | null): Promise<void> {
+    const session = current();
+    if (!session.created) return;
+    try {
+      await repository.update(session.id, { scale, calibrationId: scale?.calibrationId ?? null });
+    } catch {
+      onStorageFailed();
+    }
+  }
+
   async function setGoal(confirmation: GoalConfirmation): Promise<void> {
     const session = current();
     if (!session.created) return;
@@ -133,21 +146,17 @@ export function useSessionRecording(repository: SessionRepository, onStorageFail
     }
   }
 
-  async function markMoment(): Promise<void> {
+  /** Marks a moment locally; returns its id so the coach can refer to it. */
+  async function markMoment(label = "User marked moment"): Promise<{ id: string; timestampMs: number }> {
     const session = current();
-    if (!session.created) return;
+    const moment = { id: newId("moment"), timestampMs: Date.now() };
+    if (!session.created) return moment;
     try {
-      await repository.markMoment({
-        id: newId("moment"),
-        sessionId: session.id,
-        timestampMs: Date.now(),
-        label: "User marked moment",
-        stillBlobId: null,
-        localOnly: true,
-      });
+      await repository.markMoment({ ...moment, sessionId: session.id, label, stillBlobId: null, localOnly: true });
     } catch {
       onStorageFailed();
     }
+    return moment;
   }
 
   /** Flushes and closes the session, returning what was stored (or an empty bundle if storage failed). */
@@ -175,6 +184,7 @@ export function useSessionRecording(repository: SessionRepository, onStorageFail
     recordMilestone,
     recordProcessingMode,
     setGoal,
+    setScale,
     markMoment,
     end,
     reset: () => {
@@ -203,7 +213,7 @@ function emptyBundle(id: string, now: number): SessionBundle {
   return {
     session: {
       id,
-      schemaVersion: 1,
+      schemaVersion: 2,
       startedAtMs: now,
       endedAtMs: now,
       goal: null,

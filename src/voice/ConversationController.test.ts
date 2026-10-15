@@ -116,3 +116,18 @@ it("closes the previous transport before reconnecting and resets the retry budge
   expect(transports).toHaveLength(7);
   expect(controller.getState()).toBe("connected");
 });
+
+it("forwards provider events and state changes, and routes tool results to the live transport", async () => {
+  const transport = new MockRealtimeTransport();
+  const controller = new ConversationController(() => transport);
+  const events: string[] = [];
+  const states: string[] = [];
+  controller.onEvent((event) => events.push(event.type));
+  controller.onStateChange((state) => states.push(state));
+  await controller.connect(config);
+  transport.emit({ type: "tool-call", callId: "call-1", name: "getSetupStatus", arguments: {} });
+  await controller.sendToolResult("call-1", { ok: true });
+  expect(events).toContain("tool-call");
+  expect(states).toEqual(["connecting", "connected"]);
+  expect(transport.sentToolResults).toEqual([{ callId: "call-1", result: { ok: true } }]);
+});

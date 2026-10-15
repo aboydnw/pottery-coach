@@ -36,7 +36,7 @@ const records = cases.map((fixture, index) => {
   };
   const { reading, measurable } = measureScene(scene);
   const row: SegmentationResult = {
-    boundaryErrorMm: reading.maximumWidthMm === null ? null : reading.maximumWidthMm - 2 * RADIUS_MM,
+    boundaryErrorMm: reading.maximumWidth === null ? null : reading.maximumWidth - 2 * RADIUS_MM,
     occlusionFraction: fixture.occlusionFraction,
     measurable,
   };

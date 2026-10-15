@@ -8,8 +8,8 @@ export function contourSampleFromReading(reading: DimensionReading, bands = 7): 
   for (let band = 0; band < bands; band++) {
     const ratio = bands === 1 ? 0.5 : band / (bands - 1);
     const sample = reading.profile[Math.round(ratio * (reading.profile.length - 1))];
-    const radius = sample?.radiusMm ?? null;
-    const center = radius === null ? null : (reading.centerlineOffsetMm ?? 0);
+    const radius = sample?.radius ?? null;
+    const center = radius === null ? null : (reading.centerlineOffset ?? 0);
     centersMm.push(center);
     leftMm.push(center === null || radius === null ? null : center - radius);
     rightMm.push(center === null || radius === null ? null : center + radius);
@@ -22,7 +22,7 @@ export function contourSampleFromReading(reading: DimensionReading, bands = 7): 
     leftMm,
     rightMm,
     rimCenterMm: centersMm.at(-1) ?? null,
-    rimHeightMm: reading.heightMm,
+    rimHeightMm: reading.height,
     cameraTransformConfidence: reading.confidence.calibration.score,
     occluded: valid < 0.7,
     shapeChangeRate: 0,

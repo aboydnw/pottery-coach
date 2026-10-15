@@ -2,102 +2,48 @@ import { describe, expect, it } from "vitest";
 import { createSessionState, restoreSessionShell, transition, type SessionState } from "./AppSessionOrchestrator";
 
 describe("session lifecycle", () => {
-  it("follows the explicit happy path and supports review deletion", () => {
+  it("goes from welcome straight to a live session, then review and deletion", () => {
     let state = createSessionState();
-    for (const event of [
-      "ACCEPT_NOTICE",
-      "CAMERA_READY",
-      "CALIBRATED",
-      "AUDIO_DECIDED",
-      "GOAL_SET",
-      "START_LIVE",
-      "END_SESSION",
-    ] as const)
-      state = transition(state, { type: event });
+    state = transition(state, { type: "START_SESSION" });
+    expect(state.step).toBe("live");
+    state = transition(state, { type: "END_SESSION" });
     expect(state.step).toBe("review");
     expect(transition(state, { type: "DELETE_SESSION" }).step).toBe("notice");
   });
 
   it("rejects invalid transitions and audits them", () => {
-    const state = transition(createSessionState(), { type: "START_LIVE" });
+    const state = transition(createSessionState(), { type: "END_SESSION" });
     expect(state.step).toBe("notice");
     expect(state.audit.at(-1)?.accepted).toBe(false);
   });
 
-  it("degrades independently when calibration, voice, and storage fail", () => {
+  it("degrades voice and storage independently while staying live", () => {
     let state: SessionState = { ...createSessionState(), step: "live" };
-    state = transition(state, { type: "CALIBRATION_LOST" });
     state = transition(state, { type: "VOICE_DISCONNECTED" });
     state = transition(state, { type: "STORAGE_FAILED" });
-    expect(state.modes).toEqual({ numeric: false, voice: false, storage: false, paused: false });
+    expect(state.modes).toEqual({ voice: false, storage: false, paused: false });
     expect(state.step).toBe("live");
   });
 
-  it("pauses on background and resumes without making stale data fresh", () => {
-    let state: SessionState = { ...createSessionState(), step: "live" };
-    state = transition(state, { type: "BACKGROUND" });
-    expect(state.modes.paused).toBe(true);
-    state = transition(state, { type: "RESUME" });
-    expect(state.modes.paused).toBe(false);
-    expect(state.requiresFreshEvidence).toBe(true);
+  it("records a denied camera and clears it when a new session starts", () => {
+    let state = transition({ ...createSessionState(), step: "live" }, { type: "CAMERA_DENIED" });
+    expect(state.cameraError).toBe("permission-denied");
+    state = transition({ ...state, step: "notice" }, { type: "START_SESSION" });
+    expect(state.cameraError).toBeNull();
   });
 
-  it("recovers only a non-sensitive resumable shell after reload", () => {
+  it("restores only degraded modes after a reload, never a live session", () => {
     const restored = restoreSessionShell(
-      JSON.stringify({ step: "goal", modes: { voice: false }, secret: "must-ignore" }),
+      JSON.stringify({ step: "live", modes: { voice: false }, secret: "must-ignore" }),
     );
-    expect(restored.step).toBe("camera");
+    expect(restored.step).toBe("notice");
     expect(restored.modes.voice).toBe(false);
     expect(JSON.stringify(restored)).not.toContain("must-ignore");
   });
 
-  it("audits permission denial and permits explicit retry", () => {
-    let state = transition({ ...createSessionState(), step: "camera" }, { type: "CAMERA_DENIED" });
-    expect(state.cameraError).toBe("permission-denied");
-    state = transition(state, { type: "RETRY_CAMERA" });
-    expect(state.cameraError).toBeNull();
-  });
-});
-
-describe("returning to earlier steps", () => {
-  const at = (step: SessionState["step"]): SessionState => ({ ...createSessionState(), step });
-
-  it("returns to camera setup from any later step when the camera stops", () => {
-    for (const step of ["calibration", "audio-consent", "goal", "live"] as const) {
-      expect(transition(at(step), { type: "CAMERA_STOPPED" }).step).toBe("camera");
-    }
-  });
-
-  it("allows recalibration after calibration and marks evidence stale", () => {
-    const state = transition(at("live"), { type: "RECALIBRATE" });
-    expect(state.step).toBe("calibration");
-    expect(state.requiresFreshEvidence).toBe(true);
-  });
-
-  it("returns to goal selection when the goal is cleared during a live session", () => {
-    expect(transition(at("live"), { type: "GOAL_CLEARED" }).step).toBe("goal");
-  });
-
   it("keeps the audit trail bounded", () => {
-    let state = at("notice");
-    for (let index = 0; index < 250; index += 1) state = transition(state, { type: "START_LIVE" });
+    let state = createSessionState();
+    for (let index = 0; index < 250; index += 1) state = transition(state, { type: "END_SESSION" });
     expect(state.audit).toHaveLength(100);
-  });
-});
-
-describe("calibration choice", () => {
-  const at = (step: SessionState["step"]): SessionState => ({ ...createSessionState(), step });
-
-  it("continues without calibration in shape-only mode", () => {
-    const state = transition(at("calibration"), { type: "SKIP_CALIBRATION" });
-    expect(state.step).toBe("audio-consent");
-    expect(state.modes.numeric).toBe(false);
-  });
-
-  it("restores numeric evidence when a later recalibration succeeds", () => {
-    let state = transition(at("calibration"), { type: "SKIP_CALIBRATION" });
-    state = transition(state, { type: "RECALIBRATE" });
-    state = transition(state, { type: "CALIBRATED" });
-    expect(state.modes.numeric).toBe(true);
   });
 });
