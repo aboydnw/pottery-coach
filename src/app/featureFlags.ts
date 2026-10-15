@@ -1,3 +1,9 @@
+/**
+ * Build-time override for field-test deployments: shows measurements before the measurement gate
+ * passes. The UI labels them as unverified, and the release manifest's gate record is unchanged.
+ */
+export const UNVERIFIED_MEASUREMENTS = import.meta.env.VITE_UNVERIFIED_MEASUREMENTS === "true";
+
 export type FeatureFlags = {
   numericMeasurement: boolean;
   proactiveWobble: boolean;

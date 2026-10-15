@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type RefObject } from "react";
-import { CameraController } from "./CameraController";
+import { CameraController, cameraConstraints, type CameraFacing } from "./CameraController";
 import type { CameraSettings } from "./types";
 import { useLatest } from "../shared/useLatest";
 
@@ -21,6 +21,7 @@ export function useCamera(videoRef: RefObject<HTMLVideoElement | null>, callback
   const [error, setError] = useState<string | null>(null);
   const [status, setStatus] = useState<"idle" | "starting" | "active">("idle");
   const [interrupted, setInterrupted] = useState(false);
+  const [facing, setFacing] = useState<CameraFacing>("user");
 
   useEffect(() => {
     const unsubscribe = controller.subscribe((event) => {
@@ -34,11 +35,12 @@ export function useCamera(videoRef: RefObject<HTMLVideoElement | null>, callback
     };
   }, [controller]);
 
-  async function start(): Promise<CameraSettings | null> {
+  async function start(requested: CameraFacing = facing): Promise<CameraSettings | null> {
     setError(null);
     setStatus("starting");
     try {
-      const result = await controller.start();
+      const result = await controller.start(cameraConstraints(requested));
+      setFacing(requested);
       if (videoRef.current) videoRef.current.srcObject = result.stream;
       setSettings(result.settings);
       setStatus("active");
@@ -64,7 +66,22 @@ export function useCamera(videoRef: RefObject<HTMLVideoElement | null>, callback
     wakeLockRef.current = null;
   }
 
-  return { settings, error, active: status === "active", starting: status === "starting", interrupted, start, stop };
+  /** Restarts the stream on the other camera; resolves with the new settings, or null if it failed. */
+  function switchFacing(): Promise<CameraSettings | null> {
+    return start(facing === "user" ? "environment" : "user");
+  }
+
+  return {
+    facing,
+    switchFacing,
+    settings,
+    error,
+    active: status === "active",
+    starting: status === "starting",
+    interrupted,
+    start,
+    stop,
+  };
 }
 
 function cameraErrorMessage(error: unknown): string {

@@ -32,7 +32,7 @@ describe("CameraController", () => {
     vi.restoreAllMocks();
   });
 
-  it("requests the rear camera with the documented defaults", async () => {
+  it("requests the front camera by default so the screen stays visible", async () => {
     const controller = new CameraController();
 
     await controller.start();
@@ -40,7 +40,7 @@ describe("CameraController", () => {
     expect(getUserMedia).toHaveBeenCalledWith({
       audio: false,
       video: {
-        facingMode: { ideal: "environment" },
+        facingMode: { ideal: "user" },
         width: { ideal: 1280 },
         height: { ideal: 720 },
         frameRate: { ideal: 30 },

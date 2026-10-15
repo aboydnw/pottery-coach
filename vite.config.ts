@@ -3,7 +3,17 @@ import { VitePWA } from "vite-plugin-pwa";
 import { defineConfig } from "vitest/config";
 
 export default defineConfig({
-  plugins: [react(), VitePWA({ manifest: false })],
+  plugins: [
+    react(),
+    VitePWA({
+      manifest: false,
+      workbox: {
+        // Only app routes fall back to index.html offline. Without this, opening the printable board
+        // (or any other static file) in a new tab showed the app's first screen instead of the file.
+        navigateFallbackAllowlist: [/^\/$/, /^\/session(\/|$)/],
+      },
+    }),
+  ],
   test: {
     projects: [
       {

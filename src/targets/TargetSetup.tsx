@@ -7,11 +7,19 @@ export function TargetSetup({
   targetId,
   onTargetChange,
   onGoalConfirmed,
+  shapeOnly = false,
+  started = false,
+  onStartShapeOnly,
 }: {
   templates: TargetProfile[];
   targetId: string;
   onTargetChange(targetId: string): void;
   onGoalConfirmed(goal: GoalConfirmation): void;
+  /** Without calibration there is no size to aim for, so only the target shape is chosen. */
+  shapeOnly?: boolean;
+  /** The live session is running; the template can still change but there is nothing to start. */
+  started?: boolean;
+  onStartShapeOnly?(): void;
 }) {
   return (
     <section className="target-setup" aria-labelledby="target-title">
@@ -26,7 +34,15 @@ export function TargetSetup({
           ))}
         </select>
       </label>
-      <GoalForm targetId={targetId} onConfirm={onGoalConfirmed} />
+      {shapeOnly ? (
+        !started && (
+          <button type="button" onClick={onStartShapeOnly}>
+            Start shape-only session
+          </button>
+        )
+      ) : (
+        <GoalForm targetId={targetId} onConfirm={onGoalConfirmed} />
+      )}
     </section>
   );
 }

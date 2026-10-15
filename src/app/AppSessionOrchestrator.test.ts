@@ -84,3 +84,20 @@ describe("returning to earlier steps", () => {
     expect(state.audit).toHaveLength(100);
   });
 });
+
+describe("calibration choice", () => {
+  const at = (step: SessionState["step"]): SessionState => ({ ...createSessionState(), step });
+
+  it("continues without calibration in shape-only mode", () => {
+    const state = transition(at("calibration"), { type: "SKIP_CALIBRATION" });
+    expect(state.step).toBe("audio-consent");
+    expect(state.modes.numeric).toBe(false);
+  });
+
+  it("restores numeric evidence when a later recalibration succeeds", () => {
+    let state = transition(at("calibration"), { type: "SKIP_CALIBRATION" });
+    state = transition(state, { type: "RECALIBRATE" });
+    state = transition(state, { type: "CALIBRATED" });
+    expect(state.modes.numeric).toBe(true);
+  });
+});

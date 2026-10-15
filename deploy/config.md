@@ -20,6 +20,10 @@ Connect the GitHub repository once in the Cloudflare dashboard: **Workers & Page
 
 Workers Builds reads Node 24 from `.nvmrc` and pnpm from `packageManager` in `package.json`. Every push to `main` then builds and deploys. Leave non-production branch builds off. Preview URLs are disabled because they would sit on `workers.dev`, outside the custom domain.
 
+## Unverified measurements on this deployment
+
+`.env.production` sets `VITE_UNVERIFIED_MEASUREMENTS=true`, so the live site shows millimetre measurements before the physical measurement gate passes. The UI labels them "unverified", and `src/release/manifest.ts` still records the gate as pending. Delete that line to return to strict gating. In that mode a session can still run in shape-only mode, but sizes are never shown.
+
 ## Cloud voice secrets
 
 Cloud voice stays off (`503 VOICE_DISABLED`) until both secrets exist. Set them in the dashboard under the Worker's **Settings → Variables and Secrets**, or with Wrangler, which prompts for the value so it never appears in shell history:

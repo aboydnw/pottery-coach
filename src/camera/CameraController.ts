@@ -1,14 +1,19 @@
 import type { CameraEvent, CameraSettings, CameraStartResult } from "./types";
 
-const DEFAULT_CONSTRAINTS: MediaStreamConstraints = {
-  audio: false,
-  video: {
-    facingMode: { ideal: "environment" },
-    width: { ideal: 1280 },
-    height: { ideal: 720 },
-    frameRate: { ideal: 30 },
-  },
-};
+export type CameraFacing = "user" | "environment";
+
+/** Video-only constraints preferring the given camera; `ideal` lets single-camera devices still start. */
+export function cameraConstraints(facing: CameraFacing): MediaStreamConstraints {
+  return {
+    audio: false,
+    video: {
+      facingMode: { ideal: facing },
+      width: { ideal: 1280 },
+      height: { ideal: 720 },
+      frameRate: { ideal: 30 },
+    },
+  };
+}
 
 export class CameraController {
   private stream: MediaStream | null = null;
@@ -16,7 +21,7 @@ export class CameraController {
   private listeningForVisibility = false;
   private generation = 0;
 
-  async start(constraints: MediaStreamConstraints = DEFAULT_CONSTRAINTS): Promise<CameraStartResult> {
+  async start(constraints: MediaStreamConstraints = cameraConstraints("user")): Promise<CameraStartResult> {
     this.stop();
     const generation = this.generation;
     this.listenForVisibility();

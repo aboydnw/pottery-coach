@@ -7,6 +7,7 @@ export type SessionEventType =
   | "RETRY_CAMERA"
   | "CAMERA_STOPPED"
   | "CALIBRATED"
+  | "SKIP_CALIBRATION"
   | "RECALIBRATE"
   | "AUDIO_DECIDED"
   | "GOAL_SET"
@@ -46,7 +47,7 @@ export function createSessionState(): SessionState {
 const path: Partial<Record<SessionStep, Partial<Record<SessionEventType, SessionStep>>>> = {
   notice: { ACCEPT_NOTICE: "camera" },
   camera: { CAMERA_READY: "calibration" },
-  calibration: { CALIBRATED: "audio-consent" },
+  calibration: { CALIBRATED: "audio-consent", SKIP_CALIBRATION: "audio-consent" },
   "audio-consent": { AUDIO_DECIDED: "goal", RECALIBRATE: "calibration" },
   goal: { GOAL_SET: "live", START_LIVE: "live", RECALIBRATE: "calibration" },
   live: { END_SESSION: "review", GOAL_CLEARED: "goal", RECALIBRATE: "calibration" },
@@ -76,7 +77,11 @@ export function transition(state: SessionState, event: SessionEvent): SessionSta
   if (!next) return { ...state, audit: appendAudit(state.audit, event.type, false) };
   if (event.type === "DELETE_SESSION")
     return { ...createSessionState(), audit: appendAudit(state.audit, event.type, true) };
-  return update(state, event, { step: next, ...(event.type === "RECALIBRATE" ? { requiresFreshEvidence: true } : {}) });
+  return update(state, event, {
+    step: next,
+    ...(event.type === "RECALIBRATE" ? { requiresFreshEvidence: true } : {}),
+    ...modesFor(state, event),
+  });
 }
 
 const resumableSteps = new Set<SessionStep>(["camera", "calibration", "audio-consent", "goal", "live"]);
@@ -101,6 +106,13 @@ export function restoreSessionShell(value: string | null): SessionState {
 
 export function serializeSessionShell(state: SessionState) {
   return JSON.stringify({ step: state.step, modes: { voice: state.modes.voice, storage: state.modes.storage } });
+}
+
+/** Calibrating enables numeric (millimetre) evidence; skipping it leaves the session in shape-only mode. */
+function modesFor(state: SessionState, event: SessionEvent): Partial<SessionState> {
+  if (event.type === "CALIBRATED") return { modes: { ...state.modes, numeric: true } };
+  if (event.type === "SKIP_CALIBRATION") return { modes: { ...state.modes, numeric: false } };
+  return {};
 }
 
 function update(state: SessionState, event: SessionEvent, patch: Partial<SessionState>): SessionState {
