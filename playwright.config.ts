@@ -1,5 +1,5 @@
 import { defineConfig, devices } from "@playwright/test";
-import { BOARD_VIDEO_PATH } from "./tests/e2e/support/boardVideo";
+import { BOARD_VIDEO_PATH, WHEEL_VIDEO_PATH } from "./tests/e2e/support/boardVideo";
 
 const fakeCamera = ["--use-fake-device-for-media-stream", "--use-fake-ui-for-media-stream"];
 // E2E_PREVIEW=1 runs the suite against a production build (served by `vite preview`) with demo
@@ -24,12 +24,12 @@ export default defineConfig({
   projects: [
     {
       name: "chromium",
-      testIgnore: /calibration-board\.spec\.ts/,
+      testIgnore: /(calibration-board|wheel-head)\.spec\.ts/,
       use: { ...devices["Desktop Chrome"], permissions: ["camera"], launchOptions: { args: fakeCamera } },
     },
     {
       name: "mobile-chromium",
-      testIgnore: /calibration-board\.spec\.ts/,
+      testIgnore: /(calibration-board|wheel-head)\.spec\.ts/,
       use: { ...devices["Pixel 7"], permissions: ["camera"], launchOptions: { args: fakeCamera } },
     },
     {
@@ -39,6 +39,15 @@ export default defineConfig({
         ...devices["Desktop Chrome"],
         permissions: ["camera"],
         launchOptions: { args: [...fakeCamera, `--use-file-for-fake-video-capture=${BOARD_VIDEO_PATH}`] },
+      },
+    },
+    {
+      name: "chromium-wheel-camera",
+      testMatch: /wheel-head\.spec\.ts/,
+      use: {
+        ...devices["Desktop Chrome"],
+        permissions: ["camera"],
+        launchOptions: { args: [...fakeCamera, `--use-file-for-fake-video-capture=${WHEEL_VIDEO_PATH}`] },
       },
     },
     {

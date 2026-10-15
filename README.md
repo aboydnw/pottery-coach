@@ -15,7 +15,7 @@ pnpm dev
 
 Open the printed URL. Camera access needs HTTPS except on `localhost`, and the app only asks for it after you click **Start camera**. To walk through the whole flow without a printed board or a pot, open `/?mode=demo`. Demo mode loads a fixed calibration and reading, and only exists in development builds (or builds made with `VITE_ENABLE_DEMO=true`).
 
-To calibrate for real, print [`public/calibration/board-v1.svg`](public/calibration/board-v1.svg) at 100% scale and check that the reference line measures 100 mm.
+To measure sizes, the app uses your wheel head as a ruler. Tell it the wheel head's (or bat's) diameter, check the two markers it places on the edges, and you're done. The size is remembered on the device. For the best accuracy you can instead print [`public/calibration/board-v1.svg`](public/calibration/board-v1.svg) at 100% scale and check that its reference line measures 100 mm. Or skip calibration entirely for a shape-only session.
 
 ## Deployment
 
@@ -23,15 +23,15 @@ The app runs on Cloudflare Workers at **https://potterycoach.anthonynboyd.com**,
 
 ## Checks
 
-| Command                  | What it does                                                                                                                                       |
-| ------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `pnpm lint`              | oxlint (TypeScript, React hooks, accessibility, Vitest rules)                                                                                      |
-| `pnpm format`            | Formats with Prettier; CI runs `pnpm format:check`                                                                                                 |
-| `pnpm typecheck`         | Type-checks the app (`tsconfig.json`) and the Node code in `api/`, `benchmarks/`, `scripts/` and `tests/` (`tsconfig.node.json`)                   |
-| `pnpm test`              | Vitest unit and component tests                                                                                                                    |
-| `pnpm e2e`               | Playwright journeys in Chromium (fake camera), mobile Chromium and WebKit. One project feeds a rendered calibration board to the real tag detector |
-| `E2E_PREVIEW=1 pnpm e2e` | The same journeys against a production build                                                                                                       |
-| `pnpm verify`            | Everything above plus the build and evidence-manifest checks                                                                                       |
+| Command                  | What it does                                                                                                                                                                        |
+| ------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `pnpm lint`              | oxlint (TypeScript, React hooks, accessibility, Vitest rules)                                                                                                                       |
+| `pnpm format`            | Formats with Prettier; CI runs `pnpm format:check`                                                                                                                                  |
+| `pnpm typecheck`         | Type-checks the app (`tsconfig.json`) and the Node code in `api/`, `benchmarks/`, `scripts/` and `tests/` (`tsconfig.node.json`)                                                    |
+| `pnpm test`              | Vitest unit and component tests                                                                                                                                                     |
+| `pnpm e2e`               | Playwright journeys in Chromium (fake camera), mobile Chromium and WebKit. Two projects feed rendered scenes (the printable board, and a pot on a wheel head) to the real detectors |
+| `E2E_PREVIEW=1 pnpm e2e` | The same journeys against a production build                                                                                                                                        |
+| `pnpm verify`            | Everything above plus the build and evidence-manifest checks                                                                                                                        |
 
 After changing `src/calibration/boardV1.ts`, regenerate the printable board with `pnpm calibration:board`. A unit test fails if the SVG and the definition drift apart.
 
@@ -46,7 +46,7 @@ camera ──▶ CanvasFrameSource ──▶ measurement worker ──▶ stable
 
 - `src/app/` holds the session state machine (`AppSessionOrchestrator.ts`), the top-level flow and session recording.
 - `src/camera/`, `src/vision/`, `src/measurement/` and `src/wobble/` hold the camera, the worker pipeline, dimension extraction and oscillation detection.
-- `src/calibration/` holds the board definition, the AprilTag worker (vendored WebAssembly in `public/vendor/apriltag`) and the homography.
+- `src/calibration/` holds wheel-head detection and sizing (`wheelHead.ts`, `wheelSize.ts`), the board definition, the AprilTag worker (vendored WebAssembly in `public/vendor/apriltag`) and the homography.
 - `src/session/`, `src/privacy/` and `src/review/` hold local storage, retention and deletion, and the post-session review.
 - `worker/` is the Cloudflare Worker. It serves the built app and exchanges a WebRTC offer with the voice provider at `/api/realtime/session`, which returns 503 until its secrets are configured.
 

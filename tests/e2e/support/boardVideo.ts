@@ -3,6 +3,9 @@ import { dirname, resolve } from "node:path";
 import { chromium } from "@playwright/test";
 
 export const BOARD_VIDEO_PATH = resolve("test-results/.fixtures/board-v1.y4m");
+export const WHEEL_VIDEO_PATH = resolve("test-results/.fixtures/wheel-head.y4m");
+/** Where the synthetic wheel head's outer edges sit, in camera pixels. */
+export const WHEEL_SCENE = { leftX: 256, rightX: 1024, row: 560 };
 const WIDTH = 1280;
 const HEIGHT = 720;
 
@@ -35,6 +38,42 @@ export async function writeBoardVideo(): Promise<void> {
     );
     await mkdir(dirname(BOARD_VIDEO_PATH), { recursive: true });
     await writeFile(BOARD_VIDEO_PATH, toY4m(Uint8Array.from(rgba), WIDTH, HEIGHT));
+  } finally {
+    await browser.close();
+  }
+}
+
+/**
+ * Renders a side view of a pot on a dark wheel head against a studio wall into a fake camera feed,
+ * so tests exercise wheel-head detection and the confirm step.
+ */
+export async function writeWheelVideo(): Promise<void> {
+  const browser = await chromium.launch();
+  try {
+    const page = await browser.newPage();
+    const rgba = await page.evaluate(
+      ({ width, height, scene }) => {
+        const canvas = document.createElement("canvas");
+        canvas.width = width;
+        canvas.height = height;
+        const context = canvas.getContext("2d")!;
+        context.fillStyle = "#cfc6b8";
+        context.fillRect(0, 0, width, height);
+        context.fillStyle = "#9c948a";
+        context.fillRect(0, scene.row + 40, width, height - scene.row - 40);
+        const centerX = (scene.leftX + scene.rightX) / 2;
+        context.fillStyle = "#4a4d52";
+        context.beginPath();
+        context.ellipse(centerX, scene.row, (scene.rightX - scene.leftX) / 2, 18, 0, 0, Math.PI * 2);
+        context.fill();
+        context.fillStyle = "#a8643f";
+        context.fillRect(centerX - 120, scene.row - 260, 240, 250);
+        return Array.from(context.getImageData(0, 0, width, height).data);
+      },
+      { width: WIDTH, height: HEIGHT, scene: WHEEL_SCENE },
+    );
+    await mkdir(dirname(WHEEL_VIDEO_PATH), { recursive: true });
+    await writeFile(WHEEL_VIDEO_PATH, toY4m(Uint8Array.from(rgba), WIDTH, HEIGHT));
   } finally {
     await browser.close();
   }

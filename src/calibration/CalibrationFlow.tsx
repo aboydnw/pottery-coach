@@ -65,7 +65,7 @@ export function CalibrationFlow({ result, boardMoved = false, onAccepted, onReca
       {result.reasons.length > 0 && (
         <ul aria-label="Calibration problems">
           {result.reasons.map((reason) => (
-            <li key={reason}>{reasonLabel(reason)}</li>
+            <li key={reason}>{describeCalibrationReason(reason)}</li>
           ))}
         </ul>
       )}
@@ -89,8 +89,13 @@ export function CalibrationFlow({ result, boardMoved = false, onAccepted, onReca
   );
 }
 
-function reasonLabel(reason: string): string {
+/** Plain-language explanation of a calibration reason code. */
+export function describeCalibrationReason(reason: string): string {
   const labels: Record<string, string> = {
+    WHEEL_TOO_SMALL: "The wheel head is too small in the view. Move the phone closer so it spans more of the picture.",
+    WHEEL_IMPLAUSIBLE:
+      "Those markers can't be the wheel-head edges. Put the left marker on the left edge and the right marker on the right edge.",
+    TAG_COUNT: "Fewer than three board tags were found. Keep all four corner tags in view.",
     ROI_CLIPPED: "ROI clipped — move the camera until the full working area is visible.",
     BOARD_REVISION: "Unsupported calibration board revision.",
     ESTIMATED_ERROR: "Estimated measurement error is too high.",

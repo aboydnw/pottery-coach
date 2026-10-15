@@ -6,6 +6,7 @@ import { BOARD_V1 } from "../calibration/boardV1";
 export function demoCalibration(width = 640, height = 360): CalibrationResult {
   return {
     id: "demo-calibration",
+    method: "board",
     createdAtMs: Date.now(),
     status: "accepted",
     homographyImageToMm: [1, 0, 0, 0, 1, 0, 0, 0, 1],

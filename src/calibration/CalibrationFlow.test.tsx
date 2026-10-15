@@ -10,6 +10,7 @@ afterEach(cleanup);
 function result(status: CalibrationResult["status"], reasons: string[] = []): CalibrationResult {
   return {
     id: "cal-1",
+    method: "board",
     createdAtMs: 1,
     status,
     homographyImageToMm: [1, 0, 0, 0, 1, 0, 0, 0, 1],

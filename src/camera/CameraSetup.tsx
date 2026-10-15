@@ -4,6 +4,12 @@ import type { SessionStep } from "../app/AppSessionOrchestrator";
 import { demoCalibration, demoReading } from "../app/demoFixtures";
 import { CalibrationFlow } from "../calibration/CalibrationFlow";
 import { calibrateFromVideo } from "../calibration/calibrateFromVideo";
+import { describeCalibrationReason } from "../calibration/CalibrationFlow";
+import { detectWheelHead, toGray, wheelHeadCalibration, type WheelHeadDetection } from "../calibration/wheelHead";
+import { WheelHeadConfirm } from "../calibration/WheelHeadConfirm";
+import { WheelHeadStep } from "../calibration/WheelHeadStep";
+import { loadRememberedDiameterMm, rememberDiameterMm } from "../calibration/wheelSize";
+import { captureFrame } from "./captureFrame";
 import type { CalibrationResult } from "../calibration/types";
 import { uncalibratedCalibration } from "../calibration/uncalibrated";
 import { WasmTagDetector } from "../calibration/WasmTagDetector";
@@ -79,6 +85,9 @@ export function CameraSetup(props: CameraSetupProps) {
   const [candidate, setCandidate] = useState<CalibrationResult | null>(null);
   const [calibrating, setCalibrating] = useState(false);
   const [calibrationError, setCalibrationError] = useState<string | null>(null);
+  const [calibrationMethod, setCalibrationMethod] = useState<"wheel-head" | "board">("wheel-head");
+  const [wheelDiameterMm, setWheelDiameterMm] = useState<number | null>(() => loadRememberedDiameterMm());
+  const [wheelStill, setWheelStill] = useState<{ image: ImageData; detection: WheelHeadDetection } | null>(null);
   const [voiceTransport, setVoiceTransport] = useState<MockRealtimeTransport | null>(null);
   const [targetId, setTargetId] = useState(TARGET_TEMPLATES[0]!.id);
   const [goal, setGoal] = useState<GoalConfirmation | null>(null);
@@ -146,6 +155,42 @@ export function CameraSetup(props: CameraSetupProps) {
     } finally {
       setCalibrating(false);
     }
+  }
+
+  function findWheelHead(diameterMm: number): void {
+    const video = videoRef.current;
+    if (!video) return;
+    setCalibrationError(null);
+    setWheelDiameterMm(diameterMm);
+    rememberDiameterMm(diameterMm);
+    try {
+      const image = captureFrame(video);
+      const gray = toGray(image.data, image.width, image.height);
+      const found = detectWheelHead(gray);
+      const toFull = (value: number) => Math.round((value + 0.5) * gray.scale);
+      setWheelStill({
+        image,
+        detection: { ...found, leftX: toFull(found.leftX), rightX: toFull(found.rightX), row: toFull(found.row) },
+      });
+    } catch (error) {
+      setCalibrationError(`Couldn't capture the camera view: ${error instanceof Error ? error.message : "try again."}`);
+    }
+  }
+
+  function confirmWheelHead(edges: { leftX: number; rightX: number; row: number; adjustedByUser: boolean }): void {
+    if (!wheelStill || wheelDiameterMm === null) return;
+    const result = wheelHeadCalibration({
+      ...edges,
+      diameterMm: wheelDiameterMm,
+      frameWidth: wheelStill.image.width,
+      frameHeight: wheelStill.image.height,
+    });
+    if (result.status !== "accepted") {
+      setCalibrationError(result.reasons.map(describeCalibrationReason).join(" "));
+      return;
+    }
+    setWheelStill(null);
+    acceptCalibration(result);
   }
 
   function loadDemoCalibration(): void {
@@ -263,20 +308,47 @@ export function CameraSetup(props: CameraSetupProps) {
       )}
 
       {camera.active && <DiagnosticsPanel sample={pipeline.sample} />}
-      {camera.active && step === "calibration" && !candidate && (
+      {camera.active && step === "calibration" && !candidate && wheelStill && (
+        <WheelHeadConfirm
+          still={wheelStill.image}
+          detection={wheelStill.detection}
+          mirrored={mirrored}
+          onConfirm={confirmWheelHead}
+          onRetry={() => setWheelStill(null)}
+        />
+      )}
+      {camera.active && step === "calibration" && !candidate && !wheelStill && (
         <section className="calibration-actions" aria-labelledby="calibration-step-title">
           <h2 id="calibration-step-title">Calibrate for sizes</h2>
-          <p>
-            To measure in millimetres, print the{" "}
-            <a href="/calibration/board-v1.svg" target="_blank" rel="noreferrer">
-              calibration board
-            </a>{" "}
-            at 100% scale, stand it beside the pot facing the camera, then calibrate. Without it you can still continue
-            and coach on shape and proportions.
-          </p>
-          <button type="button" disabled={calibrating} onClick={() => void runCalibration()}>
-            {calibrating ? "Detecting board…" : "Calibrate printed board"}
-          </button>
+          {calibrationMethod === "wheel-head" ? (
+            <>
+              <p>
+                Pottery Coach uses your wheel head as a ruler. Make sure its left and right edges are both in view, with
+                the pot sitting on it.
+              </p>
+              <WheelHeadStep initialDiameterMm={wheelDiameterMm} busy={calibrating} onFind={findWheelHead} />
+              <button type="button" className="link-button" onClick={() => setCalibrationMethod("board")}>
+                Use a printed board instead
+              </button>
+            </>
+          ) : (
+            <>
+              <p>
+                Print the{" "}
+                <a href="/calibration/board-v1.svg" target="_blank" rel="noreferrer">
+                  calibration board
+                </a>{" "}
+                at 100% scale, stand it beside the pot facing the camera, then calibrate.
+              </p>
+              <button type="button" disabled={calibrating} onClick={() => void runCalibration()}>
+                {calibrating ? "Detecting board…" : "Calibrate printed board"}
+              </button>
+              <button type="button" className="link-button" onClick={() => setCalibrationMethod("wheel-head")}>
+                Use the wheel head instead
+              </button>
+            </>
+          )}
+          <p>No measurements needed? You can still coach on shape and proportions.</p>
           <button type="button" className="secondary" disabled={calibrating} onClick={skipCalibration}>
             Continue without calibration
           </button>

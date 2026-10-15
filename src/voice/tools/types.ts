@@ -12,4 +12,6 @@ export type ToolDependencies = {
   setGoal(goal: ThrowingGoal): Promise<GoalConfirmation>;
   setPaused(paused: boolean): void;
   markMoment(input: { label?: string }): Promise<MarkedMoment>;
+  /** Stores the wheel-head size the user stated; the app then looks for the wheel head's edges. */
+  setWheelHeadDiameter(diameterMm: number): Promise<{ diameterMm: number }>;
 };

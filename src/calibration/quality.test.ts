@@ -6,6 +6,7 @@ import type { CalibrationResult } from "./types";
 function acceptedResult(): CalibrationResult {
   return {
     id: "calibration-1",
+    method: "board",
     createdAtMs: 1,
     status: "accepted",
     homographyImageToMm: [1, 0, 0, 0, 1, 0, 0, 0, 1],

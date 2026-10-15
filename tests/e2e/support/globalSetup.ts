@@ -1,5 +1,5 @@
-import { writeBoardVideo } from "./boardVideo";
+import { writeBoardVideo, writeWheelVideo } from "./boardVideo";
 
 export default async function globalSetup(): Promise<void> {
-  await writeBoardVideo();
+  await Promise.all([writeBoardVideo(), writeWheelVideo()]);
 }

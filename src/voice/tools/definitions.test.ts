@@ -11,5 +11,6 @@ it("publishes exactly the allow-listed coaching tools to the provider", () => {
     "pauseCoaching",
     "resumeCoaching",
     "setGoal",
+    "setWheelHeadDiameter",
   ]);
 });
