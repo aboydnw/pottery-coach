@@ -42,3 +42,10 @@ test("the printable board opens as an SVG even after the offline cache is instal
   expect(response?.headers()["content-type"]).toContain("image/svg+xml");
   await expect(board.locator("svg[data-revision='board-v1']")).toHaveCount(1);
 });
+
+test("the offline cache installs new versions immediately instead of waiting for a prompt", async ({ request }) => {
+  test.skip(process.env.E2E_PREVIEW !== "1", "Service workers are only built for production");
+  const script = await (await request.get("/sw.js")).text();
+  expect(script).toMatch(/self\.skipWaiting\(\)/);
+  expect(script).toMatch(/clientsClaim\(\)/);
+});

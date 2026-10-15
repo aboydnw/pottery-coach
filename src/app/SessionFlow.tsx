@@ -11,6 +11,7 @@ import type { SessionBundle } from "../session/types";
 import { createSessionState, restoreSessionShell, serializeSessionShell, transition } from "./AppSessionOrchestrator";
 import { isCameraOnlyMode, isDemoMode } from "./demoMode";
 import { deriveGatedFeatureFlags, UNVERIFIED_MEASUREMENTS } from "./featureFlags";
+import { useAppUpdate } from "./useAppUpdate";
 import { useSessionRecording } from "./useSessionRecording";
 
 const SHELL_KEY = "pottery-coach-session-shell";
@@ -27,6 +28,7 @@ export function SessionFlow() {
   const [bundle, setBundle] = useState<SessionBundle | null>(null);
   const [demoMode] = useState(() => isDemoMode());
   const [cameraOnly] = useState(() => isCameraOnlyMode());
+  const updated = useAppUpdate();
   const recording = useSessionRecording(repository, () => dispatch({ type: "STORAGE_FAILED" }));
 
   useEffect(() => {
@@ -37,6 +39,20 @@ export function SessionFlow() {
     const path = state.step === "notice" ? "/" : `/session/${state.step}`;
     if (window.location.pathname !== path) window.history.replaceState(null, "", `${path}${window.location.search}`);
   }, [state]);
+
+  useEffect(() => {
+    // Nothing is in progress on the welcome screen, so pick up a new version straight away.
+    if (updated && state.step === "notice") window.location.reload();
+  }, [updated, state.step]);
+
+  const updateBanner = updated && state.step !== "notice" && (
+    <div className="stale-banner" role="status">
+      Pottery Coach has been updated. Reload when you're ready to use the new version.
+      <button type="button" onClick={() => window.location.reload()}>
+        Reload now
+      </button>
+    </div>
+  );
 
   async function endSession(): Promise<void> {
     const stored = await recording.end();
@@ -77,6 +93,7 @@ export function SessionFlow() {
   if (state.step === "review" && bundle) {
     return (
       <section className="review-shell">
+        {updateBanner}
         <SessionReview bundle={bundle} />
         <DeleteSessionDialog onDelete={deleteSession} onFinish={startAnotherSession} />
       </section>
@@ -85,6 +102,7 @@ export function SessionFlow() {
 
   return (
     <>
+      {updateBanner}
       {!state.modes.storage && (
         <div className="stale-banner" role="alert">
           Session storage is unavailable. Live coaching can continue ephemerally, but this session cannot be reviewed
