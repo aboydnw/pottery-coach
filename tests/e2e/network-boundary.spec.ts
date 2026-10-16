@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { startSession } from "./fixtures/session-streams";
 
 test("camera workflow sends no raw image, video, or frame payload", async ({ page }) => {
   const violations: string[] = [];
@@ -10,9 +11,7 @@ test("camera workflow sends no raw image, video, or frame payload", async ({ pag
     if (!new URL(request.url()).hostname.match(/^(127\.0\.0\.1|localhost)$/))
       violations.push(`domain:${request.url()}`);
   });
-  await page.goto("/");
-  await page.getByRole("button", { name: /begin private setup/i }).click();
-  await page.getByRole("button", { name: "Start camera" }).click();
-  await expect(page.getByRole("button", { name: "Stop camera" })).toBeVisible();
+  await startSession(page, { demo: false });
+  await page.waitForTimeout(1_500);
   expect(violations).toEqual([]);
 });

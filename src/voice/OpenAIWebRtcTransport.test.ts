@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { expect, it, vi } from "vitest";
 
-import { OpenAIWebRtcTransport } from "./OpenAIWebRtcTransport";
+import { mapProviderEvent, OpenAIWebRtcTransport } from "./OpenAIWebRtcTransport";
 
 it("exchanges an offer, routes remote audio, stops tracks, and closes idempotently", async () => {
   const track = { stop: vi.fn(), enabled: true, readyState: "live" } as unknown as MediaStreamTrack;
@@ -176,4 +176,57 @@ it("sends the field-test access token as a bearer header", async () => {
   await transport.connect(config);
 
   expect(fetch.mock.calls[0]![1].headers).toMatchObject({ authorization: "Bearer field-token" });
+});
+
+it("builds captions from transcript pieces and reports usage", () => {
+  const transcripts = new Map<string, string>();
+  expect(
+    mapProviderEvent({ type: "response.output_audio_transcript.delta", item_id: "a", delta: "It's 12" }, transcripts),
+  ).toMatchObject({ type: "transcript-delta", speaker: "assistant", text: "It's 12" });
+  expect(
+    mapProviderEvent(
+      { type: "response.output_audio_transcript.delta", item_id: "a", delta: " centimetres" },
+      transcripts,
+    ),
+  ).toMatchObject({ text: "It's 12 centimetres" });
+  expect(
+    mapProviderEvent(
+      { type: "response.output_audio_transcript.done", item_id: "a", transcript: "It's 12 centimetres." },
+      transcripts,
+    ),
+  ).toMatchObject({ type: "transcript-final", text: "It's 12 centimetres." });
+  expect(
+    mapProviderEvent(
+      { type: "conversation.item.input_audio_transcription.completed", item_id: "u", transcript: "How tall?" },
+      transcripts,
+    ),
+  ).toMatchObject({ speaker: "user", text: "How tall?" });
+  expect(
+    mapProviderEvent(
+      {
+        type: "response.done",
+        response: {
+          usage: {
+            input_token_details: { audio_tokens: 40, text_tokens: 5 },
+            output_token_details: { audio_tokens: 90, text_tokens: 12 },
+          },
+        },
+      },
+      transcripts,
+    ),
+  ).toEqual({
+    type: "usage",
+    usage: { inputTextTokens: 5, inputAudioTokens: 40, outputTextTokens: 12, outputAudioTokens: 90 },
+  });
+});
+
+it("marks a refused passphrase as not worth retrying", async () => {
+  const { peer } = fakePeer();
+  const transport = new OpenAIWebRtcTransport({
+    createPeer: () => peer,
+    getUserMedia: vi.fn().mockResolvedValue(fakeStream().stream),
+    createAudio: audio,
+    fetch: vi.fn().mockResolvedValue(new Response("{}", { status: 401 })),
+  });
+  await expect(transport.connect(config)).rejects.toMatchObject({ status: 401, retryable: false });
 });

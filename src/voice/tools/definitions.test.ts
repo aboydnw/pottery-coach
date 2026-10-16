@@ -1,16 +1,10 @@
 import { expect, it } from "vitest";
 import { REALTIME_TOOL_DEFINITIONS } from "./definitions";
+import { COACH_INSTRUCTIONS } from "../instructions";
 
-it("publishes exactly the allow-listed coaching tools to the provider", () => {
-  expect(REALTIME_TOOL_DEFINITIONS.map((tool) => tool.name).sort()).toEqual([
-    "compareTargetProfile",
-    "getCurrentDimensions",
-    "getMeasurementConfidence",
-    "getWobbleStatus",
-    "markMoment",
-    "pauseCoaching",
-    "resumeCoaching",
-    "setGoal",
-    "setWheelHeadDiameter",
-  ]);
+it("only refers to tools that exist in the coach instructions", () => {
+  const names = new Set<string>(REALTIME_TOOL_DEFINITIONS.map((tool) => tool.name));
+  const mentioned = [...COACH_INSTRUCTIONS.matchAll(/\b([a-z]+[A-Z][A-Za-z]+)\b/g)].map((match) => match[1]!);
+  expect(mentioned.length).toBeGreaterThan(0);
+  expect(mentioned.filter((name) => !names.has(name))).toEqual([]);
 });

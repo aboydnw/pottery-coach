@@ -11,11 +11,12 @@ export function measureScene(scene: VesselScene) {
   const reading = extractDimensions(segmentation.mask, segmentation.rowReliability, {
     width: image.width,
     height: image.height,
-    mmPerPixel: scene.mmPerPixel,
+    unitsPerPixel: scene.mmPerPixel,
+    unit: "mm",
     centerlineX: image.width / 2,
     calibrationId: "synthetic",
     frameId: 1,
     timestampMs: 0,
   });
-  return { segmentation, reading, measurable: segmentation.reliableFraction >= 0.75 && reading.heightMm !== null };
+  return { segmentation, reading, measurable: segmentation.reliableFraction >= 0.75 && reading.height !== null };
 }

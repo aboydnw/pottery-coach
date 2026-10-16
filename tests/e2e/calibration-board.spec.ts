@@ -1,4 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
+import { openSetup, startSession } from "./fixtures/session-streams";
 
 async function processedFps(page: Page): Promise<number> {
   const text = await page.locator("details.diagnostics dl").innerText();
@@ -8,9 +9,8 @@ async function processedFps(page: Page): Promise<number> {
 test("calibrates from the printed board with the real AprilTag detector and keeps processing frames", async ({
   page,
 }) => {
-  await page.goto("/?mode=demo");
-  await page.getByRole("button", { name: /begin private setup/i }).click();
-  await page.getByRole("button", { name: /start camera/i }).click();
+  await startSession(page);
+  await openSetup(page);
   await page.getByRole("button", { name: /use a printed board instead/i }).click();
   await page.getByRole("button", { name: /calibrate printed board/i }).click();
 
@@ -18,7 +18,7 @@ test("calibrates from the printed board with the real AprilTag detector and keep
   await expect(page.getByRole("list", { name: /calibration problems/i })).toHaveCount(0);
   await page.getByLabel(/100 mm line/i).check();
   await page.getByRole("button", { name: /use calibration/i }).click();
-  await expect(page.getByRole("heading", { name: /choose voice coaching/i })).toBeVisible();
+  await expect(page.locator("details.setup-checklist summary")).toContainText(/sizes are in centimetres/i);
 
   await page.locator("details.diagnostics summary").click();
   await page.waitForTimeout(4_000);

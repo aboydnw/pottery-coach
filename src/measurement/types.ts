@@ -1,3 +1,6 @@
+/** Readings are measured in full-resolution camera pixels until a session scale converts them to millimetres. */
+export type LengthUnit = "px" | "mm";
+
 export type ConfidenceComponent = { score: number; reasons: string[] };
 export type MeasurementConfidence = {
   overall: number;
@@ -6,21 +9,23 @@ export type MeasurementConfidence = {
   occlusion: ConfidenceComponent;
   temporalStability: ConfidenceComponent;
   freshnessMs: number;
-  estimatedErrorMm95: number | null;
+  /** 95th-percentile error estimate, in the reading's unit. */
+  estimatedError95: number | null;
 };
-export type ProfileSample = { heightRatio: number; radiusMm: number | null; confidence: number };
+export type ProfileSample = { heightRatio: number; radius: number | null; confidence: number };
 export type DimensionReading = {
   id: string;
   timestampMs: number;
   sourceFrameId: number;
   calibrationId: string;
-  heightMm: number | null;
-  maximumWidthMm: number | null;
-  rimWidthMm: number | null;
-  baseWidthMm: number | null;
-  centerlineOffsetMm: number | null;
+  unit: LengthUnit;
+  height: number | null;
+  maximumWidth: number | null;
+  rimWidth: number | null;
+  baseWidth: number | null;
+  centerlineOffset: number | null;
   profile: ProfileSample[];
-  visibleAsymmetryMm: number | null;
+  visibleAsymmetry: number | null;
   confidence: MeasurementConfidence;
 };
 export type StableDimensionReading = DimensionReading & {

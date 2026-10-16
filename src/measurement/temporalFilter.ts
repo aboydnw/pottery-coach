@@ -4,6 +4,7 @@ import { epochNow } from "../platform/clock";
 
 const WINDOW_SIZE = 5;
 const EMA_TIME_CONSTANT_MS = 400;
+const RELATIVE_OUTLIER_FLOOR = 0.04;
 
 export class TemporalFilter {
   private readings: DimensionReading[] = [];
@@ -13,8 +14,8 @@ export class TemporalFilter {
   constructor(private readonly now: () => number = epochNow) {}
 
   push(reading: DimensionReading): StableDimensionReading | null {
-    if (reading.confidence.overall < 0.75 || reading.heightMm === null) return null;
-    if (this.isOutlier(this.readings, reading.heightMm)) return this.handleOutlier(reading);
+    if (reading.confidence.overall < 0.75 || reading.height === null) return null;
+    if (this.isOutlier(this.readings, reading.height)) return this.handleOutlier(reading);
     this.outliers = [];
     this.readings.push(reading);
     if (this.readings.length > WINDOW_SIZE) this.readings.shift();
@@ -33,7 +34,7 @@ export class TemporalFilter {
   // A run of mutually consistent outliers means the vessel really changed (for example, the walls
   // were pulled up while hands blocked the view), so the window restarts from the new level.
   private handleOutlier(reading: DimensionReading): StableDimensionReading | null {
-    const consistent = this.outliers.length < 2 || !this.isOutlier(this.outliers, reading.heightMm!, 2);
+    const consistent = this.outliers.length < 2 || !this.isOutlier(this.outliers, reading.height!, 2);
     this.outliers = consistent ? [...this.outliers, reading] : [reading];
     if (this.outliers.length < WINDOW_SIZE) return this.buildStable(this.readings);
     this.readings = this.outliers;
@@ -46,10 +47,11 @@ export class TemporalFilter {
 
   private isOutlier(window: DimensionReading[], value: number, minimumSize = WINDOW_SIZE): boolean {
     if (window.length < minimumSize) return false;
-    const values = window.map((reading) => reading.heightMm!);
+    const values = window.map((reading) => reading.height!);
     const center = median(values);
     const mad = median(values.map((item) => Math.abs(item - center)));
-    return Math.abs(value - center) > Math.max(5, 3 * 1.4826 * mad);
+    // Units may be pixels or millimetres, so the floor is relative to the vessel's own size.
+    return Math.abs(value - center) > Math.max(2, Math.abs(center) * RELATIVE_OUTLIER_FLOOR, 3 * 1.4826 * mad);
   }
 
   private buildStable(readings: DimensionReading[]): StableDimensionReading | null {
@@ -61,7 +63,7 @@ export class TemporalFilter {
     const smooth = (
       key: keyof Pick<
         DimensionReading,
-        "heightMm" | "maximumWidthMm" | "rimWidthMm" | "baseWidthMm" | "centerlineOffsetMm" | "visibleAsymmetryMm"
+        "height" | "maximumWidth" | "rimWidth" | "baseWidth" | "centerlineOffset" | "visibleAsymmetry"
       >,
     ): number | null => {
       const values = readings
@@ -74,23 +76,23 @@ export class TemporalFilter {
     };
     const profile: ProfileSample[] = latest.profile.map((sample, index) => {
       const values = readings
-        .map((reading) => reading.profile[index]?.radiusMm)
+        .map((reading) => reading.profile[index]?.radius)
         .filter((value): value is number => typeof value === "number");
       return {
         heightRatio: sample.heightRatio,
-        radiusMm: values.length >= 3 ? median(values) : null,
+        radius: values.length >= 3 ? median(values) : null,
         confidence: values.length / readings.length,
       };
     });
     return {
       ...latest,
       timestampMs: latest.timestampMs,
-      heightMm: smooth("heightMm"),
-      maximumWidthMm: smooth("maximumWidthMm"),
-      rimWidthMm: smooth("rimWidthMm"),
-      baseWidthMm: smooth("baseWidthMm"),
-      centerlineOffsetMm: smooth("centerlineOffsetMm"),
-      visibleAsymmetryMm: smooth("visibleAsymmetryMm"),
+      height: smooth("height"),
+      maximumWidth: smooth("maximumWidth"),
+      rimWidth: smooth("rimWidth"),
+      baseWidth: smooth("baseWidth"),
+      centerlineOffset: smooth("centerlineOffset"),
+      visibleAsymmetry: smooth("visibleAsymmetry"),
       profile,
       confidence: {
         ...latest.confidence,

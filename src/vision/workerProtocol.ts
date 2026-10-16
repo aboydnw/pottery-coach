@@ -1,5 +1,5 @@
 import type { AcquiredFrame } from "../camera/FrameSource";
-import type { CalibrationResult } from "../calibration/types";
+import type { SessionScale } from "../measurement/scale";
 import type { DimensionReading, StableDimensionReading } from "../measurement/types";
 import type { WobbleReading } from "../wobble/types";
 
@@ -23,7 +23,9 @@ export type DiagnosticResponse = {
 };
 
 export type MeasurementWorkerRequest =
-  { type: "configure"; calibration: CalibrationResult | null } | FrameRequest | { type: "reset"; reason: string };
+  | { type: "scale"; scale: SessionScale | null; imageCenterlineX?: number }
+  | FrameRequest
+  | { type: "reset"; reason: string };
 
 export type MeasurementWorkerEvent =
   | { type: "reading"; instantaneous: DimensionReading; stable: StableDimensionReading | null }

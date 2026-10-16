@@ -7,8 +7,8 @@ type ConfidenceInputs = {
   temporalStability: ConfidenceComponent;
   capturedAtMs: number;
   nowMs: number;
-  calibrationErrorMm95: number | null;
-  segmentationErrorMm95: number | null;
+  calibrationError95: number | null;
+  segmentationError95: number | null;
 };
 
 export function scoreConfidence(inputs: ConfidenceInputs): MeasurementConfidence {
@@ -18,7 +18,7 @@ export function scoreConfidence(inputs: ConfidenceInputs): MeasurementConfidence
     inputs.occlusion.score,
     inputs.temporalStability.score,
   ];
-  const errors = [inputs.calibrationErrorMm95, inputs.segmentationErrorMm95].filter(
+  const errors = [inputs.calibrationError95, inputs.segmentationError95].filter(
     (value): value is number => value !== null,
   );
   return {
@@ -28,6 +28,6 @@ export function scoreConfidence(inputs: ConfidenceInputs): MeasurementConfidence
     occlusion: inputs.occlusion,
     temporalStability: inputs.temporalStability,
     freshnessMs: Math.max(0, inputs.nowMs - inputs.capturedAtMs),
-    estimatedErrorMm95: errors.length === 0 ? null : errors.reduce((sum, value) => sum + value, 0),
+    estimatedError95: errors.length === 0 ? null : errors.reduce((sum, value) => sum + value, 0),
   };
 }

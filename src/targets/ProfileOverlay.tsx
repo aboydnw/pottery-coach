@@ -14,15 +14,15 @@ export function ProfileOverlay({
     ratio: sample.heightRatio,
     radius: sample.radiusToHeightRatio * 100,
   }));
-  const height = reading.heightMm ?? target.intendedWetHeightMm;
+  const height = reading.height ?? target.intendedWetHeightMm;
   const currentSamples = reading.profile.map((sample) => ({
     ratio: sample.heightRatio,
     radius:
-      sample.radiusMm === null
+      sample.radius === null
         ? null
         : mode === "millimetres"
-          ? (sample.radiusMm / height) * 100
-          : (sample.radiusMm / height) * 100,
+          ? (sample.radius / height) * 100
+          : (sample.radius / height) * 100,
   }));
   return (
     <figure className="profile-overlay">

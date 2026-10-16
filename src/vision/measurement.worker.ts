@@ -4,7 +4,7 @@ import { segmentVessel } from "./segmentVessel";
 import { extractDimensions } from "../measurement/extractProfile";
 import { scoreConfidence } from "../measurement/confidence";
 import { TemporalFilter } from "../measurement/temporalFilter";
-import type { CalibrationResult } from "../calibration/types";
+import { toMm, type SessionScale } from "../measurement/scale";
 import type {
   DiagnosticResponse,
   FrameRequest,
@@ -22,7 +22,8 @@ import { bitmapToLab } from "./lab";
 
 const BACKGROUND_FRAME_COUNT = 5;
 const worker = self as unknown as DedicatedWorkerGlobalScope;
-let calibration: CalibrationResult | null = null;
+let scale: SessionScale | null = null;
+let imageCenterlineX: number | null = null;
 let backgroundFrames: LabImage[] = [];
 let background: ReturnType<typeof buildBackground> | null = null;
 const temporalFilter = new TemporalFilter();
@@ -31,9 +32,11 @@ const wobbleService = new WobbleService();
 
 worker.addEventListener("message", (event: MessageEvent<MeasurementWorkerRequest>) => {
   const request = event.data;
-  if (request?.type === "configure") {
-    calibration = request.calibration;
-    resetEvidence("calibration-change");
+  if (request?.type === "scale") {
+    // A scale can arrive at any time; pixel evidence stays valid, so nothing is reset.
+    scale = request.scale;
+    imageCenterlineX = request.imageCenterlineX ?? null;
+    contourBuffer.clear("scale-change");
     return;
   }
   if (request?.type === "reset") {
@@ -45,7 +48,7 @@ worker.addEventListener("message", (event: MessageEvent<MeasurementWorkerRequest
   const startedAt = performance.now();
   let error: string | undefined;
   try {
-    if (calibration) processFrame(request, calibration);
+    processFrame(request);
   } catch (caught) {
     error = caught instanceof Error ? caught.message : "Frame processing failed";
   } finally {
@@ -61,7 +64,7 @@ worker.addEventListener("message", (event: MessageEvent<MeasurementWorkerRequest
   post(response);
 });
 
-function processFrame(request: FrameRequest, active: CalibrationResult): void {
+function processFrame(request: FrameRequest): void {
   const image = bitmapToLab(request.bitmap);
   const reference = background ?? backgroundFrames[0];
   if (reference && (reference.width !== image.width || reference.height !== image.height)) {
@@ -79,27 +82,31 @@ function processFrame(request: FrameRequest, active: CalibrationResult): void {
   const segmentation = segmentVessel(image, background, []);
   const reliableFraction = segmentation.reliableFraction;
   const confidence = scoreConfidence({
-    calibration: { score: active.status === "accepted" ? 1 : 0, reasons: active.reasons },
+    calibration: { score: 1, reasons: [] },
     segmentation: { score: reliableFraction, reasons: segmentation.reasons },
     occlusion: { score: reliableFraction, reasons: reliableFraction < 0.7 ? ["OCCLUDED_ROWS"] : [] },
     temporalStability: { score: 1, reasons: [] },
     capturedAtMs: request.capturedAtMs,
     nowMs: epochNow(),
-    calibrationErrorMm95: active.quality.estimatedErrorMm95,
-    segmentationErrorMm95: reliableFraction >= 0.7 ? 3 : 10,
+    calibrationError95: null,
+    segmentationError95: (reliableFraction >= 0.7 ? 1 : 3) * request.scale,
   });
   const instantaneous = extractDimensions(segmentation.mask, segmentation.rowReliability, {
     width: image.width,
     height: image.height,
-    mmPerPixel: estimateMmPerPixel(active) * request.scale,
-    centerlineX: active.imageCenterlineX === undefined ? image.width / 2 : active.imageCenterlineX / request.scale,
-    calibrationId: active.id,
+    unitsPerPixel: request.scale,
+    unit: "px",
+    centerlineX: imageCenterlineX === null ? image.width / 2 : imageCenterlineX / request.scale,
+    calibrationId: scale?.calibrationId ?? "uncalibrated",
     frameId: request.frameId,
     timestampMs: request.capturedAtMs,
     confidence,
   });
   post({ type: "reading", instantaneous, stable: temporalFilter.push(instantaneous) });
-  contourBuffer.push(contourSampleFromReading(instantaneous));
+  // Wobble thresholds are physical sizes, so oscillation is only tracked once a scale exists.
+  const instantaneousMm = toMm(instantaneous, scale);
+  if (!instantaneousMm) return;
+  contourBuffer.push(contourSampleFromReading(instantaneousMm));
   const window = contourBuffer.window(12_000);
   const periodSamples = window.flatMap((sample) =>
     sample.rimCenterMm === null ? [] : [{ timestampMs: sample.timestampMs, value: sample.rimCenterMm }],
@@ -121,9 +128,4 @@ function resetEvidence(reason: string): void {
 
 function post(message: MeasurementWorkerEvent): void {
   worker.postMessage(message);
-}
-
-function estimateMmPerPixel(value: CalibrationResult): number {
-  const matrix = value.homographyImageToMm;
-  return (Math.hypot(matrix[0], matrix[3]) + Math.hypot(matrix[1], matrix[4])) / 2;
 }

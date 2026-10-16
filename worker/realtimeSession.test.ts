@@ -92,3 +92,19 @@ it("validates content type, SDP bounds, config version, and stable provider erro
   );
   expect(await provider.json()).toEqual({ error: "VOICE_PROVIDER_ERROR" });
 });
+
+it("adds speech-to-text for captions only when a transcription model is configured", async () => {
+  const without = dependencies();
+  await handleRealtimeSession(requestBody(), without);
+  const plain = JSON.parse(
+    String(((without.fetch as ReturnType<typeof vi.fn>).mock.calls[0]![1].body as FormData).get("session")),
+  );
+  expect(plain.audio.input).not.toHaveProperty("transcription");
+
+  const withCaptions = dependencies({ transcriptionModel: "gpt-live-transcribe" });
+  await handleRealtimeSession(requestBody(), withCaptions);
+  const configured = JSON.parse(
+    String(((withCaptions.fetch as ReturnType<typeof vi.fn>).mock.calls[0]![1].body as FormData).get("session")),
+  );
+  expect(configured.audio.input.transcription).toEqual({ model: "gpt-live-transcribe" });
+});

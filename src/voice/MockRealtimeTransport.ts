@@ -14,6 +14,10 @@ export class MockRealtimeTransport implements RealtimeCoachTransport {
   async sendToolResult(callId: string, result: unknown): Promise<void> {
     this.sentToolResults.push({ callId, result });
   }
+  readonly startedResponses: number[] = [];
+  async startResponse(): Promise<void> {
+    this.startedResponses.push(performance.now());
+  }
   async speakApprovedCue(cue: ApprovedCue): Promise<void> {
     this.spokenCues.push(cue);
   }

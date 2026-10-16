@@ -21,19 +21,20 @@ function readingWithDelta(region: ProfileRegion, deltaMm: number, noiseMm: numbe
     timestampMs: 0,
     sourceFrameId: 0,
     calibrationId: "synthetic",
-    heightMm: target.intendedWetHeightMm,
-    maximumWidthMm: null,
-    rimWidthMm: null,
-    baseWidthMm: null,
-    centerlineOffsetMm: 0,
-    visibleAsymmetryMm: 0,
+    unit: "mm",
+    height: target.intendedWetHeightMm,
+    maximumWidth: null,
+    rimWidth: null,
+    baseWidth: null,
+    centerlineOffset: 0,
+    visibleAsymmetry: 0,
     profile: Array.from({ length: 64 }, (_, index) => {
       const heightRatio = index / 63;
       const targetSample = target.normalizedRadiusByHeight[Math.round(heightRatio * 100)]!;
       const delta = heightRatio >= start && heightRatio < end ? deltaMm : 0;
       return {
         heightRatio,
-        radiusMm: targetSample.radiusToHeightRatio * target.intendedWetHeightMm + delta + noiseMm,
+        radius: targetSample.radiusToHeightRatio * target.intendedWetHeightMm + delta + noiseMm,
         confidence: 1,
       };
     }),
@@ -44,7 +45,7 @@ function readingWithDelta(region: ProfileRegion, deltaMm: number, noiseMm: numbe
       occlusion: component,
       temporalStability: component,
       freshnessMs: 0,
-      estimatedErrorMm95: 0,
+      estimatedError95: 0,
     },
     windowStartMs: 0,
     contributingFrameCount: 5,

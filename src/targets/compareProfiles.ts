@@ -14,7 +14,7 @@ export function compareProfiles(reading: StableDimensionReading, target: TargetP
     const sourceIndex = Math.round(targetSample.heightRatio * (reading.profile.length - 1));
     const current = reading.profile[sourceIndex];
     const targetRadius = targetSample.radiusToHeightRatio * target.intendedWetHeightMm;
-    const currentRadius = current?.radiusMm ?? null;
+    const currentRadius = current?.radius ?? null;
     return {
       ratio: targetSample.heightRatio,
       targetRadius,
@@ -58,4 +58,23 @@ export function compareProfiles(reading: StableDimensionReading, target: TargetP
     regions,
     confidence: reading.confidence,
   };
+}
+
+/**
+ * Compares shape only: the reading is rescaled so its height matches the target's, which makes the
+ * regional errors meaningful as proportions even before any calibration exists.
+ */
+export function compareShape(reading: StableDimensionReading, target: TargetProfile): ProfileComparison | null {
+  if (!reading.height) return null;
+  const factor = target.intendedWetHeightMm / reading.height;
+  const normalized: StableDimensionReading = {
+    ...reading,
+    unit: "mm",
+    height: target.intendedWetHeightMm,
+    profile: reading.profile.map((sample) => ({
+      ...sample,
+      radius: sample.radius === null ? null : sample.radius * factor,
+    })),
+  };
+  return compareProfiles(normalized, target);
 }

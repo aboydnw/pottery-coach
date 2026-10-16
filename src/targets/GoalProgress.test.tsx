@@ -29,7 +29,7 @@ function comparison(confidence = 0.9): ProfileComparison {
       occlusion: component,
       temporalStability: component,
       freshnessMs: 0,
-      estimatedErrorMm95: 5,
+      estimatedError95: 5,
     },
   };
 }

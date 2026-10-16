@@ -1,11 +1,11 @@
 import { expect, test } from "@playwright/test";
-import { beginDemoSession, chooseNoVoiceAndConfirmWetGoal } from "./fixtures/session-streams";
+import { beginDemoSession, confirmWetGoal, endSession } from "./fixtures/session-streams";
 
 test("local databases hold measurements but no raw media after a session", async ({ page }) => {
   await beginDemoSession(page);
-  await chooseNoVoiceAndConfirmWetGoal(page);
+  await confirmWetGoal(page);
   await page.getByRole("button", { name: /mark this moment/i }).click();
-  await page.getByRole("button", { name: /end session and review/i }).click();
+  await endSession(page);
   await expect(page.getByText(/camera active.*frames stay/i)).toHaveCount(0);
 
   const contents = await page.evaluate(async () => {

@@ -107,4 +107,17 @@ describe("CanvasFrameSource", () => {
     await vi.advanceTimersByTimeAsync(1000);
     expect(sink.mock.calls.length).toBeLessThanOrEqual(10);
   });
+
+  it("samples the whole current frame by default and waits until the video has a size", async () => {
+    const source = new CanvasFrameSource();
+    const sink = vi.fn((_frame: AcquiredFrame) => "accepted" as const);
+    const video = { videoWidth: 0, videoHeight: 0 } as HTMLVideoElement;
+    source.start(video, { targetFps: 10 }, sink);
+    await vi.advanceTimersByTimeAsync(300);
+    expect(sink).not.toHaveBeenCalled();
+
+    Object.assign(video, { videoWidth: 720, videoHeight: 1280 });
+    await vi.advanceTimersByTimeAsync(300);
+    expect(sink.mock.calls[0]![0]).toMatchObject({ sourceRoi: { width: 720, height: 1280 }, scale: 2.25 });
+  });
 });

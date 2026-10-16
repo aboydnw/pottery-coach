@@ -41,7 +41,12 @@ export function useCamera(videoRef: RefObject<HTMLVideoElement | null>, callback
     try {
       const result = await controller.start(cameraConstraints(requested));
       setFacing(requested);
-      if (videoRef.current) videoRef.current.srcObject = result.stream;
+      if (videoRef.current) {
+        videoRef.current.srcObject = result.stream;
+        // Started with play() rather than the autoplay attribute: Chrome pauses muted autoplay videos
+        // once they scroll off screen, which would stop measurement.
+        void videoRef.current.play().catch(() => undefined);
+      }
       setSettings(result.settings);
       setStatus("active");
       setInterrupted(false);

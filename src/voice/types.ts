@@ -31,6 +31,8 @@ export interface RealtimeCoachTransport {
   connect(config: RealtimeSessionConfig): Promise<void>;
   sendToolResult(callId: string, result: unknown): Promise<void>;
   speakApprovedCue(cue: ApprovedCue): Promise<void>;
+  /** Prompts the model to speak first (greeting, or picking up after a reconnect). */
+  startResponse(): Promise<void>;
   cancelOutput(reason: string): Promise<void>;
   pauseInput(): Promise<void>;
   resumeInput(): Promise<void>;

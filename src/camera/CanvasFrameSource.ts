@@ -1,21 +1,15 @@
 import { toEpochMs } from "../platform/clock";
 import { DEFAULT_PROCESSING_WIDTH, type FrameSink, type FrameSource, type FrameSourceOptions } from "./FrameSource";
 
-type VideoWithFrameCallback = HTMLVideoElement & {
-  requestVideoFrameCallback?: (callback: VideoFrameRequestCallback) => number;
-  cancelVideoFrameCallback?: (handle: number) => void;
-};
-
 /**
  * Samples a video element at a bounded rate and hands downscaled `ImageBitmap`s to a sink.
- * Uses `requestVideoFrameCallback` when available and a timer otherwise.
+ * Sampling runs on a timer so it continues while the preview is off screen.
  */
 export class CanvasFrameSource implements FrameSource {
-  private video: VideoWithFrameCallback | null = null;
-  private options: Required<FrameSourceOptions> | null = null;
+  private video: HTMLVideoElement | null = null;
+  private options: (Omit<Required<FrameSourceOptions>, "roi"> & Pick<FrameSourceOptions, "roi">) | null = null;
   private sink: FrameSink | null = null;
   private timer: ReturnType<typeof setTimeout> | null = null;
-  private callbackHandle: number | null = null;
   private frameId = 0;
   private lastCaptureAt = -Infinity;
   private generation = 0;
@@ -33,11 +27,7 @@ export class CanvasFrameSource implements FrameSource {
   stop(): void {
     this.generation += 1;
     if (this.timer !== null) clearTimeout(this.timer);
-    if (this.callbackHandle !== null && this.video?.cancelVideoFrameCallback) {
-      this.video.cancelVideoFrameCallback(this.callbackHandle);
-    }
     this.timer = null;
-    this.callbackHandle = null;
     this.video = null;
     this.options = null;
     this.sink = null;
@@ -48,12 +38,10 @@ export class CanvasFrameSource implements FrameSource {
     if (this.options) this.options = { ...this.options, ...options };
   }
 
+  // A timer rather than requestVideoFrameCallback: browsers stop video-frame callbacks while the
+  // preview is scrolled off screen, which silently stopped measurement mid-session.
   private schedule(generation: number): void {
     if (generation !== this.generation || !this.video || !this.options) return;
-    if (typeof this.video.requestVideoFrameCallback === "function") {
-      this.callbackHandle = this.video.requestVideoFrameCallback((now) => void this.onFrame(now, generation));
-      return;
-    }
     this.timer = setTimeout(() => void this.onFrame(performance.now(), generation), 1000 / this.options.targetFps);
   }
 
@@ -61,7 +49,13 @@ export class CanvasFrameSource implements FrameSource {
     if (generation !== this.generation || !this.video || !this.options || !this.sink) return;
     if (now - this.lastCaptureAt + 0.01 >= 1000 / this.options.targetFps) {
       this.lastCaptureAt = now;
-      const { roi, maxOutputWidth } = this.options;
+      const { maxOutputWidth } = this.options;
+      const roi = this.options.roi ?? { x: 0, y: 0, width: this.video.videoWidth, height: this.video.videoHeight };
+      if (roi.width <= 0 || roi.height <= 0) {
+        // No frame decoded yet; try again on the next tick.
+        this.schedule(generation);
+        return;
+      }
       const outputWidth = Math.max(1, Math.min(Math.round(roi.width), Math.round(maxOutputWidth)));
       const scale = roi.width / outputWidth;
       try {
