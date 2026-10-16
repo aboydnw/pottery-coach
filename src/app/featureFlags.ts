@@ -4,6 +4,12 @@
  */
 export const UNVERIFIED_MEASUREMENTS = import.meta.env.VITE_UNVERIFIED_MEASUREMENTS === "true";
 
+/**
+ * Build-time switch for the field-test deployment: offers the cloud voice coach to anyone holding the
+ * passphrase. The release manifest's realtime gate still records the provider review as pending.
+ */
+export const CLOUD_VOICE = import.meta.env.VITE_CLOUD_VOICE === "true";
+
 export type FeatureFlags = {
   numericMeasurement: boolean;
   proactiveWobble: boolean;

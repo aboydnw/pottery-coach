@@ -19,6 +19,7 @@
   },
   "vars": {
     "VOICE_MODEL": "gpt-realtime-2.1-mini",
+    "VOICE_TRANSCRIPTION_MODEL": "",
     "REALTIME_ALLOWED_ORIGINS": "",
   },
   "ratelimits": [

@@ -57,7 +57,7 @@ camera ──▶ CanvasFrameSource ──▶ measurement worker ──▶ stable
 
 These modules are tested and kept for the next milestones, but the running app doesn't use them yet:
 
-- **Cloud voice:** `src/voice/OpenAIWebRtcTransport.ts` and `TranscriptStore.ts`. The conversation loop and tools are wired in and tested with a scripted stand-in voice; connecting the real provider is the next PR.
+- **Transcript storage:** `src/voice/TranscriptStore.ts`. Captions are shown live but not stored.
 - **Coaching engine:** everything in `src/coaching/`, which covers cue policies, arbitration, phase tracking and spoken-claim validation.
 - **Other pieces:** spoken goals (`src/goals/parseSpokenGoal.ts`), session export (`src/review/exportSession.ts`), camera-motion estimation (`src/wobble/cameraMotion.ts`) and field-study analysis (`src/research/`).
 

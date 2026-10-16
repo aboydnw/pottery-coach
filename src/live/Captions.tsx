@@ -12,11 +12,25 @@ const STATUS_TEXT: Record<string, string> = {
 };
 
 /** Shows what the coach and potter just said, plus the connection state, for a quick glance. */
-export function Captions({ state, captions }: { state: string; captions: Caption[] }) {
+const FAILURE_TEXT: Record<string, string> = {
+  unauthorized: "The voice passphrase didn't work. Carry on by touch, or fix it on the start screen.",
+  disabled: "The voice coach is switched off on the server.",
+  unavailable: "Voice coach lost.",
+};
+
+export function Captions({
+  state,
+  failure = null,
+  captions,
+}: {
+  state: string;
+  failure?: string | null;
+  captions: Caption[];
+}) {
   return (
     <section className="captions" aria-label="Conversation">
       <p className="voice-status" role="status">
-        {STATUS_TEXT[state] ?? state}
+        {(failure && FAILURE_TEXT[failure]) ?? STATUS_TEXT[state] ?? state}
       </p>
       <ol aria-live="polite">
         {captions.map((caption) => (

@@ -23,6 +23,7 @@ export class OpenAIWebRtcTransport implements RealtimeCoachTransport {
   private audio: HTMLAudioElement | null = null;
   private listeners = new Set<(event: RealtimeEvent) => void>();
   private usage: ProviderUsage | null = null;
+  private readonly transcripts = new Map<string, string>();
   private closed = false;
 
   constructor(private readonly dependencies: Dependencies = defaults) {}
@@ -63,7 +64,7 @@ export class OpenAIWebRtcTransport implements RealtimeCoachTransport {
         credentials: "same-origin",
         body: JSON.stringify({ sdp: offer.sdp, sessionId: crypto.randomUUID(), clientConfigVersion: "voice-v1" }),
       });
-      if (!response.ok) throw new Error(`Realtime session failed (${response.status})`);
+      if (!response.ok) throw new RealtimeSessionError(response.status);
       await peer.setRemoteDescription({ type: "answer", sdp: await response.text() });
       this.peer = peer;
       this.channel = channel;
@@ -86,6 +87,11 @@ export class OpenAIWebRtcTransport implements RealtimeCoachTransport {
     });
     this.send({ type: "response.create" });
   }
+  /** Asks the model to speak without waiting for the potter, so the coach greets them first. */
+  async startResponse(): Promise<void> {
+    this.send({ type: "response.create" });
+  }
+
   async speakApprovedCue(cue: ApprovedCue): Promise<void> {
     this.send({
       type: "response.create",
@@ -146,18 +152,37 @@ export class OpenAIWebRtcTransport implements RealtimeCoachTransport {
     } catch {
       return;
     }
-    const mapped = mapProviderEvent(raw);
+    const mapped = mapProviderEvent(raw, this.transcripts);
     if (mapped) {
       if (mapped.type === "usage") this.usage = mapped.usage;
       this.emit(mapped);
     }
   };
+
   private emit(event: RealtimeEvent): void {
     this.listeners.forEach((listener) => listener(event));
   }
 }
 
-function mapProviderEvent(raw: Record<string, unknown>): RealtimeEvent | null {
+/** Thrown when the session endpoint refuses the request; retrying won't help for auth or disabled voice. */
+export class RealtimeSessionError extends Error {
+  readonly retryable: boolean;
+  constructor(readonly status: number) {
+    super(`Realtime session failed (${status})`);
+    this.retryable = !(status === 401 || status === 403 || status === 503);
+  }
+}
+
+/** Browser dependencies for the real transport, with the field-test passphrase as the bearer token. */
+export function browserTransportDependencies(getAccessToken: () => string): Dependencies {
+  return { ...defaults, getAccessToken };
+}
+
+/**
+ * Maps provider events to app events. Transcript deltas arrive in pieces, so `transcripts`
+ * accumulates text per item to give captions the whole sentence so far.
+ */
+export function mapProviderEvent(raw: Record<string, unknown>, transcripts: Map<string, string>): RealtimeEvent | null {
   const timestampMs = performance.now();
   if (raw.type === "input_audio_buffer.speech_started") return { type: "speech-started", timestampMs };
   if (raw.type === "input_audio_buffer.speech_stopped") return { type: "speech-stopped", timestampMs };
@@ -174,11 +199,50 @@ function mapProviderEvent(raw: Record<string, unknown>): RealtimeEvent | null {
     }
     return { type: "tool-call", callId: raw.call_id, name: raw.name, arguments: args };
   }
+  const speaker = transcriptSpeaker(raw.type);
+  if (speaker && typeof raw.item_id === "string") {
+    const eventId = raw.item_id;
+    if (typeof raw.delta === "string") {
+      const text = (transcripts.get(eventId) ?? "") + raw.delta;
+      transcripts.set(eventId, text);
+      return { type: "transcript-delta", eventId, speaker, text, timestampMs };
+    }
+    if (typeof raw.transcript === "string") {
+      transcripts.delete(eventId);
+      return { type: "transcript-final", eventId, speaker, text: raw.transcript, timestampMs };
+    }
+  }
+  if (raw.type === "response.done") {
+    const usage = (raw.response as { usage?: Record<string, unknown> } | undefined)?.usage;
+    if (!usage) return null;
+    const input = (usage.input_token_details ?? {}) as Record<string, number>;
+    const output = (usage.output_token_details ?? {}) as Record<string, number>;
+    return {
+      type: "usage",
+      usage: {
+        inputTextTokens: input.text_tokens ?? 0,
+        inputAudioTokens: input.audio_tokens ?? 0,
+        outputTextTokens: output.text_tokens ?? 0,
+        outputAudioTokens: output.audio_tokens ?? 0,
+      },
+    };
+  }
   if (raw.type === "error")
     return {
       type: "error",
       code: String((raw.error as Record<string, unknown> | undefined)?.code ?? "provider-error"),
       message: String((raw.error as Record<string, unknown> | undefined)?.message ?? "Realtime provider error"),
     };
+  return null;
+}
+
+function transcriptSpeaker(type: unknown): "user" | "assistant" | null {
+  if (type === "response.output_audio_transcript.delta" || type === "response.output_audio_transcript.done")
+    return "assistant";
+  if (
+    type === "conversation.item.input_audio_transcription.delta" ||
+    type === "conversation.item.input_audio_transcription.completed"
+  )
+    return "user";
   return null;
 }

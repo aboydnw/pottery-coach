@@ -8,6 +8,8 @@ export function reconnectDelayMs(attempt: number): number | null {
   return attempt >= 5 ? null : [0, 1000, 2000, 4000, 8000][attempt]!;
 }
 
+export type ConversationFailure = "unauthorized" | "disabled" | "unavailable";
+
 export class ConversationController {
   private state: ConversationState = "idle";
   private readonly eventListeners = new Set<(event: RealtimeEvent) => void>();
@@ -18,6 +20,7 @@ export class ConversationController {
   private reconnectAttempt = 0;
   private intentionallyClosed = false;
   private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
+  private failure: ConversationFailure | null = null;
   private compactContext: CompactContext = { goalId: null, phase: "setup", policyRevision: 1 };
   private ephemeralReadingId: string | null = null;
   private proactiveCloudSpeechEnabled = true;
@@ -39,6 +42,11 @@ export class ConversationController {
   /** Returns a tool's result to the model; silently ignored while reconnecting. */
   async sendToolResult(callId: string, result: unknown): Promise<void> {
     await this.transport?.sendToolResult(callId, result);
+  }
+
+  /** Why the conversation failed: a wrong passphrase, voice switched off on the server, or no connection. */
+  getFailure(): ConversationFailure | null {
+    return this.failure;
   }
 
   getState(): ConversationState {
@@ -102,10 +110,20 @@ export class ConversationController {
     try {
       await transport.connect(this.config);
       if (this.transport !== transport) return;
+      this.failure = null;
       this.setState("connected");
       this.reconnectAttempt = 0;
-    } catch {
-      if (this.transport === transport) this.scheduleReconnect();
+      // The model waits for speech by default; this lets the coach greet first (or pick up after a drop).
+      await transport.startResponse().catch(() => undefined);
+    } catch (error) {
+      if (this.transport !== transport) return;
+      const status = (error as { status?: unknown }).status;
+      if ((error as { retryable?: unknown }).retryable === false) {
+        this.failure = status === 503 ? "disabled" : "unauthorized";
+        this.setState("failed");
+        return;
+      }
+      this.scheduleReconnect();
     }
   }
   private async disposeTransport(): Promise<void> {
@@ -125,6 +143,7 @@ export class ConversationController {
     if (this.reconnectTimer !== null || this.intentionallyClosed) return;
     const delay = reconnectDelayMs(this.reconnectAttempt++);
     if (delay === null) {
+      this.failure = "unavailable";
       this.setState("failed");
       return;
     }

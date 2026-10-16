@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
-import { ConversationController } from "./ConversationController";
+import { ConversationController, type ConversationFailure } from "./ConversationController";
+import { NOTICES, primeSpokenNotices, speakNotice } from "./spokenNotice";
 import type { ConversationState, RealtimeCoachTransport, RealtimeSessionConfig } from "./types";
 
 export type Caption = { id: string; speaker: "user" | "assistant"; text: string; final: boolean };
@@ -24,6 +25,7 @@ export function useVoiceSession(createTransport: (() => RealtimeCoachTransport) 
   const toolsRef = useRef(tools);
   const [state, setState] = useState<ConversationState | "off">("off");
   const [captions, setCaptions] = useState<Caption[]>([]);
+  const [failure, setFailure] = useState<ConversationFailure | null>(null);
 
   useEffect(() => {
     toolsRef.current = tools;
@@ -33,9 +35,20 @@ export function useVoiceSession(createTransport: (() => RealtimeCoachTransport) 
 
   async function start(config: RealtimeSessionConfig = SESSION_CONFIG): Promise<void> {
     if (!createTransport || controllerRef.current) return;
+    // Runs inside the start tap, which unlocks the phone's own voice for later notices.
+    primeSpokenNotices();
     const controller = new ConversationController(createTransport);
     controllerRef.current = controller;
-    controller.onStateChange(setState);
+    setFailure(null);
+    controller.onStateChange((next) => {
+      setState(next);
+      if (next === "reconnecting") speakNotice(NOTICES.reconnecting);
+      if (next === "failed") {
+        const reason = controller.getFailure();
+        setFailure(reason);
+        speakNotice(reason === "unauthorized" ? NOTICES.passphrase : NOTICES.lostVoice);
+      }
+    });
     controller.onEvent((event) => {
       if (event.type === "tool-call") {
         void toolsRef.current
@@ -63,5 +76,11 @@ export function useVoiceSession(createTransport: (() => RealtimeCoachTransport) 
     setState("off");
   }
 
-  return { available: createTransport !== null, state, captions, start, stop };
+  /** Tries again after a failure; called from the one tap the failure notice asks for. */
+  async function restart(): Promise<void> {
+    await stop();
+    await start();
+  }
+
+  return { available: createTransport !== null, state, failure, captions, start, stop, restart };
 }

@@ -33,9 +33,15 @@ pnpm exec wrangler secret put OPENAI_API_KEY
 pnpm exec wrangler secret put REALTIME_ACCESS_TOKEN
 ```
 
-`wrangler secret put` deploys a new version immediately. Field-test clients send the access token as `Authorization: Bearer …`. `REALTIME_ALLOWED_ORIGINS` (comma-separated) and `VOICE_MODEL` are plain variables in `wrangler.jsonc`. For local `wrangler dev`, copy `.dev.vars.example` to `.dev.vars`.
+`wrangler secret put` deploys a new version immediately. `REALTIME_ACCESS_TOKEN` is the voice passphrase: type it once on the phone's start screen ("Voice passphrase") and it is remembered there and sent as `Authorization: Bearer …`. Anyone without it gets the touch-only app. `.env.production` sets `VITE_CLOUD_VOICE=true`, which shows that passphrase field; the release manifest still records the provider gate as pending.
 
-The app's release manifest still keeps cloud voice switched off in the UI, so setting the secrets alone exposes nothing to users.
+Plain variables in `wrangler.jsonc`:
+
+- `VOICE_MODEL`: the realtime model.
+- `VOICE_TRANSCRIPTION_MODEL`: empty by default. Set it (for example `gpt-live-transcribe`) to caption what the potter says as well as what the coach says. It is opt-in because an unsupported model makes the whole session request fail; if voice stops connecting after setting it, clear it again.
+- `REALTIME_ALLOWED_ORIGINS`: extra allowed origins, comma-separated.
+
+For local `wrangler dev`, copy `.dev.vars.example` to `.dev.vars`.
 
 ## Manual deploys and checks
 

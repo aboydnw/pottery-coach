@@ -131,3 +131,31 @@ it("forwards provider events and state changes, and routes tool results to the l
   expect(states).toEqual(["connecting", "connected"]);
   expect(transport.sentToolResults).toEqual([{ callId: "call-1", result: { ok: true } }]);
 });
+
+it("asks the coach to speak first once connected", async () => {
+  const transport = new MockRealtimeTransport();
+  const controller = new ConversationController(() => transport);
+  await controller.connect(config);
+  expect(transport.startedResponses).toHaveLength(1);
+});
+
+it("stops retrying when the passphrase is refused or voice is switched off", async () => {
+  for (const [status, failure] of [
+    [401, "unauthorized"],
+    [503, "disabled"],
+  ] as const) {
+    let attempts = 0;
+    const controller = new ConversationController(() => {
+      attempts += 1;
+      const transport = new MockRealtimeTransport();
+      transport.connect = async () => {
+        throw Object.assign(new Error("refused"), { status, retryable: false });
+      };
+      return transport;
+    });
+    await controller.connect(config);
+    expect(controller.getState()).toBe("failed");
+    expect(controller.getFailure()).toBe(failure);
+    expect(attempts).toBe(1);
+  }
+});

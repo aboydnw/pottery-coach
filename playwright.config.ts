@@ -16,7 +16,7 @@ export default defineConfig({
   webServer: {
     command: preview
       ? "VITE_ENABLE_DEMO=true pnpm exec vite build && pnpm exec vite preview --host 127.0.0.1 --port 4173 --strictPort"
-      : "pnpm dev --host 127.0.0.1 --port 4173 --strictPort",
+      : "VITE_CLOUD_VOICE=true pnpm dev --host 127.0.0.1 --port 4173 --strictPort",
     url: "http://127.0.0.1:4173",
     reuseExistingServer: !process.env.CI,
     timeout: 120_000,
@@ -25,19 +25,19 @@ export default defineConfig({
     {
       name: "chromium",
       testIgnore: /(calibration-board|wheel-head)\.spec\.ts/,
-      use: { ...devices["Desktop Chrome"], permissions: ["camera"], launchOptions: { args: fakeCamera } },
+      use: { ...devices["Desktop Chrome"], permissions: ["camera", "microphone"], launchOptions: { args: fakeCamera } },
     },
     {
       name: "mobile-chromium",
       testIgnore: /(calibration-board|wheel-head)\.spec\.ts/,
-      use: { ...devices["Pixel 7"], permissions: ["camera"], launchOptions: { args: fakeCamera } },
+      use: { ...devices["Pixel 7"], permissions: ["camera", "microphone"], launchOptions: { args: fakeCamera } },
     },
     {
       name: "chromium-board-camera",
       testMatch: /calibration-board\.spec\.ts/,
       use: {
         ...devices["Desktop Chrome"],
-        permissions: ["camera"],
+        permissions: ["camera", "microphone"],
         launchOptions: { args: [...fakeCamera, `--use-file-for-fake-video-capture=${BOARD_VIDEO_PATH}`] },
       },
     },
@@ -46,7 +46,7 @@ export default defineConfig({
       testMatch: /wheel-head\.spec\.ts/,
       use: {
         ...devices["Desktop Chrome"],
-        permissions: ["camera"],
+        permissions: ["camera", "microphone"],
         launchOptions: { args: [...fakeCamera, `--use-file-for-fake-video-capture=${WHEEL_VIDEO_PATH}`] },
       },
     },

@@ -12,13 +12,15 @@ import { SessionRepository } from "../session/SessionRepository";
 import type { SessionBundle } from "../session/types";
 import { SetupStore } from "../setup/SetupStore";
 import { loadTemplates } from "../targets/loadTemplates";
+import { browserTransportDependencies, OpenAIWebRtcTransport } from "../voice/OpenAIWebRtcTransport";
+import { forgetPassphrase, loadPassphrase, savePassphrase } from "../voice/passphrase";
 import { ScriptedVoice } from "../voice/scriptedVoice";
 import { createToolRegistry } from "../voice/tools/registry";
 import type { SpokenSummary, ToolDependencies } from "../voice/tools/types";
 import { useVoiceSession } from "../voice/useVoiceSession";
 import { createSessionState, restoreSessionShell, serializeSessionShell, transition } from "./AppSessionOrchestrator";
 import { isCameraOnlyMode, isDemoMode } from "./demoMode";
-import { deriveGatedFeatureFlags, UNVERIFIED_MEASUREMENTS } from "./featureFlags";
+import { CLOUD_VOICE, deriveGatedFeatureFlags, UNVERIFIED_MEASUREMENTS } from "./featureFlags";
 import { useAppUpdate } from "./useAppUpdate";
 import { useSessionRecording } from "./useSessionRecording";
 
@@ -42,6 +44,8 @@ export function SessionFlow() {
   const [cameraOnly] = useState(() => isCameraOnlyMode());
   const [setup, setSetup] = useState(() => new SetupStore());
   const [scripted] = useState(() => (demoMode ? new ScriptedVoice() : null));
+  const [passphrase, setPassphrase] = useState(() => (CLOUD_VOICE ? loadPassphrase() : null));
+  const [passphraseDraft, setPassphraseDraft] = useState("");
   const updated = useAppUpdate();
   const recording = useSessionRecording(repository, () => dispatch({ type: "STORAGE_FAILED" }));
   const bridge = useRef<Partial<ToolDependencies>>({});
@@ -83,7 +87,12 @@ export function SessionFlow() {
     // oxlint-disable-next-line react-hooks/exhaustive-deps
     [],
   );
-  const voice = useVoiceSession(scripted ? () => scripted.transport : null, registry);
+  const createTransport = scripted
+    ? () => scripted.transport
+    : passphrase
+      ? () => new OpenAIWebRtcTransport(browserTransportDependencies(() => passphrase))
+      : null;
+  const voice = useVoiceSession(createTransport, registry);
 
   useEffect(() => {
     setupRef.current = setup;
@@ -166,6 +175,49 @@ export function SessionFlow() {
           Camera frames are processed on this phone and never stored or uploaded. It is not safety equipment.
           {voice.available && " Your voice goes to the coach's speech service while the session runs."}
         </p>
+        {CLOUD_VOICE && !scripted && (
+          <div className="voice-setup">
+            {passphrase ? (
+              <p>
+                Voice coach is on for this phone.{" "}
+                <button
+                  type="button"
+                  className="link-button"
+                  onClick={() => {
+                    forgetPassphrase();
+                    setPassphrase(null);
+                  }}
+                >
+                  Forget passphrase
+                </button>
+              </p>
+            ) : (
+              <form
+                onSubmit={(event) => {
+                  event.preventDefault();
+                  if (!passphraseDraft.trim()) return;
+                  savePassphrase(passphraseDraft);
+                  setPassphrase(passphraseDraft.trim());
+                  setPassphraseDraft("");
+                }}
+              >
+                <label>
+                  Voice passphrase (once per phone)
+                  <input
+                    type="password"
+                    autoComplete="current-password"
+                    value={passphraseDraft}
+                    onChange={(event) => setPassphraseDraft(event.target.value)}
+                  />
+                </label>
+                <button type="submit" className="secondary">
+                  Turn on voice coach
+                </button>
+                <p>Without it, you can still set up by touch.</p>
+              </form>
+            )}
+          </div>
+        )}
         <button type="button" className="start-button" onClick={startSession}>
           Start session
         </button>

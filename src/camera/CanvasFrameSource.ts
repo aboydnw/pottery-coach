@@ -7,7 +7,7 @@ import { DEFAULT_PROCESSING_WIDTH, type FrameSink, type FrameSource, type FrameS
  */
 export class CanvasFrameSource implements FrameSource {
   private video: HTMLVideoElement | null = null;
-  private options: Required<FrameSourceOptions> | null = null;
+  private options: (Omit<Required<FrameSourceOptions>, "roi"> & Pick<FrameSourceOptions, "roi">) | null = null;
   private sink: FrameSink | null = null;
   private timer: ReturnType<typeof setTimeout> | null = null;
   private frameId = 0;
@@ -49,7 +49,13 @@ export class CanvasFrameSource implements FrameSource {
     if (generation !== this.generation || !this.video || !this.options || !this.sink) return;
     if (now - this.lastCaptureAt + 0.01 >= 1000 / this.options.targetFps) {
       this.lastCaptureAt = now;
-      const { roi, maxOutputWidth } = this.options;
+      const { maxOutputWidth } = this.options;
+      const roi = this.options.roi ?? { x: 0, y: 0, width: this.video.videoWidth, height: this.video.videoHeight };
+      if (roi.width <= 0 || roi.height <= 0) {
+        // No frame decoded yet; try again on the next tick.
+        this.schedule(generation);
+        return;
+      }
       const outputWidth = Math.max(1, Math.min(Math.round(roi.width), Math.round(maxOutputWidth)));
       const scale = roi.width / outputWidth;
       try {

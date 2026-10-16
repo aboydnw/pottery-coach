@@ -36,6 +36,7 @@ async function realtimeSession(request: Request, env: WorkerEnv): Promise<Respon
   return handleRealtimeSession(request, {
     apiKey: env.OPENAI_API_KEY,
     model: env.VOICE_MODEL || DEFAULT_MODEL,
+    transcriptionModel: env.VOICE_TRANSCRIPTION_MODEL || undefined,
     fetch: (input, init) => fetch(input, init),
     authenticate: (incoming) => hasBearerToken(incoming, accessToken),
     verifyOrigin: (incoming) => isSameOrigin(incoming, allowedOrigins),

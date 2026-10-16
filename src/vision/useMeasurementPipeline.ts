@@ -1,6 +1,5 @@
 import { useEffect, useRef, useState } from "react";
 import { CanvasFrameSource } from "../camera/CanvasFrameSource";
-import type { CameraSettings } from "../camera/types";
 import type { SessionScale } from "../measurement/scale";
 import { FrameDiagnostics, type DiagnosticSample } from "../diagnostics/FrameDiagnostics";
 import type { StableDimensionReading } from "../measurement/types";
@@ -28,6 +27,8 @@ type Pipeline = {
  * worker hand-off, diagnostics, and adaptive rate control. The confirmed calibration is remembered
  * and re-sent whenever the pipeline restarts (for example after a camera interruption).
  */
+const STALL_RESTART_SECONDS = 4;
+
 export function useMeasurementPipeline(callbacks: MeasurementCallbacks = {}) {
   const latest = useLatest(callbacks);
   const [diagnostics] = useState(() => new FrameDiagnostics());
@@ -38,28 +39,8 @@ export function useMeasurementPipeline(callbacks: MeasurementCallbacks = {}) {
   const pipelineRef = useRef<Pipeline | null>(null);
   const scaleRef = useRef<{ scale: SessionScale | null; imageCenterlineX?: number }>({ scale: null });
   const pinnedRef = useRef(false);
-  useEffect(() => {
-    const adaptive = new AdaptiveRateController((mode) => {
-      setProcessingHz(mode.processingHz);
-      diagnostics.setTargetFps(mode.processingHz);
-      pipelineRef.current?.source.updateOptions({ targetFps: mode.processingHz });
-      latest.current.onProcessingModeChange?.(mode);
-    });
-    void readBatteryLevel(diagnostics);
-    const interval = window.setInterval(() => {
-      const next = diagnostics.snapshot();
-      setSample(next);
-      if (pipelineRef.current)
-        adaptive.update({ processingMsP95: next.workerProcessingMsP95, frameAgeMsP95: next.frameAgeMsP95 });
-    }, 1000);
-    return () => {
-      window.clearInterval(interval);
-      teardown(pipelineRef.current);
-      pipelineRef.current = null;
-    };
-  }, [diagnostics, latest]);
 
-  function start(video: HTMLVideoElement, settings: CameraSettings): void {
+  function start(video: HTMLVideoElement): void {
     teardown(pipelineRef.current);
     pipelineRef.current = null;
     diagnostics.reset();
@@ -88,12 +69,6 @@ export function useMeasurementPipeline(callbacks: MeasurementCallbacks = {}) {
       video,
       {
         targetFps: processingHz,
-        roi: {
-          x: 0,
-          y: 0,
-          width: settings.width ?? video.videoWidth ?? 640,
-          height: settings.height ?? video.videoHeight ?? 360,
-        },
       },
       (frame) => {
         diagnostics.record("acquired", performance.now(), frame.frameId);
@@ -146,6 +121,38 @@ export function useMeasurementPipeline(callbacks: MeasurementCallbacks = {}) {
   function post(message: MeasurementWorkerRequest): void {
     pipelineRef.current?.worker.postMessage(message);
   }
+
+  const restartRef = useLatest(start);
+
+  useEffect(() => {
+    const adaptive = new AdaptiveRateController((mode) => {
+      setProcessingHz(mode.processingHz);
+      diagnostics.setTargetFps(mode.processingHz);
+      pipelineRef.current?.source.updateOptions({ targetFps: mode.processingHz });
+      latest.current.onProcessingModeChange?.(mode);
+    });
+    void readBatteryLevel(diagnostics);
+    let idleSeconds = 0;
+    const interval = window.setInterval(() => {
+      const next = diagnostics.snapshot();
+      setSample(next);
+      const pipeline = pipelineRef.current;
+      if (!pipeline) return;
+      adaptive.update({ processingMsP95: next.workerProcessingMsP95, frameAgeMsP95: next.frameAgeMsP95 });
+      // Self-heal: if nothing has been processed for a while, the worker crashed or stalled. Restarting
+      // it costs a few frames of background learning, which beats silently losing measurement.
+      idleSeconds = next.processedFps === 0 ? idleSeconds + 1 : 0;
+      if (idleSeconds >= STALL_RESTART_SECONDS) {
+        idleSeconds = 0;
+        restartRef.current(pipeline.video);
+      }
+    }, 1000);
+    return () => {
+      window.clearInterval(interval);
+      teardown(pipelineRef.current);
+      pipelineRef.current = null;
+    };
+  }, [diagnostics, latest, restartRef]);
 
   return { sample, stableReading, wobbleReading, processingHz, start, stop, setScale, injectReading };
 }

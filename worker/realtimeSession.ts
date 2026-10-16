@@ -10,6 +10,8 @@ export type RealtimeErrorCode = "VOICE_RATE_LIMITED" | "VOICE_PROVIDER_ERROR" | 
 export type RealtimeSessionDependencies = {
   apiKey: string;
   model: string;
+  /** Optional speech-to-text model for captions of what the potter said; omitted when empty. */
+  transcriptionModel?: string;
   fetch: typeof globalThis.fetch;
   authenticate(request: Request): Promise<boolean>;
   verifyOrigin(request: Request): boolean;
@@ -56,7 +58,13 @@ export async function handleRealtimeSession(
       JSON.stringify({
         type: "realtime",
         model: dependencies.model,
-        audio: { output: { voice: VOICE }, input: { turn_detection: { type: "server_vad" } } },
+        audio: {
+          output: { voice: VOICE },
+          input: {
+            turn_detection: { type: "server_vad" },
+            ...(dependencies.transcriptionModel ? { transcription: { model: dependencies.transcriptionModel } } : {}),
+          },
+        },
         instructions: COACH_INSTRUCTIONS,
         tools: REALTIME_TOOL_DEFINITIONS,
       }),

@@ -423,3 +423,25 @@ button.link-button {
   gap: 0.75rem;
   margin: 1rem 0;
 }
+
+.tap-anywhere {
+  position: fixed;
+  inset: 0;
+  z-index: 10;
+  border-radius: 0;
+  font-size: 1.5rem;
+  background: rgb(36 92 101 / 92%);
+}
+
+.voice-setup {
+  margin: 1rem 0;
+}
+
+.voice-setup input {
+  width: 100%;
+}
+
+.notice,
+.live-session {
+  min-width: 0;
+}

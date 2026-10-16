@@ -20,7 +20,8 @@ export type FrameSink = (frame: AcquiredFrame) => "accepted" | "busy";
 
 export type FrameSourceOptions = {
   targetFps: number;
-  roi: RegionOfInterest;
+  /** Region of the video to sample; defaults to the whole frame at its current size (which can change on rotation). */
+  roi?: RegionOfInterest;
   /** Frames wider than this are downscaled before processing, keeping the aspect ratio. */
   maxOutputWidth?: number;
 };

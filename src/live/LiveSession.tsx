@@ -26,6 +26,7 @@ import { ProfileOverlay } from "../targets/ProfileOverlay";
 import { useMeasurementPipeline } from "../vision/useMeasurementPipeline";
 import type { ToolDependencies } from "../voice/tools/types";
 import type { Caption } from "../voice/useVoiceSession";
+import { NOTICES, speakNotice } from "../voice/spokenNotice";
 import { StabilityStatus } from "../wobble/StabilityStatus";
 import type { WobbleReading } from "../wobble/types";
 import { Captions } from "./Captions";
@@ -42,7 +43,7 @@ export type LiveSessionProps = {
   setup: SetupStore;
   /** Filled with the live parts of the voice tools while this session is on screen. */
   toolBridge: MutableRefObject<Partial<ToolDependencies>>;
-  voice: { available: boolean; state: string; captions: Caption[] };
+  voice: { available: boolean; state: string; failure: string | null; captions: Caption[]; restart(): Promise<void> };
   /** False while the measurement gate is closed: sizes are never shown, only shapes. */
   sizesEnabled: boolean;
   measurementsUnverified: boolean;
@@ -123,20 +124,43 @@ export function LiveSession(props: LiveSessionProps) {
 
   useEffect(() => () => detector?.dispose(), [detector]);
 
-  async function startCamera(): Promise<void> {
+  // When the camera is interrupted (app switch, lock screen), try once to resume without a tap as soon
+  // as the page is visible again; if that fails, say out loud that one tap is needed.
+  const resumeTriedRef = useRef(false);
+  useEffect(() => {
+    if (!camera.interrupted) {
+      resumeTriedRef.current = false;
+      return;
+    }
+    const tryResume = () => {
+      if (document.visibilityState !== "visible" || resumeTriedRef.current) return;
+      resumeTriedRef.current = true;
+      void startCamera().then((resumed) => {
+        if (!resumed) speakNotice(NOTICES.cameraStopped);
+      });
+    };
+    tryResume();
+    document.addEventListener("visibilitychange", tryResume);
+    return () => document.removeEventListener("visibilitychange", tryResume);
+    // startCamera is stable enough here: it only reads refs and the camera hook.
+    // oxlint-disable-next-line react-hooks/exhaustive-deps
+  }, [camera.interrupted]);
+
+  async function startCamera(): Promise<boolean> {
     const settings = await camera.start();
-    if (!settings) return;
+    if (!settings) return false;
     props.onCameraReady();
-    if (!cameraOnly && videoRef.current) pipeline.start(videoRef.current, settings);
+    if (!cameraOnly && videoRef.current) pipeline.start(videoRef.current);
     window.setTimeout(() => {
       if (videoRef.current) plateRef.current = safeCapture(videoRef.current);
     }, PLATE_STILL_DELAY_MS);
+    return true;
   }
 
   async function switchCamera(): Promise<void> {
     const settings = await camera.switchFacing();
     if (!settings) return;
-    if (!cameraOnly && videoRef.current) pipeline.start(videoRef.current, settings);
+    if (!cameraOnly && videoRef.current) pipeline.start(videoRef.current);
     // A different lens sees the wheel from a different place: the scale no longer applies.
     applyScale(null);
     setup.setCalibration("none");
@@ -379,7 +403,13 @@ export function LiveSession(props: LiveSessionProps) {
           onRetry={() => updateWheel(null)}
         />
       )}
-      {voice.available && <Captions state={voice.state} captions={voice.captions} />}
+      {voice.available && <Captions state={voice.state} failure={voice.failure} captions={voice.captions} />}
+      {voice.failure === "unavailable" && (
+        // The one tap a lost connection needs: the whole screen is the target, reachable with a knuckle.
+        <button type="button" className="tap-anywhere" onClick={() => void voice.restart()}>
+          Voice coach lost. Tap anywhere once to reconnect.
+        </button>
+      )}
 
       <SetupChecklist
         slots={slots}
