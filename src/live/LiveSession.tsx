@@ -366,7 +366,6 @@ export function LiveSession(props: LiveSessionProps) {
         <video
           ref={videoRef}
           className={mirrored ? "mirrored" : undefined}
-          autoPlay
           muted
           playsInline
           aria-label={camera.facing === "user" ? "Front camera preview" : "Rear camera preview"}
