@@ -46,7 +46,7 @@ export class CueArbiter {
       return "USER_SPEAKING";
     if (cue.evidenceIds.some((id) => this.spokenEvidence.has(`${cue.policyId}:${id}`))) return "DUPLICATE_EVIDENCE";
     if (cue.priority > 1 && now - this.lastGlobalSpokenAt < 20_000) return "GLOBAL_COOLDOWN";
-    const policyCooldown = cue.priority === 5 ? 180_000 : 60_000;
+    const policyCooldown = cue.cooldownMs ?? (cue.priority === 5 ? 180_000 : 60_000);
     if (now - (this.lastPolicySpokenAt.get(cue.policyId) ?? -Infinity) < policyCooldown) return "POLICY_COOLDOWN";
     return null;
   }

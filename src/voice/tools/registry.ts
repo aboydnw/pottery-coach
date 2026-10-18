@@ -4,6 +4,7 @@ import { proportionsOf, toMm } from "../../measurement/scale";
 import type { StableDimensionReading } from "../../measurement/types";
 import { compareProfiles, compareShape } from "../../targets/compareProfiles";
 import { median } from "../../shared/stats";
+import { toMillimetres } from "../../setup/setupSlots";
 import type { ToolDependencies } from "./types";
 
 const FRESH_MS = 750;
@@ -24,6 +25,13 @@ const confirmedSchema = z.object({ confirmed: z.boolean() }).strict();
 const markerSchema = z
   .object({ side: z.enum(["left", "right"]), direction: z.enum(["in", "out"]), size: z.enum(["small", "large"]) })
   .strict();
+
+const trueSizeSchema = z
+  .object({ dimension: z.enum(["height", "width"]), value: z.number().positive(), unit: z.enum(["mm", "cm", "in"]) })
+  .strict();
+const verdictSchema = z.object({ verdict: z.enum(["helpful", "wrong", "not-now"]) }).strict();
+const noteSchema = z.object({ text: z.string().trim().min(1).max(300), lasting: z.boolean() }).strict();
+const forgetSchema = z.object({ text: z.string().trim().min(1), confirmed: z.boolean() }).strict();
 
 const NOT_NOW = { available: false, reason: "That isn't available right now." };
 
@@ -220,6 +228,46 @@ export function createToolRegistry(dependencies: ToolDependencies) {
       dependencies.markMoment
         ? dependencies.markMoment(parse(z.object({ label: z.string().max(100).optional() }).strict(), input))
         : NOT_NOW,
+    nextPiece: async (input) => {
+      const { confirmed } = parse(confirmedSchema, input);
+      if (!dependencies.nextPiece) return NOT_NOW;
+      if (!confirmed) {
+        return {
+          needsConfirmation: "Ask: save this pot to your log and start the next one? You'll lift this one off first.",
+        };
+      }
+      await dependencies.nextPiece();
+      return { started: true, next: "Tell them to lift the pot off; the app says when it has seen the empty wheel." };
+    },
+    reportTrueSize: async (input) => {
+      const { dimension, value, unit } = parse(trueSizeSchema, input);
+      if (!dependencies.reportTrueSize) return NOT_NOW;
+      const trueMm = toMillimetres({ value, unit });
+      const { appMm } = await dependencies.reportTrueSize(dimension, trueMm);
+      return { recorded: true, trueMm, appMm: appMm === null ? null : round(appMm) };
+    },
+    rateLastCue: async (input) => {
+      const { verdict } = parse(verdictSchema, input);
+      if (!dependencies.rateLastCue) return NOT_NOW;
+      return (await dependencies.rateLastCue(verdict))
+        ? { recorded: true }
+        : { recorded: false, reason: "No cue yet." };
+    },
+    rememberNote: async (input) => {
+      const { text, lasting } = parse(noteSchema, input);
+      if (!dependencies.notes) return NOT_NOW;
+      await dependencies.notes.remember(text, lasting);
+      return { remembered: true, lasting };
+    },
+    forgetNote: async (input) => {
+      const { text, confirmed } = parse(forgetSchema, input);
+      if (!dependencies.notes) return NOT_NOW;
+      const match = await dependencies.notes.find(text);
+      if (!match) return { found: false };
+      if (!confirmed) return { found: true, match: match.text, needsConfirmation: "Ask: forget this note?" };
+      await dependencies.notes.forget(match.id);
+      return { forgotten: match.text };
+    },
     endSession: async (input) => {
       const { confirmed } = parse(confirmedSchema, input);
       if (!dependencies.endSession) return NOT_NOW;

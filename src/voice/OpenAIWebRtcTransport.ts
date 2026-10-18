@@ -28,7 +28,7 @@ export class OpenAIWebRtcTransport implements RealtimeCoachTransport {
 
   constructor(private readonly dependencies: Dependencies = defaults) {}
 
-  async connect(_config: RealtimeSessionConfig): Promise<void> {
+  async connect(config: RealtimeSessionConfig): Promise<void> {
     this.closed = false;
     const peer = this.dependencies.createPeer();
     let stream: MediaStream | null = null;
@@ -62,7 +62,12 @@ export class OpenAIWebRtcTransport implements RealtimeCoachTransport {
           ...(accessToken ? { authorization: `Bearer ${accessToken}` } : {}),
         },
         credentials: "same-origin",
-        body: JSON.stringify({ sdp: offer.sdp, sessionId: crypto.randomUUID(), clientConfigVersion: "voice-v1" }),
+        body: JSON.stringify({
+          sdp: offer.sdp,
+          sessionId: crypto.randomUUID(),
+          clientConfigVersion: "voice-v1",
+          ...(config.potterContext ? { potterContext: config.potterContext } : {}),
+        }),
       });
       if (!response.ok) throw new RealtimeSessionError(response.status);
       await peer.setRemoteDescription({ type: "answer", sdp: await response.text() });
@@ -92,10 +97,31 @@ export class OpenAIWebRtcTransport implements RealtimeCoachTransport {
     this.send({ type: "response.create" });
   }
 
+  async updateInstructions(instructions: string): Promise<void> {
+    this.send({ type: "session.update", session: { type: "realtime", instructions } });
+  }
+
+  /**
+   * Says one approved line as an out-of-band reply: it doesn't re-read the conversation, so a cue
+   * costs a few hundred tokens. A short note then tells the coach what it said, for follow-ups.
+   */
   async speakApprovedCue(cue: ApprovedCue): Promise<void> {
     this.send({
       type: "response.create",
-      response: { instructions: cue.text, metadata: { cueId: cue.id, evidenceIds: cue.evidenceIds } },
+      response: {
+        conversation: "none",
+        input: [],
+        instructions: `Say exactly this to the potter, in your usual voice, and nothing else: "${cue.text}"`,
+        metadata: { cueId: cue.id },
+      },
+    });
+    this.send({
+      type: "conversation.item.create",
+      item: {
+        type: "message",
+        role: "system",
+        content: [{ type: "input_text", text: `You just told the potter, unprompted: "${cue.text}"` }],
+      },
     });
   }
   async cancelOutput(reason: string): Promise<void> {

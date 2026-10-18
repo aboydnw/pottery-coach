@@ -253,3 +253,24 @@ it("marks a refused passphrase as not worth retrying", async () => {
   });
   await expect(transport.connect(config)).rejects.toMatchObject({ status: 401, retryable: false });
 });
+
+it("speaks a cue as a one-off reply that skips the conversation, then notes it", async () => {
+  const { peer, channel } = fakePeer();
+  const transport = new OpenAIWebRtcTransport({
+    createPeer: () => peer,
+    getUserMedia: vi.fn().mockResolvedValue(fakeStream().stream),
+    createAudio: audio,
+    fetch: vi.fn().mockResolvedValue(new Response("v=0 answer")),
+  });
+  await transport.connect(config);
+
+  await transport.speakApprovedCue({ id: "cue-1", text: "Top's flaring.", evidenceIds: ["r1"] });
+
+  const sent = (channel.send as ReturnType<typeof vi.fn>).mock.calls.map(([message]) => JSON.parse(String(message)));
+  expect(sent.at(-2)).toMatchObject({
+    type: "response.create",
+    response: { conversation: "none", input: [], metadata: { cueId: "cue-1" } },
+  });
+  expect(sent.at(-2).response.instructions).toContain("Top's flaring.");
+  expect(sent.at(-1)).toMatchObject({ type: "conversation.item.create", item: { role: "system" } });
+});

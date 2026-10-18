@@ -213,3 +213,53 @@ it("says when a tool isn't available at this point in the session", async () => 
     available: false,
   });
 });
+
+it("asks before starting the next piece", async () => {
+  const nextPiece = vi.fn(async () => undefined);
+  const registry = createToolRegistry(dependencies({ nextPiece }));
+  await expect(registry.call("nextPiece", { confirmed: false })).resolves.toHaveProperty("needsConfirmation");
+  expect(nextPiece).not.toHaveBeenCalled();
+  await expect(registry.call("nextPiece", { confirmed: true })).resolves.toMatchObject({ started: true });
+  expect(nextPiece).toHaveBeenCalledOnce();
+});
+
+it("converts a measured size in code before logging it", async () => {
+  const reportTrueSize = vi.fn(async () => ({ appMm: 141.26 }));
+  const registry = createToolRegistry(dependencies({ reportTrueSize }));
+  await expect(registry.call("reportTrueSize", { dimension: "height", value: 14.5, unit: "cm" })).resolves.toEqual({
+    recorded: true,
+    trueMm: 145,
+    appMm: 141.3,
+  });
+  expect(reportTrueSize).toHaveBeenCalledWith("height", 145);
+});
+
+it("records a reaction to the last cue, or says there was none", async () => {
+  const rateLastCue = vi.fn(async () => true);
+  await expect(
+    createToolRegistry(dependencies({ rateLastCue })).call("rateLastCue", { verdict: "wrong" }),
+  ).resolves.toEqual({
+    recorded: true,
+  });
+  rateLastCue.mockResolvedValueOnce(false);
+  await expect(
+    createToolRegistry(dependencies({ rateLastCue })).call("rateLastCue", { verdict: "helpful" }),
+  ).resolves.toMatchObject({ recorded: false });
+});
+
+it("remembers notes and confirms before forgetting one", async () => {
+  const notes = {
+    remember: vi.fn(async () => undefined),
+    find: vi.fn(async () => ({ id: "n1", text: "Quiet while I pull" })),
+    forget: vi.fn(async () => undefined),
+  };
+  const registry = createToolRegistry(dependencies({ notes }));
+  await registry.call("rememberNote", { text: "Quiet while I pull", lasting: true });
+  expect(notes.remember).toHaveBeenCalledWith("Quiet while I pull", true);
+  await expect(registry.call("forgetNote", { text: "pulling", confirmed: false })).resolves.toMatchObject({
+    match: "Quiet while I pull",
+  });
+  expect(notes.forget).not.toHaveBeenCalled();
+  await registry.call("forgetNote", { text: "pulling", confirmed: true });
+  expect(notes.forget).toHaveBeenCalledWith("n1");
+});

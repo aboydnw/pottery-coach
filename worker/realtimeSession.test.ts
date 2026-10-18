@@ -111,3 +111,15 @@ it("adds speech-to-text for captions only when a transcription model is configur
   );
   expect(configured.audio.input.transcription).toEqual({ model: "gpt-live-transcribe" });
 });
+
+it("appends what the coach knows about the potter, within a size cap", async () => {
+  const deps = dependencies();
+  await handleRealtimeSession(requestBody({ ...body, potterContext: "- Quiet while I pull walls" }), deps);
+  const form = (deps.fetch as ReturnType<typeof vi.fn>).mock.calls[0]![1].body as FormData;
+  expect(JSON.parse(String(form.get("session"))).instructions).toContain("- Quiet while I pull walls");
+
+  const tooLong = dependencies();
+  const response = await handleRealtimeSession(requestBody({ ...body, potterContext: "x".repeat(5_000) }), tooLong);
+  expect(response.status).toBe(400);
+  expect(tooLong.fetch).not.toHaveBeenCalled();
+});

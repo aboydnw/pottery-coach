@@ -130,6 +130,64 @@ export const REALTIME_TOOL_DEFINITIONS = [
   },
   {
     type: "function",
+    name: "nextPiece",
+    description:
+      "Save the current pot to the throw log and start the next one; the empty wheel is looked at again. Call with confirmed: false first, then confirmed: true after the potter agrees.",
+    parameters: confirmed,
+  },
+  {
+    type: "function",
+    name: "reportTrueSize",
+    description:
+      "Record a size the potter measured themselves (numbers and units exactly as spoken), to check the app's accuracy. Doesn't change any readings.",
+    parameters: {
+      type: "object",
+      properties: {
+        dimension: { enum: ["height", "width"] },
+        value: { type: "number" },
+        unit: { enum: ["mm", "cm", "in"] },
+      },
+      required: ["dimension", "value", "unit"],
+      additionalProperties: false,
+    },
+  },
+  {
+    type: "function",
+    name: "rateLastCue",
+    description: "Record how the potter reacted to the most recent unprompted cue.",
+    parameters: {
+      type: "object",
+      properties: { verdict: { enum: ["helpful", "wrong", "not-now"] } },
+      required: ["verdict"],
+      additionalProperties: false,
+    },
+  },
+  {
+    type: "function",
+    name: "rememberNote",
+    description:
+      "Remember something the potter said, in their words, under 100 characters. lasting: true for preferences and things they're working on in general (kept across sessions); false for this pot only.",
+    parameters: {
+      type: "object",
+      properties: { text: { type: "string" }, lasting: { type: "boolean" } },
+      required: ["text", "lasting"],
+      additionalProperties: false,
+    },
+  },
+  {
+    type: "function",
+    name: "forgetNote",
+    description:
+      "Forget a lasting note. Call with confirmed: false to find the closest match and read it back, then confirmed: true after a yes.",
+    parameters: {
+      type: "object",
+      properties: { text: { type: "string" }, confirmed: { type: "boolean" } },
+      required: ["text", "confirmed"],
+      additionalProperties: false,
+    },
+  },
+  {
+    type: "function",
     name: "endSession",
     description:
       "End the session. Call with confirmed: false first to get the consequence to read out; call with confirmed: true only after the potter agrees.",

@@ -42,4 +42,15 @@ export type ToolDependencies = {
   markMoment?(input: { label?: string }): Promise<MarkedMoment>;
   endSession?(): Promise<void>;
   getSessionSummary?(): Promise<SpokenSummary | null>;
+  /** Closes the current piece and re-learns the empty wheel for the next one. */
+  nextPiece?(): Promise<void>;
+  /** Logs a size the potter measured next to what the app read; returns the app's value. */
+  reportTrueSize?(dimension: "height" | "width", trueMm: number): Promise<{ appMm: number | null }>;
+  /** False when no cue has been given on this piece yet. */
+  rateLastCue?(verdict: "helpful" | "wrong" | "not-now"): Promise<boolean>;
+  notes?: {
+    remember(text: string, lasting: boolean): Promise<void>;
+    find(text: string): Promise<{ id: string; text: string } | null>;
+    forget(id: string): Promise<void>;
+  };
 };

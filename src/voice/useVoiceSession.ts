@@ -2,10 +2,16 @@ import { useEffect, useRef, useState } from "react";
 import { CaptionPacer } from "./captionPacer";
 import { ConversationController, type ConversationFailure } from "./ConversationController";
 import { NOTICES, primeSpokenNotices, speakNotice } from "./spokenNotice";
-import type { ConversationState, RealtimeCoachTransport, RealtimeSessionConfig } from "./types";
+import type { ConversationState, ProviderUsage, RealtimeCoachTransport, RealtimeSessionConfig } from "./types";
 
 export type Caption = { id: string; speaker: "user" | "assistant"; text: string; final: boolean };
 export type ToolRunner = { call(name: string, input: unknown): Promise<unknown> };
+export type VoiceSessionOptions = {
+  /** Token usage after each reply, for the throw log's cost estimate. */
+  onUsage?(usage: ProviderUsage): void;
+  /** What the coach should know about the potter when a call starts. */
+  getPotterContext?(): string;
+};
 
 const MAX_CAPTIONS = 4;
 const CAPTION_TICK_MS = 100;
@@ -28,9 +34,15 @@ const SESSION_CONFIG: RealtimeSessionConfig = {
  * Runs one spoken conversation: connects through the transport factory, answers the model's tool
  * calls with `tools`, and keeps recent captions. Works with any transport, including the mock.
  */
-export function useVoiceSession(createTransport: (() => RealtimeCoachTransport) | null, tools: ToolRunner) {
+export function useVoiceSession(
+  createTransport: (() => RealtimeCoachTransport) | null,
+  tools: ToolRunner,
+  options: VoiceSessionOptions = {},
+) {
   const controllerRef = useRef<ConversationController | null>(null);
   const toolsRef = useRef(tools);
+  const optionsRef = useRef(options);
+  const speakingRef = useRef({ potter: false, coach: false });
   const [state, setState] = useState<ConversationState | "off">("off");
   const [captions, setCaptions] = useState<Caption[]>([]);
   const [failure, setFailure] = useState<VoiceFailure | null>(null);
@@ -41,6 +53,7 @@ export function useVoiceSession(createTransport: (() => RealtimeCoachTransport) 
 
   useEffect(() => {
     toolsRef.current = tools;
+    optionsRef.current = options;
   });
 
   useEffect(
@@ -85,6 +98,9 @@ export function useVoiceSession(createTransport: (() => RealtimeCoachTransport) 
       }
     });
     controller.onEvent((event) => {
+      if (event.type === "usage") optionsRef.current.onUsage?.(event.usage);
+      if (event.type === "speech-started") speakingRef.current.potter = true;
+      if (event.type === "speech-stopped") speakingRef.current.potter = false;
       if (event.type === "tool-call") {
         void toolsRef.current
           .call(event.name, event.arguments)
@@ -102,11 +118,13 @@ export function useVoiceSession(createTransport: (() => RealtimeCoachTransport) 
         showCaptions();
       }
       if (event.type === "output-started") {
+        speakingRef.current.coach = true;
         pacerRef.current.audioStarted(performance.now());
         if (hangUpRef.current) hangUpRef.current.heardReply = true;
         showCaptions();
       }
       if (event.type === "output-stopped") {
+        speakingRef.current.coach = false;
         const finished = event.reason === undefined || event.reason === "finished";
         pacerRef.current.audioStopped(performance.now(), !finished);
         showCaptions();
@@ -119,7 +137,26 @@ export function useVoiceSession(createTransport: (() => RealtimeCoachTransport) 
         speakNotice(NOTICES.timeLimit);
       });
     }, MAX_CALL_MS);
-    await controller.connect(config);
+    const potterContext = optionsRef.current.getPotterContext?.();
+    await controller.connect(potterContext ? { ...config, potterContext } : config);
+  }
+
+  /** Whether someone is talking right now, so cues wait their turn. */
+  function isBusy(): boolean {
+    return speakingRef.current.potter || speakingRef.current.coach;
+  }
+
+  /** Speaks one approved cue line in the coach's voice; false when there's no call to speak on. */
+  function speakCue(id: string, text: string): boolean {
+    const controller = controllerRef.current;
+    if (!controller || controller.getState() !== "connected") return false;
+    void controller.speakCue({ id, text, evidenceIds: [] });
+    return true;
+  }
+
+  /** Tells the coach what it now knows about the potter (notes changed mid-call). */
+  function setPotterContext(potterContext: string): void {
+    void controllerRef.current?.setPotterContext(potterContext);
   }
 
   async function stop(): Promise<void> {
@@ -127,6 +164,7 @@ export function useVoiceSession(createTransport: (() => RealtimeCoachTransport) 
     controllerRef.current = null;
     if (hangUpRef.current) clearTimeout(hangUpRef.current.timer);
     hangUpRef.current = null;
+    speakingRef.current = { potter: false, coach: false };
     if (callLimitRef.current) clearTimeout(callLimitRef.current);
     callLimitRef.current = null;
     await controller?.close();
@@ -145,5 +183,17 @@ export function useVoiceSession(createTransport: (() => RealtimeCoachTransport) 
     await start();
   }
 
-  return { available: createTransport !== null, state, failure, captions, start, stop, restart, hangUpAfterReply };
+  return {
+    available: createTransport !== null,
+    state,
+    failure,
+    captions,
+    start,
+    stop,
+    restart,
+    hangUpAfterReply,
+    isBusy,
+    speakCue,
+    setPotterContext,
+  };
 }

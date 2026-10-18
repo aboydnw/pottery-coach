@@ -18,6 +18,10 @@ export class MockRealtimeTransport implements RealtimeCoachTransport {
   async startResponse(): Promise<void> {
     this.startedResponses.push(performance.now());
   }
+  readonly instructionUpdates: string[] = [];
+  async updateInstructions(instructions: string): Promise<void> {
+    this.instructionUpdates.push(instructions);
+  }
   async speakApprovedCue(cue: ApprovedCue): Promise<void> {
     this.spokenCues.push(cue);
   }
