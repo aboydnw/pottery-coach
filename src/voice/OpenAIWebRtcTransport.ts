@@ -186,6 +186,16 @@ export function mapProviderEvent(raw: Record<string, unknown>, transcripts: Map<
   const timestampMs = performance.now();
   if (raw.type === "input_audio_buffer.speech_started") return { type: "speech-started", timestampMs };
   if (raw.type === "input_audio_buffer.speech_stopped") return { type: "speech-stopped", timestampMs };
+  // WebRTC reports when the coach's audio actually plays, which is what captions are timed to.
+  if (raw.type === "output_audio_buffer.started")
+    return { type: "output-started", itemId: String(raw.response_id ?? ""), timestampMs };
+  if (raw.type === "output_audio_buffer.stopped" || raw.type === "output_audio_buffer.cleared")
+    return {
+      type: "output-stopped",
+      itemId: String(raw.response_id ?? ""),
+      timestampMs,
+      reason: raw.type === "output_audio_buffer.cleared" ? "interrupted" : "finished",
+    };
   if (
     raw.type === "response.function_call_arguments.done" &&
     typeof raw.call_id === "string" &&

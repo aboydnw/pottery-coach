@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { CaptionPacer } from "./captionPacer";
 import { ConversationController, type ConversationFailure } from "./ConversationController";
 import { NOTICES, primeSpokenNotices, speakNotice } from "./spokenNotice";
 import type { ConversationState, RealtimeCoachTransport, RealtimeSessionConfig } from "./types";
@@ -7,6 +8,9 @@ export type Caption = { id: string; speaker: "user" | "assistant"; text: string;
 export type ToolRunner = { call(name: string, input: unknown): Promise<unknown> };
 
 const MAX_CAPTIONS = 4;
+const CAPTION_TICK_MS = 100;
+/** Hang up anyway if the goodbye never finishes playing. */
+const HANG_UP_TIMEOUT_MS = 20_000;
 const SESSION_CONFIG: RealtimeSessionConfig = {
   provider: "openai",
   model: "server-owned",
@@ -26,12 +30,35 @@ export function useVoiceSession(createTransport: (() => RealtimeCoachTransport) 
   const [state, setState] = useState<ConversationState | "off">("off");
   const [captions, setCaptions] = useState<Caption[]>([]);
   const [failure, setFailure] = useState<ConversationFailure | null>(null);
+  const pacerRef = useRef(new CaptionPacer(MAX_CAPTIONS));
+  const tickerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const hangUpRef = useRef<{ heardReply: boolean; timer: ReturnType<typeof setTimeout> } | null>(null);
 
   useEffect(() => {
     toolsRef.current = tools;
   });
 
-  useEffect(() => () => void controllerRef.current?.close(), []);
+  useEffect(
+    () => () => {
+      clearCaptionTicker();
+      if (hangUpRef.current) clearTimeout(hangUpRef.current.timer);
+      void controllerRef.current?.close();
+    },
+    // oxlint-disable-next-line react-hooks/exhaustive-deps
+    [],
+  );
+
+  function showCaptions(): void {
+    const pacer = pacerRef.current;
+    setCaptions(pacer.visible(performance.now()));
+    if (!pacer.isRevealing()) clearCaptionTicker();
+    else tickerRef.current ??= setInterval(showCaptions, CAPTION_TICK_MS);
+  }
+
+  function clearCaptionTicker(): void {
+    if (tickerRef.current !== null) clearInterval(tickerRef.current);
+    tickerRef.current = null;
+  }
 
   async function start(config: RealtimeSessionConfig = SESSION_CONFIG): Promise<void> {
     if (!createTransport || controllerRef.current) return;
@@ -39,6 +66,8 @@ export function useVoiceSession(createTransport: (() => RealtimeCoachTransport) 
     primeSpokenNotices();
     const controller = new ConversationController(createTransport);
     controllerRef.current = controller;
+    pacerRef.current = new CaptionPacer(MAX_CAPTIONS);
+    setCaptions([]);
     setFailure(null);
     controller.onStateChange((next) => {
       setState(next);
@@ -63,7 +92,19 @@ export function useVoiceSession(createTransport: (() => RealtimeCoachTransport) 
           text: event.text,
           final: event.type === "transcript-final",
         };
-        setCaptions((current) => [...current.filter((item) => item.id !== caption.id), caption].slice(-MAX_CAPTIONS));
+        pacerRef.current.update(caption, performance.now());
+        showCaptions();
+      }
+      if (event.type === "output-started") {
+        pacerRef.current.audioStarted(performance.now());
+        if (hangUpRef.current) hangUpRef.current.heardReply = true;
+        showCaptions();
+      }
+      if (event.type === "output-stopped") {
+        const finished = event.reason === undefined || event.reason === "finished";
+        pacerRef.current.audioStopped(performance.now(), !finished);
+        showCaptions();
+        if (finished && hangUpRef.current?.heardReply) void stop();
       }
     });
     await controller.connect(config);
@@ -72,8 +113,16 @@ export function useVoiceSession(createTransport: (() => RealtimeCoachTransport) 
   async function stop(): Promise<void> {
     const controller = controllerRef.current;
     controllerRef.current = null;
+    if (hangUpRef.current) clearTimeout(hangUpRef.current.timer);
+    hangUpRef.current = null;
     await controller?.close();
     setState("off");
+  }
+
+  /** Lets the coach finish its next reply (the goodbye), then ends the call. */
+  function hangUpAfterReply(): void {
+    if (!controllerRef.current || hangUpRef.current) return;
+    hangUpRef.current = { heardReply: false, timer: setTimeout(() => void stop(), HANG_UP_TIMEOUT_MS) };
   }
 
   /** Tries again after a failure; called from the one tap the failure notice asks for. */
@@ -82,5 +131,5 @@ export function useVoiceSession(createTransport: (() => RealtimeCoachTransport) 
     await start();
   }
 
-  return { available: createTransport !== null, state, failure, captions, start, stop, restart };
+  return { available: createTransport !== null, state, failure, captions, start, stop, restart, hangUpAfterReply };
 }

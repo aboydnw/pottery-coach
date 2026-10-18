@@ -135,7 +135,10 @@ export function SessionFlow() {
     void voice.start();
   }
 
-  async function endSession(): Promise<void> {
+  async function endSession({ byVoice = false }: { byVoice?: boolean } = {}): Promise<void> {
+    // Ending by touch hangs up straight away; by voice, the coach says goodbye first.
+    if (byVoice) voice.hangUpAfterReply();
+    else void voice.stop();
     const stored = resolveRecordedSizes(await recording.end());
     bundleRef.current = stored;
     setBundle(stored);
@@ -263,7 +266,7 @@ export function SessionFlow() {
         onScale={(scale) => void recording.setScale(scale)}
         onGoal={(goal) => void recording.setGoal(goal)}
         onMarkMoment={() => recording.markMoment()}
-        onEnd={() => void endSession()}
+        onEnd={endSession}
       />
     </>
   );

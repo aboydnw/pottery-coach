@@ -227,7 +227,11 @@ export function createToolRegistry(dependencies: ToolDependencies) {
         return { needsConfirmation: "Ask: end the session now? The camera stops and you'll hear a short summary." };
       }
       await dependencies.endSession();
-      return { ended: true, next: "Call getSessionSummary and give a short spoken debrief." };
+      return {
+        ended: true,
+        summary: (await dependencies.getSessionSummary?.()) ?? null,
+        next: "Give a debrief of one or two sentences from the summary, then say goodbye. The call ends when you finish.",
+      };
     },
     getSessionSummary: async (input) => {
       parse(empty, input);

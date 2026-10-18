@@ -33,6 +33,11 @@ export async function endSession(page: Page) {
   await expect(page.getByRole("heading", { name: /throw complete/i })).toBeVisible();
 }
 
+/** Whether the app still has the scripted voice call open. */
+export function voiceConnected(page: Page): Promise<boolean> {
+  return page.evaluate(() => window.__potteryVoice?.connected ?? false);
+}
+
 /** Plays the voice model's part in demo mode: calls a tool and returns the app's answer. */
 export function voiceTool<T = Record<string, unknown>>(
   page: Page,

@@ -178,6 +178,22 @@ it("sends the field-test access token as a bearer header", async () => {
   expect(fetch.mock.calls[0]![1].headers).toMatchObject({ authorization: "Bearer field-token" });
 });
 
+it("reports when the coach's audio starts, finishes, or is cut off", () => {
+  const transcripts = new Map<string, string>();
+  expect(mapProviderEvent({ type: "output_audio_buffer.started", response_id: "r1" }, transcripts)).toMatchObject({
+    type: "output-started",
+    itemId: "r1",
+  });
+  expect(mapProviderEvent({ type: "output_audio_buffer.stopped", response_id: "r1" }, transcripts)).toMatchObject({
+    type: "output-stopped",
+    reason: "finished",
+  });
+  expect(mapProviderEvent({ type: "output_audio_buffer.cleared", response_id: "r1" }, transcripts)).toMatchObject({
+    type: "output-stopped",
+    reason: "interrupted",
+  });
+});
+
 it("builds captions from transcript pieces and reports usage", () => {
   const transcripts = new Map<string, string>();
   expect(

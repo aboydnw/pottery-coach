@@ -196,6 +196,22 @@ it("asks before ending or deleting a session", async () => {
   expect(deleteSession).toHaveBeenCalledOnce();
 });
 
+it("hands the coach the summary when the session ends, for a goodbye debrief", async () => {
+  const summary = {
+    durationMinutes: 12,
+    sizesAvailable: true,
+    peakHeightMm: 150,
+    finalHeightMm: 148,
+    finalMaximumWidthMm: 90,
+    goalHeightMm: 150,
+    markedMoments: 1,
+  };
+  const registry = createToolRegistry(
+    dependencies({ endSession: async () => undefined, getSessionSummary: async () => summary }),
+  );
+  await expect(registry.call("endSession", { confirmed: true })).resolves.toMatchObject({ ended: true, summary });
+});
+
 it("says when a tool isn't available at this point in the session", async () => {
   await expect(createToolRegistry(dependencies()).call("getSessionSummary", {})).resolves.toMatchObject({
     available: false,

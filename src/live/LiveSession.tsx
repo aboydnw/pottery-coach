@@ -58,7 +58,8 @@ export type LiveSessionProps = {
   onScale(scale: SessionScale | null): void;
   onGoal(goal: GoalConfirmation): void;
   onMarkMoment(): Promise<{ id: string; timestampMs: number }>;
-  onEnd(): void;
+  /** Ends the session; `byVoice` lets the coach say goodbye before the call closes. */
+  onEnd(options?: { byVoice?: boolean }): Promise<void>;
 };
 
 /**
@@ -290,7 +291,7 @@ export function LiveSession(props: LiveSessionProps) {
       wheel: { check: checkWheel, adjust: adjustWheel, confirm: confirmWheel, skip: skipWheel },
       setPaused,
       markMoment: ({ label }) => markMoment().then((moment) => (label ? { ...moment, label } : moment)),
-      endSession: async () => props.onEnd(),
+      endSession: () => props.onEnd({ byVoice: true }),
     };
   });
 
@@ -484,7 +485,7 @@ export function LiveSession(props: LiveSessionProps) {
           <h2 id="end-confirm-title">End this session?</h2>
           <p>The camera stops and you'll see the review.</p>
           <div className="session-actions">
-            <button type="button" onClick={props.onEnd}>
+            <button type="button" onClick={() => void props.onEnd()}>
               End session and review
             </button>
             <button type="button" className="secondary" onClick={() => setConfirmingEnd(false)}>
