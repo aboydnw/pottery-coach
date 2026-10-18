@@ -16,7 +16,8 @@ test("calibrates from the wheel head by touch: size, edges, confirm", async ({ p
   expect(Math.abs((await sliderValue(page, /left edge/i)) - WHEEL_SCENE.leftX)).toBeLessThanOrEqual(10);
   expect(Math.abs((await sliderValue(page, /right edge/i)) - WHEEL_SCENE.rightX)).toBeLessThanOrEqual(10);
   await page.getByRole("button", { name: /looks right/i }).click();
-  await expect(page.locator("details.setup-checklist summary")).toContainText(/sizes are in centimetres/i);
+  await openSetup(page);
+  await expect(page.locator(".setup-summary")).toContainText(/sizes are in centimetres/i);
 });
 
 test("calibrates from the wheel head entirely by voice", async ({ page }) => {
@@ -29,7 +30,8 @@ test("calibrates from the wheel head entirely by voice", async ({ page }) => {
   await expect.poll(() => sliderValue(page, /left edge/i)).toBeLessThan(before);
   await voiceTool(page, "adjustWheelMarker", { side: "left", direction: "in", size: "small" });
   await expect(voiceTool(page, "confirmWheelHead")).resolves.toMatchObject({ accepted: true });
-  await expect(page.locator("details.setup-checklist summary")).toContainText(/sizes are in centimetres/i);
+  await openSetup(page);
+  await expect(page.locator(".setup-summary")).toContainText(/sizes are in centimetres/i);
   await expect(page.getByRole("heading", { name: /check the wheel-head edges/i })).toHaveCount(0);
 });
 

@@ -10,6 +10,6 @@ test("confirms a fired tapered target with an explicit shrinkage equation", asyn
   await page.getByRole("button", { name: /review goal/i }).click();
   await expect(page.getByText(/340\.91/)).toBeVisible();
   await page.getByRole("button", { name: /confirm goal/i }).click();
-  await expect(page.locator("details.setup-checklist summary")).toContainText(/tapered cylinder, goal 30 cm fired/i);
+  await expect(page.locator(".setup-summary")).toContainText(/tapered cylinder, goal 30 cm fired/i);
   await expect(page.getByRole("region", { name: /live target comparison/i })).toBeVisible();
 });

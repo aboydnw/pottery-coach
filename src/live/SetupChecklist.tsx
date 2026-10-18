@@ -7,8 +7,6 @@ import type { TargetProfile } from "../targets/types";
 type Props = {
   slots: SetupSlots;
   templates: TargetProfile[];
-  /** Open by default when there is no voice coach to do setup by conversation. */
-  defaultOpen: boolean;
   calibration: ReactNode;
   onTargetChange(targetId: string): void;
   onGoal(goal: GoalConfirmation): void;
@@ -18,13 +16,15 @@ type Props = {
  * The setup slots at a glance, with on-screen editing as a fallback for when voice isn't available.
  * Every edit goes into the same slots the voice coach fills.
  */
-export function SetupChecklist({ slots, templates, defaultOpen, calibration, onTargetChange, onGoal }: Props) {
+export function SetupChecklist({ slots, templates, calibration, onTargetChange, onGoal }: Props) {
   const [editingGoal, setEditingGoal] = useState(false);
   const status = setupStatus(slots);
   const goal = slots.goal?.confirmed ? slots.goal.value : null;
   return (
-    <details className="setup-checklist" open={defaultOpen}>
-      <summary>Setup: {status.summary}</summary>
+    <section className="setup-checklist" aria-labelledby="setup-summary">
+      <h2 id="setup-summary" className="setup-summary">
+        Setup: {status.summary}
+      </h2>
       <ul className="slot-list">
         <li>
           <strong>Wheel head:</strong>{" "}
@@ -66,6 +66,6 @@ export function SetupChecklist({ slots, templates, defaultOpen, calibration, onT
           }}
         />
       )}
-    </details>
+    </section>
   );
 }

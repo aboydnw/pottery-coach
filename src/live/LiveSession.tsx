@@ -84,6 +84,9 @@ export function LiveSession(props: LiveSessionProps) {
   const [problem, setProblem] = useState<string | null>(null);
   const [paused, setPaused] = useState(false);
   const [momentMarked, setMomentMarked] = useState(false);
+  // Without voice, setup has to be done by touch, so settings start open.
+  const [settingsOpen, setSettingsOpen] = useState(!voice.available);
+  const [confirmingEnd, setConfirmingEnd] = useState(false);
   const plateRef = useRef<ImageData | null>(null);
   const wheelRef = useRef<WheelCheckState | null>(null);
 
@@ -176,6 +179,8 @@ export function LiveSession(props: LiveSessionProps) {
   function updateWheel(next: WheelCheckState | null): void {
     wheelRef.current = next;
     setWheelCheck(next);
+    // The edge check is shown over the video, so get the settings sheet out of its way.
+    if (next) setSettingsOpen(false);
   }
 
   async function checkWheel(fresh: boolean) {
@@ -347,22 +352,7 @@ export function LiveSession(props: LiveSessionProps) {
       <h1 id="live-title" className="visually-hidden">
         Live session
       </h1>
-      {camera.error && <p role="alert">{camera.error}</p>}
-      {camera.interrupted && (
-        <div role="alert" className="stale-banner">
-          The camera stopped. Tap here once when your hands are clean.
-          <button type="button" onClick={() => void startCamera()}>
-            Resume camera
-          </button>
-        </div>
-      )}
-      {paused && <p className="stale-banner">Coaching is paused. Say "resume" to carry on.</p>}
-      {sizesEnabled && props.measurementsUnverified && (
-        <p className="stale-banner">Prototype: measurements are unverified and may be wrong.</p>
-      )}
-      {!sizesEnabled && <p>Sizes are disabled until the measurement gate passes; shapes still work.</p>}
-
-      <div className="live-grid">
+      <div className="live-stage">
         <video
           ref={videoRef}
           className={mirrored ? "mirrored" : undefined}
@@ -370,78 +360,146 @@ export function LiveSession(props: LiveSessionProps) {
           playsInline
           aria-label={camera.facing === "user" ? "Front camera preview" : "Rear camera preview"}
         />
-        <LiveReadouts reading={reading} sized={sized} goal={goal} />
-      </div>
-      {camera.active && (
-        <p className="capture-indicator" role="status">
-          Camera active · frames stay on this device
-        </p>
-      )}
-      {reading && (
-        <section className="live-target" aria-label={sized ? "Live target comparison" : "Live shape comparison"}>
-          <ProfileOverlay target={target} reading={sized ?? reading} mode={sized ? "millimetres" : "normalized"} />
-          {comparison && sized && goal && (
-            <GoalProgress
-              comparison={comparison}
-              heightProgress={(sized.height ?? 0) / goal.wetHeightMm}
-              onMilestone={props.onMilestone}
-            />
+        <div className="stage-top">
+          <LiveReadouts reading={reading} sized={sized} goal={goal} />
+          <div className="stage-buttons">
+            <button
+              type="button"
+              className="icon-button"
+              aria-label="Settings"
+              aria-expanded={settingsOpen}
+              aria-controls="session-settings"
+              onClick={() => setSettingsOpen((open) => !open)}
+            >
+              <span aria-hidden="true">⚙</span>
+            </button>
+            <button
+              type="button"
+              className="icon-button end"
+              aria-label="End session"
+              onClick={() => setConfirmingEnd(true)}
+            >
+              <span aria-hidden="true">■</span>
+            </button>
+          </div>
+        </div>
+        <div className="stage-banners">
+          {camera.error && <p role="alert">{camera.error}</p>}
+          {camera.interrupted && (
+            <div role="alert" className="stale-banner">
+              The camera stopped. Tap here once when your hands are clean.
+              <button type="button" onClick={() => void startCamera()}>
+                Resume camera
+              </button>
+            </div>
           )}
+          {paused && <p className="stale-banner">Coaching is paused. Say "resume" to carry on.</p>}
+          {sizesEnabled && props.measurementsUnverified && (
+            <p className="stale-banner">Prototype: measurements are unverified and may be wrong.</p>
+          )}
+          {!sizesEnabled && <p className="stale-banner">Sizes are disabled until the measurement gate passes.</p>}
+          {momentMarked && <p role="status">Moment marked locally.</p>}
+        </div>
+        {wheelCheck && (
+          // Shown over the video, not in settings: the coach asks about these lines.
+          <div className="stage-panel">
+            <WheelHeadConfirm
+              still={wheelCheck.image}
+              detection={wheelCheck.detection}
+              edges={wheelCheck.edges}
+              onEdgesChange={(edges) => updateWheel({ ...wheelCheck, edges, adjusted: true })}
+              mirrored={mirrored}
+              onConfirm={() => void confirmWheel()}
+              onRetry={() => updateWheel(null)}
+            />
+          </div>
+        )}
+        <div className="stage-bottom">
+          {voice.available && <Captions state={voice.state} failure={voice.failure} captions={voice.captions} />}
+          {camera.active && (
+            <p className="capture-indicator" role="status">
+              Camera active · frames stay on this device
+            </p>
+          )}
+        </div>
+      </div>
+
+      {settingsOpen && (
+        <section id="session-settings" className="settings-sheet" aria-label="Session settings">
+          <div className="sheet-header">
+            <h2>Settings</h2>
+            <button type="button" className="secondary" onClick={() => setSettingsOpen(false)}>
+              Close
+            </button>
+          </div>
+          <SetupChecklist
+            slots={slots}
+            templates={TEMPLATES}
+            calibration={calibrationArea}
+            onTargetChange={(targetId) => setup.apply({ targetId })}
+            onGoal={(value) =>
+              setup.apply({
+                goal: {
+                  height: { value: value.goal.desiredHeightMm, unit: "mm" },
+                  basis: value.goal.basis,
+                  shrinkagePercent: value.goal.shrinkageFraction === null ? null : value.goal.shrinkageFraction * 100,
+                },
+              })
+            }
+          />
+          {reading && (
+            <section className="live-target" aria-label={sized ? "Live target comparison" : "Live shape comparison"}>
+              <ProfileOverlay target={target} reading={sized ?? reading} mode={sized ? "millimetres" : "normalized"} />
+              {comparison && sized && goal && (
+                <GoalProgress
+                  comparison={comparison}
+                  heightProgress={(sized.height ?? 0) / goal.wetHeightMm}
+                  onMilestone={props.onMilestone}
+                />
+              )}
+            </section>
+          )}
+          {activeScale && pipeline.wobbleReading && <StabilityStatus reading={pipeline.wobbleReading} />}
+          <div className="session-actions">
+            <button type="button" className="secondary" onClick={() => void markMoment()}>
+              Mark this moment
+            </button>
+            {camera.active && (
+              <button
+                type="button"
+                className="secondary"
+                disabled={camera.starting}
+                onClick={() => void switchCamera()}
+              >
+                {camera.facing === "user" ? "Use rear camera" : "Use front camera"}
+              </button>
+            )}
+          </div>
+          {camera.active && <DiagnosticsPanel sample={pipeline.sample} />}
         </section>
       )}
-      {activeScale && pipeline.wobbleReading && <StabilityStatus reading={pipeline.wobbleReading} />}
-      {wheelCheck && (
-        // Shown in the main view, not the collapsible checklist: the coach asks about these lines.
-        <WheelHeadConfirm
-          still={wheelCheck.image}
-          detection={wheelCheck.detection}
-          edges={wheelCheck.edges}
-          onEdgesChange={(edges) => updateWheel({ ...wheelCheck, edges, adjusted: true })}
-          mirrored={mirrored}
-          onConfirm={() => void confirmWheel()}
-          onRetry={() => updateWheel(null)}
-        />
+
+      {confirmingEnd && (
+        <div className="end-confirm" role="alertdialog" aria-labelledby="end-confirm-title">
+          <h2 id="end-confirm-title">End this session?</h2>
+          <p>The camera stops and you'll see the review.</p>
+          <div className="session-actions">
+            <button type="button" onClick={props.onEnd}>
+              End session and review
+            </button>
+            <button type="button" className="secondary" onClick={() => setConfirmingEnd(false)}>
+              Keep going
+            </button>
+          </div>
+        </div>
       )}
-      {voice.available && <Captions state={voice.state} failure={voice.failure} captions={voice.captions} />}
+
       {voice.failure === "unavailable" && (
         // The one tap a lost connection needs: the whole screen is the target, reachable with a knuckle.
         <button type="button" className="tap-anywhere" onClick={() => void voice.restart()}>
           Voice coach lost. Tap anywhere once to reconnect.
         </button>
       )}
-
-      <SetupChecklist
-        slots={slots}
-        templates={TEMPLATES}
-        defaultOpen={!voice.available}
-        calibration={calibrationArea}
-        onTargetChange={(targetId) => setup.apply({ targetId })}
-        onGoal={(value) =>
-          setup.apply({
-            goal: {
-              height: { value: value.goal.desiredHeightMm, unit: "mm" },
-              basis: value.goal.basis,
-              shrinkagePercent: value.goal.shrinkageFraction === null ? null : value.goal.shrinkageFraction * 100,
-            },
-          })
-        }
-      />
-
-      <div className="session-actions">
-        <button type="button" className="secondary" onClick={() => void markMoment()}>
-          Mark this moment
-        </button>
-        <button type="button" onClick={props.onEnd}>
-          End session and review
-        </button>
-        {camera.active && (
-          <button type="button" className="secondary" disabled={camera.starting} onClick={() => void switchCamera()}>
-            {camera.facing === "user" ? "Use rear camera" : "Use front camera"}
-          </button>
-        )}
-      </div>
-      {momentMarked && <p role="status">Moment marked locally.</p>}
-      {camera.active && <DiagnosticsPanel sample={pipeline.sample} />}
     </section>
   );
 }
