@@ -4,6 +4,8 @@ import { REALTIME_TOOL_DEFINITIONS } from "../src/voice/tools/definitions";
 
 const VOICE = "marin";
 const MAX_BODY_BYTES = 200_000;
+/** Conversation history (excluding instructions and tools) each reply may read. */
+const MAX_HISTORY_TOKENS = 8_000;
 
 export type RealtimeErrorCode = "VOICE_RATE_LIMITED" | "VOICE_PROVIDER_ERROR" | "VOICE_CONFIG_MISMATCH";
 
@@ -67,6 +69,13 @@ export async function handleRealtimeSession(
             turn_detection: { type: "semantic_vad", eagerness: "low" },
             ...(dependencies.transcriptionModel ? { transcription: { model: dependencies.transcriptionModel } } : {}),
           },
+        },
+        // Every reply re-reads the conversation so far, so long sessions get dearer per reply. Keep only
+        // recent history, and drop a fifth extra when trimming so the prompt cache survives longer.
+        truncation: {
+          type: "retention_ratio",
+          retention_ratio: 0.8,
+          token_limits: { post_instructions: MAX_HISTORY_TOKENS },
         },
         instructions: COACH_INSTRUCTIONS,
         tools: REALTIME_TOOL_DEFINITIONS,

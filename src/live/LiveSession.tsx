@@ -495,10 +495,12 @@ export function LiveSession(props: LiveSessionProps) {
         </div>
       )}
 
-      {voice.failure === "unavailable" && (
+      {(voice.failure === "unavailable" || voice.failure === "time-limit") && (
         // The one tap a lost connection needs: the whole screen is the target, reachable with a knuckle.
         <button type="button" className="tap-anywhere" onClick={() => void voice.restart()}>
-          Voice coach lost. Tap anywhere once to reconnect.
+          {voice.failure === "time-limit"
+            ? "Voice coach hung up after an hour. Tap anywhere once to keep talking."
+            : "Voice coach lost. Tap anywhere once to reconnect."}
         </button>
       )}
     </section>

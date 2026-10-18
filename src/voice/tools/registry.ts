@@ -233,23 +233,6 @@ export function createToolRegistry(dependencies: ToolDependencies) {
         next: "Give a debrief of one or two sentences from the summary, then say goodbye. The call ends when you finish.",
       };
     },
-    getSessionSummary: async (input) => {
-      parse(empty, input);
-      if (!dependencies.getSessionSummary) return NOT_NOW;
-      return (await dependencies.getSessionSummary()) ?? { available: false, reason: "No finished session yet." };
-    },
-    deleteSession: async (input) => {
-      const { confirmed } = parse(confirmedSchema, input);
-      if (!dependencies.deleteSession) return NOT_NOW;
-      if (!confirmed) {
-        return {
-          needsConfirmation:
-            "Ask: delete this session's measurements and marked moments from this phone? This can't be undone.",
-        };
-      }
-      await dependencies.deleteSession();
-      return { deleted: true };
-    },
   };
 
   return {
