@@ -23,9 +23,14 @@ import { isCameraOnlyMode, isDemoMode } from "./demoMode";
 import { CLOUD_VOICE, deriveGatedFeatureFlags, UNVERIFIED_MEASUREMENTS } from "./featureFlags";
 import { useAppUpdate } from "./useAppUpdate";
 import { useSessionRecording } from "./useSessionRecording";
+import { useCoachMemory } from "./useCoachMemory";
+import { usePieces } from "./usePieces";
+import { SessionPieces } from "../pieces/SessionPieces";
+import { ThrowLog } from "../pieces/ThrowLog";
 
 const SHELL_KEY = "pottery-coach-session-shell";
 const repository = new SessionRepository();
+const throwLog = new ThrowLog();
 const flags = deriveGatedFeatureFlags(releaseManifest);
 const DEFAULT_TARGET = loadTemplates()[0]!;
 
@@ -51,6 +56,17 @@ export function SessionFlow() {
   const bridge = useRef<Partial<ToolDependencies>>({});
   const bundleRef = useRef<SessionBundle | null>(null);
   const setupRef = useRef(setup);
+  const pieces = usePieces(throwLog, recording, () => {
+    const goal = bridge.current.getGoal?.() ?? null;
+    return {
+      targetId: setupRef.current.getSnapshot().targetId.value,
+      goalHeightMm: goal?.wetHeightMm ?? null,
+      goalBasis: goal?.goal.basis ?? null,
+    };
+  });
+  const memory = useCoachMemory(throwLog, (context) => appRef.current?.voice.setPotterContext(context));
+  // The tool registry is built once, so it reaches the latest hooks through this ref.
+  const appRef = useRef<{ pieces: typeof pieces; memory: typeof memory; voice: typeof voice } | null>(null);
   const sizesEnabled = flags.numericMeasurement || demoMode || UNVERIFIED_MEASUREMENTS;
 
   const registry = useMemo(
@@ -75,6 +91,21 @@ export function SessionFlow() {
         get endSession() {
           return bridge.current.endSession;
         },
+        get nextPiece() {
+          return bridge.current.nextPiece;
+        },
+        get reportTrueSize() {
+          return bridge.current.reportTrueSize;
+        },
+        rateLastCue: (verdict) => appRef.current?.pieces.rateLastCue(verdict) ?? Promise.resolve(false),
+        notes: {
+          remember: async (text, lasting) => {
+            if (lasting) await appRef.current?.memory.remember(text);
+            else await appRef.current?.pieces.addNote(text);
+          },
+          find: (text) => throwLog.findNote(text),
+          forget: async (id) => appRef.current?.memory.forget(id),
+        },
         get getSessionSummary() {
           const finished = bundleRef.current;
           return finished ? async () => spokenSummary(finished) : undefined;
@@ -89,7 +120,14 @@ export function SessionFlow() {
     : passphrase
       ? () => new OpenAIWebRtcTransport(browserTransportDependencies(() => passphrase))
       : null;
-  const voice = useVoiceSession(createTransport, registry);
+  const voice = useVoiceSession(createTransport, registry, {
+    onUsage: (usage) => void pieces.addUsage(usage).catch(() => undefined),
+    getPotterContext: memory.context,
+  });
+
+  useEffect(() => {
+    appRef.current = { pieces, memory, voice };
+  });
 
   useEffect(() => {
     setupRef.current = setup;
@@ -136,7 +174,10 @@ export function SessionFlow() {
     // Ending by touch hangs up straight away; by voice, the coach says goodbye first.
     if (byVoice) voice.hangUpAfterReply();
     else void voice.stop();
-    const stored = resolveRecordedSizes(await recording.end());
+    const recorded = await recording.end();
+    const stored = resolveRecordedSizes(recorded);
+    await pieces.finish(recorded).catch(() => undefined);
+    void memory.refresh().catch(() => undefined);
     bundleRef.current = stored;
     setBundle(stored);
     dispatch({ type: "END_SESSION" });
@@ -148,6 +189,7 @@ export function SessionFlow() {
       cache: typeof caches === "undefined" ? undefined : new BrowserCacheDeletion(caches),
       syncQueue: new LocalStorageSyncQueueDeletion(localStorage),
     }).deleteSession(recording.sessionId());
+    await throwLog.deleteSession(recording.sessionId()).catch(() => undefined);
     sessionStorage.removeItem(SHELL_KEY);
     return receipt;
   }
@@ -155,6 +197,7 @@ export function SessionFlow() {
   function startAnotherSession(): void {
     void voice.stop();
     recording.reset();
+    pieces.reset();
     bundleRef.current = null;
     setBundle(null);
     setSetup(new SetupStore());
@@ -233,6 +276,7 @@ export function SessionFlow() {
           <p className="stale-banner">This session had no wheel-head size, so only shapes were tracked.</p>
         )}
         <SessionReview bundle={bundle} />
+        <SessionPieces throwLog={throwLog} sessionId={bundle.session.id} />
         <DeleteSessionDialog onDelete={deleteSession} onFinish={startAnotherSession} />
       </section>
     );
@@ -254,7 +298,20 @@ export function SessionFlow() {
         measurementsUnverified={!flags.numericMeasurement && UNVERIFIED_MEASUREMENTS}
         demoMode={demoMode}
         cameraOnly={cameraOnly}
-        onCameraReady={() => void recording.begin()}
+        onCameraReady={() =>
+          void recording
+            .begin()
+            .then(() => pieces.ensureStarted())
+            .catch(() => undefined)
+        }
+        throwLog={throwLog}
+        pieceId={pieces.pieceId}
+        pieceNumber={pieces.pieceNumber}
+        lastingNotes={memory.notes}
+        onForgetNote={(id) => void memory.forget(id)}
+        onNextPiece={() => pieces.next()}
+        onCorrection={(correction) => void pieces.addCorrection(correction).catch(() => undefined)}
+        onCue={(policyId, text) => void pieces.logCue(policyId, text).catch(() => undefined)}
         onCameraDenied={() => dispatch({ type: "CAMERA_DENIED" })}
         onReading={recording.recordReading}
         onWobble={recording.recordWobble}

@@ -159,6 +159,19 @@ export function useSessionRecording(repository: SessionRepository, onStorageFail
     return moment;
   }
 
+  /** Everything stored so far while the session carries on (for closing a piece mid-session). */
+  async function snapshot(): Promise<SessionBundle> {
+    const session = current();
+    try {
+      await session.recorder?.flush();
+      const stored = session.created ? await repository.get(session.id) : null;
+      if (stored) return stored;
+    } catch {
+      onStorageFailed();
+    }
+    return emptyBundle(session.id, Date.now());
+  }
+
   /** Flushes and closes the session, returning what was stored (or an empty bundle if storage failed). */
   async function end(): Promise<SessionBundle> {
     const session = current();
@@ -186,6 +199,7 @@ export function useSessionRecording(repository: SessionRepository, onStorageFail
     setGoal,
     setScale,
     markMoment,
+    snapshot,
     end,
     reset: () => {
       sessionRef.current = null;

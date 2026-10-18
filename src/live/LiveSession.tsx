@@ -32,10 +32,27 @@ import type { WobbleReading } from "../wobble/types";
 import { Captions } from "./Captions";
 import { LiveReadouts } from "./LiveReadouts";
 import { SetupChecklist } from "./SetupChecklist";
+import { useLiveCues } from "./useLiveCues";
+import { HistoryPanel } from "../pieces/HistoryPanel";
+import { NotesPanel } from "../pieces/NotesPanel";
+import type { ThrowLog } from "../pieces/ThrowLog";
+import type { LastingNote, SizeCorrection } from "../pieces/types";
 
 const TEMPLATES = loadTemplates();
 /** Wait for the camera's exposure to settle before keeping the empty-wheel reference still. */
 const PLATE_STILL_DELAY_MS = 700;
+/** After "next piece", the wheel must look empty this long before it is learned again. */
+const EMPTY_WHEEL_MS = 1_000;
+/** If the old background has drifted and the wheel never looks empty, learn it again anyway. */
+const EMPTY_WHEEL_TIMEOUT_MS = 30_000;
+const CUE_TOAST_MS = 6_000;
+const LINES = {
+  liftPot: "Lift the pot off and I'll take a fresh look at the empty wheel.",
+  wheelSeen: "Got a look at the empty wheel. Put your clay on.",
+} as const;
+
+/** Where the empty-wheel snapshot is at: learning it, learned (clay can go on), or waiting for the wheel to clear. */
+type WheelPhase = "learning" | "ready" | "awaiting-empty" | "placed";
 
 type WheelCheckState = { image: ImageData; detection: WheelHeadDetection; edges: WheelEdges; adjusted: boolean };
 
@@ -43,7 +60,24 @@ export type LiveSessionProps = {
   setup: SetupStore;
   /** Filled with the live parts of the voice tools while this session is on screen. */
   toolBridge: MutableRefObject<Partial<ToolDependencies>>;
-  voice: { available: boolean; state: string; failure: string | null; captions: Caption[]; restart(): Promise<void> };
+  voice: {
+    available: boolean;
+    state: string;
+    failure: string | null;
+    captions: Caption[];
+    restart(): Promise<void>;
+    isBusy(): boolean;
+    speakCue(id: string, text: string): boolean;
+  };
+  throwLog: ThrowLog;
+  /** The current piece (pot) and its number in this session. */
+  pieceId: string | null;
+  pieceNumber: number;
+  lastingNotes: LastingNote[];
+  onForgetNote(id: string): void;
+  onNextPiece(): Promise<void>;
+  onCorrection(correction: SizeCorrection): void;
+  onCue(policyId: string, text: string): void;
   /** False while the measurement gate is closed: sizes are never shown, only shapes. */
   sizesEnabled: boolean;
   measurementsUnverified: boolean;
@@ -74,6 +108,12 @@ export function LiveSession(props: LiveSessionProps) {
     onReading: props.onReading,
     onWobble: props.onWobble,
     onProcessingModeChange: props.onProcessingModeChange,
+    onBackgroundReady: () => {
+      setPhase("ready");
+      // At the start the coach's greeting says this; after "next piece" the app says it.
+      if (announceWheelRef.current && !voice.speakCue("wheel-seen", LINES.wheelSeen)) showToast(LINES.wheelSeen);
+      announceWheelRef.current = false;
+    },
   });
   const slots = useSyncExternalStore(setup.subscribe, setup.getSnapshot);
   const [scale, setScaleState] = useState<SessionScale | null>(null);
@@ -88,6 +128,12 @@ export function LiveSession(props: LiveSessionProps) {
   // Without voice, setup has to be done by touch, so settings start open.
   const [settingsOpen, setSettingsOpen] = useState(!voice.available);
   const [confirmingEnd, setConfirmingEnd] = useState(false);
+  const [wheelPhase, setWheelPhase] = useState<WheelPhase>("learning");
+  const [cueToast, setCueToast] = useState<string | null>(null);
+  const [historyKey, setHistoryKey] = useState(0);
+  const wheelPhaseRef = useRef<WheelPhase>("learning");
+  const announceWheelRef = useRef(false);
+  const demoTimerRef = useRef<number | null>(null);
   const plateRef = useRef<ImageData | null>(null);
   const wheelRef = useRef<WheelCheckState | null>(null);
 
@@ -127,6 +173,90 @@ export function LiveSession(props: LiveSessionProps) {
   }, []);
 
   useEffect(() => () => detector?.dispose(), [detector]);
+
+  useEffect(
+    () => () => {
+      if (demoTimerRef.current !== null) window.clearInterval(demoTimerRef.current);
+    },
+    [],
+  );
+
+  // Clay on the wheel ends the "put your clay on" prompt.
+  useEffect(() => {
+    if (wheelPhase === "ready" && pipeline.vesselVisible) setPhase("placed");
+    // oxlint-disable-next-line react-hooks/exhaustive-deps
+  }, [wheelPhase, pipeline.vesselVisible]);
+
+  // After "next piece", wait until the old snapshot sees nothing (the pot is off), then learn the
+  // empty wheel again. A drifted snapshot may never look empty, so there's a time limit.
+  useEffect(() => {
+    if (wheelPhase !== "awaiting-empty") return;
+    const relearn = () => {
+      setPhase("learning");
+      pipeline.resetBackground();
+    };
+    const limit = window.setTimeout(relearn, EMPTY_WHEEL_TIMEOUT_MS);
+    const empty = pipeline.vesselVisible ? null : window.setTimeout(relearn, EMPTY_WHEEL_MS);
+    return () => {
+      window.clearTimeout(limit);
+      if (empty !== null) window.clearTimeout(empty);
+    };
+    // oxlint-disable-next-line react-hooks/exhaustive-deps
+  }, [wheelPhase, pipeline.vesselVisible]);
+
+  useLiveCues({
+    pieceId: props.pieceId,
+    reading,
+    sized,
+    wobble: activeScale ? pipeline.wobbleReading : null,
+    target,
+    goalHeightMm: goal?.wetHeightMm ?? null,
+    handsLikely: pipeline.handsLikely,
+    paused,
+    isBusy: voice.isBusy,
+    onCue: (policyId, text) => {
+      if (!voice.speakCue(policyId, text)) showToast(text);
+      props.onCue(policyId, text);
+    },
+  });
+
+  function setPhase(next: WheelPhase): void {
+    wheelPhaseRef.current = next;
+    setWheelPhase(next);
+  }
+
+  function showToast(text: string): void {
+    setCueToast(text);
+    window.setTimeout(() => setCueToast((current) => (current === text ? null : current)), CUE_TOAST_MS);
+  }
+
+  /** Saves this pot and waits for the wheel to be cleared before learning it again. */
+  async function nextPiece(): Promise<void> {
+    await props.onNextPiece();
+    announceWheelRef.current = true;
+    setPhase("awaiting-empty");
+    setHistoryKey((key) => key + 1);
+  }
+
+  async function nextPieceByTouch(): Promise<void> {
+    setSettingsOpen(false);
+    await nextPiece();
+    if (!voice.speakCue("lift-pot", LINES.liftPot)) showToast(LINES.liftPot);
+  }
+
+  async function reportTrueSize(dimension: "height" | "width", trueMm: number) {
+    const value = dimension === "height" ? sized?.height : sized?.maximumWidth;
+    const appMm = value ?? null;
+    props.onCorrection({
+      atMs: Date.now(),
+      dimension,
+      trueMm,
+      appMm,
+      confidence: reading?.confidence.overall ?? null,
+      handsLikely: pipeline.handsLikely,
+    });
+    return { appMm };
+  }
 
   // When the camera is interrupted (app switch, lock screen), try once to resume without a tap as soon
   // as the page is visible again; if that fails, say out loud that one tap is needed.
@@ -270,6 +400,9 @@ export function LiveSession(props: LiveSessionProps) {
     applyScale(scaleFromCalibration(calibration));
     setup.setCalibration("confirmed");
     pipeline.injectReading(demoReading());
+    // Keep the demo reading fresh so live cues treat it as current.
+    if (demoTimerRef.current === null)
+      demoTimerRef.current = window.setInterval(() => pipeline.injectReading(demoReading()), 500);
   }
 
   async function markMoment() {
@@ -292,6 +425,8 @@ export function LiveSession(props: LiveSessionProps) {
       setPaused,
       markMoment: ({ label }) => markMoment().then((moment) => (label ? { ...moment, label } : moment)),
       endSession: () => props.onEnd({ byVoice: true }),
+      nextPiece,
+      reportTrueSize,
     };
   });
 
@@ -400,6 +535,18 @@ export function LiveSession(props: LiveSessionProps) {
           )}
           {!sizesEnabled && <p className="stale-banner">Sizes are disabled until the measurement gate passes.</p>}
           {momentMarked && <p role="status">Moment marked locally.</p>}
+          {camera.active && wheelPhase === "learning" && (
+            <p role="status">Looking at the empty wheel… keep it clear for a moment.</p>
+          )}
+          {wheelPhase === "ready" && <p role="status">Got the empty wheel. Put your clay on.</p>}
+          {wheelPhase === "awaiting-empty" && (
+            <p role="status">Lift the pot off; I'll look at the empty wheel again.</p>
+          )}
+          {cueToast && (
+            <p role="status" className="cue-toast">
+              {cueToast}
+            </p>
+          )}
         </div>
         {wheelCheck && (
           // Shown over the video, not in settings: the coach asks about these lines.
@@ -428,7 +575,7 @@ export function LiveSession(props: LiveSessionProps) {
       {settingsOpen && (
         <section id="session-settings" className="settings-sheet" aria-label="Session settings">
           <div className="sheet-header">
-            <h2>Settings</h2>
+            <h2>{props.pieceNumber > 0 ? `Settings · piece ${props.pieceNumber}` : "Settings"}</h2>
             <button type="button" className="secondary" onClick={() => setSettingsOpen(false)}>
               Close
             </button>
@@ -462,6 +609,9 @@ export function LiveSession(props: LiveSessionProps) {
           )}
           {activeScale && pipeline.wobbleReading && <StabilityStatus reading={pipeline.wobbleReading} />}
           <div className="session-actions">
+            <button type="button" onClick={() => void nextPieceByTouch()}>
+              Next piece
+            </button>
             <button type="button" className="secondary" onClick={() => void markMoment()}>
               Mark this moment
             </button>
@@ -476,6 +626,8 @@ export function LiveSession(props: LiveSessionProps) {
               </button>
             )}
           </div>
+          <NotesPanel notes={props.lastingNotes} onForget={props.onForgetNote} />
+          <HistoryPanel throwLog={props.throwLog} refreshKey={historyKey} />
           {camera.active && <DiagnosticsPanel sample={pipeline.sample} />}
         </section>
       )}

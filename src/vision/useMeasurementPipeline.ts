@@ -44,6 +44,7 @@ export function useMeasurementPipeline(callbacks: MeasurementCallbacks = {}) {
   const pinnedRef = useRef(false);
   const backgroundRef = useRef<BackgroundModel | null>(null);
   const [handsLikely, setHandsLikely] = useState(false);
+  const [vesselVisible, setVesselVisible] = useState(false);
 
   function start(video: HTMLVideoElement, { freshBackground = false }: { freshBackground?: boolean } = {}): void {
     if (freshBackground) backgroundRef.current = null;
@@ -61,6 +62,7 @@ export function useMeasurementPipeline(callbacks: MeasurementCallbacks = {}) {
       if (message?.type === "reading") {
         diagnostics.record("rendered", performance.now(), message.instantaneous.sourceFrameId);
         setHandsLikely(message.instantaneous.handsLikely === true);
+        setVesselVisible(message.instantaneous.height !== null);
         if (message.stable && !pinnedRef.current) {
           setStableReading(message.stable);
           latest.current.onReading?.(message.stable);
@@ -179,6 +181,7 @@ export function useMeasurementPipeline(callbacks: MeasurementCallbacks = {}) {
     stableReading,
     wobbleReading,
     handsLikely,
+    vesselVisible,
     processingHz,
     start,
     stop,
