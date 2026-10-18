@@ -18,7 +18,7 @@ test("calibrates from the printed board with the real AprilTag detector and keep
   await expect(page.getByRole("list", { name: /calibration problems/i })).toHaveCount(0);
   await page.getByLabel(/100 mm line/i).check();
   await page.getByRole("button", { name: /use calibration/i }).click();
-  await expect(page.locator("details.setup-checklist summary")).toContainText(/sizes are in centimetres/i);
+  await expect(page.locator(".setup-summary")).toContainText(/sizes are in centimetres/i);
 
   await page.locator("details.diagnostics summary").click();
   await page.waitForTimeout(4_000);

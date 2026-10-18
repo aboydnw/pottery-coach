@@ -1,10 +1,11 @@
 import { expect, test } from "@playwright/test";
-import { startSession, voiceTool } from "./fixtures/session-streams";
+import { openSetup, startSession, voiceTool } from "./fixtures/session-streams";
 
 test("a whole session runs by voice after the single tap", async ({ page }) => {
   await startSession(page);
   await expect(page.getByRole("region", { name: /conversation/i })).toContainText(/coach is listening/i);
-  await expect(page.locator("details.setup-checklist")).not.toHaveAttribute("open", "");
+  await expect(page.getByRole("region", { name: /session settings/i })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: /^end session$/i })).toBeVisible();
 
   await expect(voiceTool(page, "getSetupStatus")).resolves.toMatchObject({
     missing: ["wheel-head diameter", "goal height"],
@@ -15,7 +16,8 @@ test("a whole session runs by voice after the single tap", async ({ page }) => {
   });
   expect(proposal.readback).toContain("15 centimetres (that's 1-5)");
   await voiceTool(page, "confirmSetup");
-  await expect(page.locator("details.setup-checklist summary")).toContainText(/goal 15 cm wet/i);
+  await openSetup(page);
+  await expect(page.locator(".setup-summary")).toContainText(/goal 15 cm wet/i);
 
   await expect(voiceTool(page, "getCurrentDimensions")).resolves.not.toHaveProperty("heightMm");
   await expect(voiceTool(page, "markMoment", { label: "first pull" })).resolves.toHaveProperty("id");

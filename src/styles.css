@@ -61,28 +61,13 @@ button:focus-visible {
 }
 
 .intro,
-.notice,
-.live-session {
+.notice {
   width: min(100%, 40rem);
   border: 1px solid #c9bbaa;
   border-radius: 1.25rem;
   padding: clamp(1.5rem, 5vw, 3rem);
   background: #fffaf3;
   box-shadow: 0 1rem 3rem rgb(73 53 39 / 10%);
-}
-
-.live-session video {
-  display: block;
-  width: 100%;
-  min-height: 12rem;
-  margin: 1.5rem 0;
-  border-radius: 0.75rem;
-  background: #1e1b19;
-  object-fit: contain;
-}
-
-.live-session video.mirrored {
-  transform: scaleX(-1);
 }
 
 .session-review {
@@ -111,7 +96,6 @@ button:focus-visible {
     align-items: start;
     padding: 0.75rem;
   }
-  .live-session,
   .notice,
   .intro {
     border-radius: 0.75rem;
@@ -338,23 +322,6 @@ button.link-button {
   min-height: 64px;
 }
 
-.live-grid {
-  display: grid;
-  gap: 1rem;
-  align-items: center;
-}
-
-.live-grid video {
-  max-height: 40vh;
-  margin: 0;
-}
-
-@media (min-width: 640px) {
-  .live-grid {
-    grid-template-columns: 3fr 2fr;
-  }
-}
-
 .readouts {
   display: flex;
   flex-wrap: wrap;
@@ -408,9 +375,9 @@ button.link-button {
   padding: 0.75rem 1rem;
 }
 
-.setup-checklist summary {
-  cursor: pointer;
-  font-weight: 600;
+.setup-summary {
+  margin: 0;
+  font-size: 1.1rem;
 }
 
 .slot-list {
@@ -441,7 +408,185 @@ button.link-button {
   width: 100%;
 }
 
-.notice,
-.live-session {
+.notice {
   min-width: 0;
+}
+
+/* Live session: the camera fills the screen and everything else floats over it. */
+.live-session {
+  position: fixed;
+  inset: 0;
+  background: #1e1b19;
+  color: #fff;
+}
+
+.live-stage {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+}
+
+.live-stage video {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.live-stage video.mirrored {
+  transform: scaleX(-1);
+}
+
+.stage-top,
+.stage-banners,
+.stage-bottom {
+  position: absolute;
+  left: 0;
+  right: 0;
+  padding: max(0.75rem, env(safe-area-inset-top)) 1rem 0.75rem;
+}
+
+.stage-top {
+  top: 0;
+  display: flex;
+  justify-content: space-between;
+  align-items: start;
+  gap: 1rem;
+  background: linear-gradient(rgb(0 0 0 / 55%), transparent);
+  z-index: 6;
+}
+
+.stage-top .readouts {
+  text-shadow: 0 1px 4px rgb(0 0 0 / 70%);
+}
+
+.stage-top .readout-label,
+.stage-top .readout-note,
+.stage-top .readout-waiting {
+  color: #f1e9df;
+}
+
+.stage-buttons {
+  display: flex;
+  flex-shrink: 0;
+  gap: 0.75rem;
+}
+
+.icon-button {
+  display: grid;
+  width: 3.5rem;
+  height: 3.5rem;
+  place-items: center;
+  border: 0;
+  border-radius: 50%;
+  padding: 0;
+  font-size: 1.5rem;
+  background: rgb(30 27 25 / 70%);
+  color: #fff;
+}
+
+.icon-button.end {
+  background: rgb(160 45 35 / 85%);
+}
+
+.stage-banners {
+  top: 6.5rem;
+  display: grid;
+  gap: 0.5rem;
+  padding-top: 0;
+  z-index: 6;
+}
+
+.stage-banners .stale-banner,
+.stage-banners [role="status"] {
+  margin: 0;
+  color: #1e1b19;
+}
+
+.stage-banners > [role="status"] {
+  justify-self: start;
+  border-radius: 0.5rem;
+  padding: 0.25rem 0.75rem;
+  background: rgb(255 250 243 / 90%);
+}
+
+.stage-bottom {
+  bottom: 0;
+  padding-bottom: max(0.75rem, env(safe-area-inset-bottom));
+  background: linear-gradient(transparent, rgb(0 0 0 / 65%));
+}
+
+.stage-bottom .captions {
+  margin: 0 0 0.5rem;
+  border-left-color: #8fd0d8;
+  background: rgb(30 27 25 / 55%);
+  color: #fff;
+}
+
+.stage-bottom .voice-status {
+  color: #8fd0d8;
+}
+
+.stage-bottom .capture-indicator {
+  margin: 0;
+  font-size: 0.85rem;
+  color: #f1e9df;
+}
+
+.stage-panel {
+  position: absolute;
+  inset: 6.5rem 1rem auto;
+  max-height: calc(100% - 13rem);
+  overflow: auto;
+  border-radius: 0.75rem;
+  padding: 1rem;
+  background: #fffaf3;
+  color: #1e1b19;
+}
+
+.settings-sheet {
+  position: absolute;
+  inset: auto 0 0;
+  z-index: 5;
+  max-height: 85vh;
+  overflow: auto;
+  border-radius: 1.25rem 1.25rem 0 0;
+  padding: 1rem 1rem max(1rem, env(safe-area-inset-bottom));
+  background: #fffaf3;
+  color: #1e1b19;
+  box-shadow: 0 -1rem 3rem rgb(0 0 0 / 35%);
+}
+
+.settings-sheet > * {
+  min-width: 0;
+}
+
+.sheet-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+}
+
+.sheet-header h2 {
+  margin: 0;
+}
+
+.end-confirm {
+  position: absolute;
+  inset: 50% 1rem auto;
+  z-index: 7;
+  max-width: 28rem;
+  margin: 0 auto;
+  border-radius: 1rem;
+  padding: 1.25rem;
+  background: #fffaf3;
+  color: #1e1b19;
+  box-shadow: 0 1rem 3rem rgb(0 0 0 / 45%);
+  transform: translateY(-50%);
+}
+
+.end-confirm h2 {
+  margin-top: 0;
 }

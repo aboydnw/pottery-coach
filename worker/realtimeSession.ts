@@ -61,7 +61,10 @@ export async function handleRealtimeSession(
         audio: {
           output: { voice: VOICE },
           input: {
-            turn_detection: { type: "server_vad" },
+            // Studio noise (wheel motor, water, radio) must not count as the potter speaking: filter for a
+            // close headset mic, and only take a turn when it sounds like real speech.
+            noise_reduction: { type: "near_field" },
+            turn_detection: { type: "semantic_vad", eagerness: "low" },
             ...(dependencies.transcriptionModel ? { transcription: { model: dependencies.transcriptionModel } } : {}),
           },
         },

@@ -31,14 +31,15 @@ test("review times are relative to the session start", async ({ page }) => {
   expect(Number.parseFloat(firstTime)).toBeLessThan(3600);
 });
 
-test("measurement runs from the first tap, before calibration, even with the preview scrolled away", async ({
+test("measurement runs from the first tap, before calibration, even with settings covering the preview", async ({
   page,
 }) => {
   await page.setViewportSize({ width: 412, height: 500 });
   await startSession(page, { demo: false });
+  // Chrome pauses muted autoplay videos once they're hidden, which stopped measurement.
+  await expect(page.locator("video")).not.toHaveAttribute("autoplay");
+  await openSetup(page);
   await page.locator("details.diagnostics summary").click();
-  await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
-  await expect(page.locator("video")).not.toBeInViewport();
   await page.waitForTimeout(6_000);
   const samples: number[] = [];
   for (let index = 0; index < 4; index += 1) {

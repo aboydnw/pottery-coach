@@ -58,6 +58,8 @@ it("keeps authorization server-only and returns only the SDP answer", async () =
   const form = (deps.fetch as ReturnType<typeof vi.fn>).mock.calls[0]![1].body as FormData;
   const injected = JSON.parse(String(form.get("session")));
   expect(injected.model).toBe("gpt-realtime-2.1-mini");
+  expect(injected.audio.input.noise_reduction).toEqual({ type: "near_field" });
+  expect(injected.audio.input.turn_detection).toEqual({ type: "semantic_vad", eagerness: "low" });
   expect(injected.tools.map((tool: { name: string }) => tool.name)).toEqual(
     expect.arrayContaining(["getCurrentDimensions", "markMoment"]),
   );

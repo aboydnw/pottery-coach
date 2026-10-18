@@ -4,7 +4,7 @@ import { endSession, startSession } from "./fixtures/session-streams";
 test("skipping sizes keeps a shape-only session that never shows millimetres", async ({ page }) => {
   await startSession(page, { demo: false });
   await page.getByRole("button", { name: /skip sizes/i }).click();
-  await expect(page.locator("details.setup-checklist")).toContainText(/skipped \(shape only\)/i);
+  await expect(page.locator(".setup-checklist")).toContainText(/skipped \(shape only\)/i);
   await expect(page.getByRole("region", { name: /live measurements/i })).not.toContainText("cm");
   await endSession(page);
   await expect(page.getByRole("table", { name: /measurement data/i })).not.toContainText("mm");
