@@ -6,12 +6,15 @@ import type { StableDimensionReading } from "../measurement/types";
 import { AdaptiveRateController, type AdaptiveMode, type ProcessingRate } from "../performance/AdaptiveRateController";
 import { useLatest } from "../shared/useLatest";
 import type { WobbleReading } from "../wobble/types";
+import type { BackgroundModel } from "./backgroundModel";
 import { BoundedWorkerSink, type MeasurementWorkerEvent, type MeasurementWorkerRequest } from "./workerProtocol";
 
 export type MeasurementCallbacks = {
   onReading?(reading: StableDimensionReading): void;
   onWobble?(reading: WobbleReading): void;
   onProcessingModeChange?(mode: AdaptiveMode): void;
+  /** The empty wheel has been learned (at the start, and after each `resetBackground`). */
+  onBackgroundReady?(): void;
 };
 
 type Pipeline = {
@@ -39,8 +42,11 @@ export function useMeasurementPipeline(callbacks: MeasurementCallbacks = {}) {
   const pipelineRef = useRef<Pipeline | null>(null);
   const scaleRef = useRef<{ scale: SessionScale | null; imageCenterlineX?: number }>({ scale: null });
   const pinnedRef = useRef(false);
+  const backgroundRef = useRef<BackgroundModel | null>(null);
+  const [handsLikely, setHandsLikely] = useState(false);
 
-  function start(video: HTMLVideoElement): void {
+  function start(video: HTMLVideoElement, { freshBackground = false }: { freshBackground?: boolean } = {}): void {
+    if (freshBackground) backgroundRef.current = null;
     teardown(pipelineRef.current);
     pipelineRef.current = null;
     diagnostics.reset();
@@ -48,8 +54,13 @@ export function useMeasurementPipeline(callbacks: MeasurementCallbacks = {}) {
     const worker = new Worker(new URL("./measurement.worker.ts", import.meta.url), { type: "module" });
     worker.addEventListener("message", (event: MessageEvent<MeasurementWorkerEvent>) => {
       const message = event.data;
+      if (message?.type === "background-ready") {
+        backgroundRef.current = message.model;
+        latest.current.onBackgroundReady?.();
+      }
       if (message?.type === "reading") {
         diagnostics.record("rendered", performance.now(), message.instantaneous.sourceFrameId);
+        setHandsLikely(message.instantaneous.handsLikely === true);
         if (message.stable && !pinnedRef.current) {
           setStableReading(message.stable);
           latest.current.onReading?.(message.stable);
@@ -86,6 +97,14 @@ export function useMeasurementPipeline(callbacks: MeasurementCallbacks = {}) {
       pipeline.previewHandle = video.requestVideoFrameCallback(tick);
     }
     pipelineRef.current = pipeline;
+    if (backgroundRef.current) post({ type: "background", model: backgroundRef.current });
+    if (scaleRef.current.scale) post({ type: "scale", ...scaleRef.current });
+  }
+
+  /** Forgets the empty-wheel background and learns it again (next piece); the scale is kept. */
+  function resetBackground(): void {
+    backgroundRef.current = null;
+    post({ type: "reset", reason: "next-piece" });
     if (scaleRef.current.scale) post({ type: "scale", ...scaleRef.current });
   }
 
@@ -94,6 +113,7 @@ export function useMeasurementPipeline(callbacks: MeasurementCallbacks = {}) {
     pipelineRef.current = null;
     diagnostics.reset();
     pinnedRef.current = false;
+    backgroundRef.current = null;
     setStableReading(null);
     setWobbleReading(null);
   }
@@ -154,7 +174,18 @@ export function useMeasurementPipeline(callbacks: MeasurementCallbacks = {}) {
     };
   }, [diagnostics, latest, restartRef]);
 
-  return { sample, stableReading, wobbleReading, processingHz, start, stop, setScale, injectReading };
+  return {
+    sample,
+    stableReading,
+    wobbleReading,
+    handsLikely,
+    processingHz,
+    start,
+    stop,
+    setScale,
+    injectReading,
+    resetBackground,
+  };
 }
 
 function teardown(pipeline: Pipeline | null): void {

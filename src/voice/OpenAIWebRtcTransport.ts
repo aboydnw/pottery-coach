@@ -227,6 +227,8 @@ export function mapProviderEvent(raw: Record<string, unknown>, transcripts: Map<
     if (!usage) return null;
     const input = (usage.input_token_details ?? {}) as Record<string, number>;
     const output = (usage.output_token_details ?? {}) as Record<string, number>;
+    const cached = ((usage.input_token_details as Record<string, unknown> | undefined)?.cached_tokens_details ??
+      {}) as Record<string, number>;
     return {
       type: "usage",
       usage: {
@@ -234,6 +236,8 @@ export function mapProviderEvent(raw: Record<string, unknown>, transcripts: Map<
         inputAudioTokens: input.audio_tokens ?? 0,
         outputTextTokens: output.text_tokens ?? 0,
         outputAudioTokens: output.audio_tokens ?? 0,
+        cachedInputTextTokens: cached.text_tokens ?? 0,
+        cachedInputAudioTokens: cached.audio_tokens ?? 0,
       },
     };
   }

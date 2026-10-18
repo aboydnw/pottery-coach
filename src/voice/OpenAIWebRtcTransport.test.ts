@@ -223,7 +223,7 @@ it("builds captions from transcript pieces and reports usage", () => {
         type: "response.done",
         response: {
           usage: {
-            input_token_details: { audio_tokens: 40, text_tokens: 5 },
+            input_token_details: { audio_tokens: 40, text_tokens: 5, cached_tokens_details: { audio_tokens: 30 } },
             output_token_details: { audio_tokens: 90, text_tokens: 12 },
           },
         },
@@ -232,7 +232,14 @@ it("builds captions from transcript pieces and reports usage", () => {
     ),
   ).toEqual({
     type: "usage",
-    usage: { inputTextTokens: 5, inputAudioTokens: 40, outputTextTokens: 12, outputAudioTokens: 90 },
+    usage: {
+      inputTextTokens: 5,
+      inputAudioTokens: 40,
+      outputTextTokens: 12,
+      outputAudioTokens: 90,
+      cachedInputTextTokens: 0,
+      cachedInputAudioTokens: 30,
+    },
   });
 });
 

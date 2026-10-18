@@ -47,6 +47,7 @@ export function toMm<T extends DimensionReading>(reading: T, scale: SessionScale
     baseWidth: convert(reading.baseWidth),
     centerlineOffset: convert(reading.centerlineOffset),
     visibleAsymmetry: convert(reading.visibleAsymmetry),
+    leanOffset: convert(reading.leanOffset ?? null),
     profile: reading.profile.map((sample) => ({ ...sample, radius: convert(sample.radius) })),
     confidence: {
       ...reading.confidence,

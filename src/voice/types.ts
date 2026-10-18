@@ -12,6 +12,9 @@ export type ProviderUsage = {
   outputTextTokens: number;
   inputAudioTokens: number;
   outputAudioTokens: number;
+  /** Parts of the input served from the prompt cache, billed at a lower rate. */
+  cachedInputTextTokens?: number;
+  cachedInputAudioTokens?: number;
 };
 export type ApprovedCue = { id: string; text: string; evidenceIds: string[] };
 export type RealtimeEvent =

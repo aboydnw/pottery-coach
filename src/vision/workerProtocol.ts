@@ -2,6 +2,7 @@ import type { AcquiredFrame } from "../camera/FrameSource";
 import type { SessionScale } from "../measurement/scale";
 import type { DimensionReading, StableDimensionReading } from "../measurement/types";
 import type { WobbleReading } from "../wobble/types";
+import type { BackgroundModel } from "./backgroundModel";
 
 export type FrameRequest = {
   type: "frame";
@@ -25,13 +26,17 @@ export type DiagnosticResponse = {
 export type MeasurementWorkerRequest =
   | { type: "scale"; scale: SessionScale | null; imageCenterlineX?: number }
   | FrameRequest
-  | { type: "reset"; reason: string };
+  | { type: "reset"; reason: string }
+  /** Restores an empty-wheel background learned before a restart, so a pot already on the wheel isn't mistaken for background. */
+  | { type: "background"; model: BackgroundModel };
 
 export type MeasurementWorkerEvent =
   | { type: "reading"; instantaneous: DimensionReading; stable: StableDimensionReading | null }
   | { type: "wobble"; reading: WobbleReading }
   | DiagnosticResponse
-  | { type: "invalidated"; reason: string };
+  | { type: "invalidated"; reason: string }
+  /** The empty-wheel background is learned; the potter can put their clay on. */
+  | { type: "background-ready"; model: BackgroundModel };
 
 /**
  * Keeps at most one frame in flight to the measurement worker. Frames offered while the worker is

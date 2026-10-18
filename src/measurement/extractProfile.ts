@@ -62,6 +62,7 @@ export function extractDimensions(
       : null,
     profile,
     visibleAsymmetry: offsets.length ? median(offsets) : null,
+    leanOffset: leanOf(rows, context.unitsPerPixel),
     confidence,
   };
 }
@@ -77,4 +78,11 @@ function defaultConfidence(score: number): MeasurementConfidence {
     freshnessMs: 0,
     estimatedError95: null,
   };
+}
+
+function leanOf(rows: Array<{ center: number }>, unitsPerPixel: number): number | null {
+  if (rows.length < 10) return null;
+  const top = rows.slice(0, Math.ceil(rows.length * 0.3)).map((row) => row.center);
+  const base = rows.slice(-Math.ceil(rows.length * 0.2)).map((row) => row.center);
+  return (median(top) - median(base)) * unitsPerPixel;
 }

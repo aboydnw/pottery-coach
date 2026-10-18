@@ -164,7 +164,7 @@ export function LiveSession(props: LiveSessionProps) {
   async function switchCamera(): Promise<void> {
     const settings = await camera.switchFacing();
     if (!settings) return;
-    if (!cameraOnly && videoRef.current) pipeline.start(videoRef.current);
+    if (!cameraOnly && videoRef.current) pipeline.start(videoRef.current, { freshBackground: true });
     // A different lens sees the wheel from a different place: the scale no longer applies.
     applyScale(null);
     setup.setCalibration("none");
