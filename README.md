@@ -51,7 +51,7 @@ camera ──▶ CanvasFrameSource ──▶ measurement worker ──▶ stable
 - `src/camera/`, `src/vision/`, `src/measurement/` and `src/wobble/` hold the camera, the worker pipeline, dimension extraction and oscillation detection.
 - `src/calibration/` holds wheel-head detection and sizing (`wheelHead.ts`, `wheelSize.ts`), the board definition, the AprilTag worker (vendored WebAssembly in `public/vendor/apriltag`) and the homography.
 - `src/session/`, `src/privacy/` and `src/review/` hold local storage, retention and deletion, and the post-session review.
-- `worker/` is the Cloudflare Worker. It serves the built app and exchanges a WebRTC offer with the voice provider at `/api/realtime/session`, which returns 503 until its secrets are configured.
+- `worker/` is the Cloudflare Worker. It serves the built app and exchanges a WebRTC offer with the voice provider at `/api/realtime/session` (503 until its secret is configured) and syncs the throw log at `/api/sync`, both for potters signed in with Cloudflare Access.
 
 ### Built but not yet wired into the app
 

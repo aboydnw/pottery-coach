@@ -13,7 +13,6 @@ import type { SessionBundle } from "../session/types";
 import { SetupStore } from "../setup/SetupStore";
 import { loadTemplates } from "../targets/loadTemplates";
 import { browserTransportDependencies, OpenAIWebRtcTransport } from "../voice/OpenAIWebRtcTransport";
-import { forgetPassphrase, loadPassphrase, savePassphrase } from "../voice/passphrase";
 import { ScriptedVoice } from "../voice/scriptedVoice";
 import { createToolRegistry } from "../voice/tools/registry";
 import type { SpokenSummary, ToolDependencies } from "../voice/tools/types";
@@ -27,10 +26,12 @@ import { useCoachMemory } from "./useCoachMemory";
 import { usePieces } from "./usePieces";
 import { SessionPieces } from "../pieces/SessionPieces";
 import { ThrowLog } from "../pieces/ThrowLog";
+import { SyncClient } from "../sync/SyncClient";
 
 const SHELL_KEY = "pottery-coach-session-shell";
 const repository = new SessionRepository();
 const throwLog = new ThrowLog();
+const syncClient = new SyncClient(throwLog);
 const flags = deriveGatedFeatureFlags(releaseManifest);
 const DEFAULT_TARGET = loadTemplates()[0]!;
 
@@ -49,8 +50,6 @@ export function SessionFlow() {
   const [cameraOnly] = useState(() => isCameraOnlyMode());
   const [setup, setSetup] = useState(() => new SetupStore());
   const [scripted] = useState(() => (demoMode ? new ScriptedVoice() : null));
-  const [passphrase, setPassphrase] = useState(() => (CLOUD_VOICE ? loadPassphrase() : null));
-  const [passphraseDraft, setPassphraseDraft] = useState("");
   const updated = useAppUpdate();
   const recording = useSessionRecording(repository, () => dispatch({ type: "STORAGE_FAILED" }));
   const bridge = useRef<Partial<ToolDependencies>>({});
@@ -117,8 +116,8 @@ export function SessionFlow() {
   );
   const createTransport = scripted
     ? () => scripted.transport
-    : passphrase
-      ? () => new OpenAIWebRtcTransport(browserTransportDependencies(() => passphrase))
+    : CLOUD_VOICE
+      ? () => new OpenAIWebRtcTransport(browserTransportDependencies())
       : null;
   const voice = useVoiceSession(createTransport, registry, {
     onUsage: (usage) => void pieces.addUsage(usage).catch(() => undefined),
@@ -144,6 +143,23 @@ export function SessionFlow() {
   useEffect(() => {
     void new RetentionService(repository).expire().catch(() => undefined);
   }, []);
+
+  useEffect(() => {
+    // Demo sessions never leave the phone.
+    if (demoMode) return;
+    const syncNow = () => void sync();
+    syncNow();
+    window.addEventListener("online", syncNow);
+    return () => window.removeEventListener("online", syncNow);
+    // oxlint-disable-next-line react-hooks/exhaustive-deps
+  }, [demoMode]);
+
+  /** Pushes and pulls the throw log; when anything arrives, the coach's memory is rebuilt. */
+  async function sync(): Promise<void> {
+    if (demoMode) return;
+    const result = await syncClient.sync().catch(() => "failed" as const);
+    if (result === "synced") await memory.refresh().catch(() => undefined);
+  }
 
   useEffect(() => {
     sessionStorage.setItem(SHELL_KEY, serializeSessionShell(state));
@@ -177,7 +193,10 @@ export function SessionFlow() {
     const recorded = await recording.end();
     const stored = resolveRecordedSizes(recorded);
     await pieces.finish(recorded).catch(() => undefined);
-    void memory.refresh().catch(() => undefined);
+    void memory
+      .refresh()
+      .then(sync)
+      .catch(() => undefined);
     bundleRef.current = stored;
     setBundle(stored);
     dispatch({ type: "END_SESSION" });
@@ -221,50 +240,8 @@ export function SessionFlow() {
         <p>
           Camera frames are processed on this phone and never stored or uploaded. It is not safety equipment.
           {voice.available && " Your voice goes to the coach's speech service while the session runs."}
+          {!demoMode && " A short log of each pot (sizes and your notes, never images) is saved to your account."}
         </p>
-        {CLOUD_VOICE && !scripted && (
-          <div className="voice-setup">
-            {passphrase ? (
-              <p>
-                Voice coach is on for this phone.{" "}
-                <button
-                  type="button"
-                  className="link-button"
-                  onClick={() => {
-                    forgetPassphrase();
-                    setPassphrase(null);
-                  }}
-                >
-                  Forget passphrase
-                </button>
-              </p>
-            ) : (
-              <form
-                onSubmit={(event) => {
-                  event.preventDefault();
-                  if (!passphraseDraft.trim()) return;
-                  savePassphrase(passphraseDraft);
-                  setPassphrase(passphraseDraft.trim());
-                  setPassphraseDraft("");
-                }}
-              >
-                <label>
-                  Voice passphrase (once per phone)
-                  <input
-                    type="password"
-                    autoComplete="current-password"
-                    value={passphraseDraft}
-                    onChange={(event) => setPassphraseDraft(event.target.value)}
-                  />
-                </label>
-                <button type="submit" className="secondary">
-                  Turn on voice coach
-                </button>
-                <p>Without it, you can still set up by touch.</p>
-              </form>
-            )}
-          </div>
-        )}
         <button type="button" className="start-button" onClick={startSession}>
           Start session
         </button>
@@ -313,7 +290,7 @@ export function SessionFlow() {
         pieceNumber={pieces.pieceNumber}
         lastingNotes={memory.notes}
         onForgetNote={(id) => void memory.forget(id)}
-        onNextPiece={() => pieces.next()}
+        onNextPiece={() => pieces.next().then(() => void sync())}
         onCorrection={(correction) => void pieces.addCorrection(correction).catch(() => undefined)}
         onCue={(policyId, text) => void pieces.logCue(policyId, text).catch(() => undefined)}
         onCameraDenied={() => dispatch({ type: "CAMERA_DENIED" })}

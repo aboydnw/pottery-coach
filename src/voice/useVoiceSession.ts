@@ -94,7 +94,7 @@ export function useVoiceSession(
       if (next === "failed") {
         const reason = controller.getFailure();
         setFailure(reason);
-        speakNotice(reason === "unauthorized" ? NOTICES.passphrase : NOTICES.lostVoice);
+        speakNotice(reason === "unauthorized" ? NOTICES.notAllowed : NOTICES.lostVoice);
       }
     });
     controller.onEvent((event) => {

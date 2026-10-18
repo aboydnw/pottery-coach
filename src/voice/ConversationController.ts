@@ -62,7 +62,7 @@ export class ConversationController {
     await this.transport?.updateInstructions(buildInstructions(potterContext));
   }
 
-  /** Why the conversation failed: a wrong passphrase, voice switched off on the server, or no connection. */
+  /** Why the conversation failed: not signed in, voice switched off on the server, or no connection. */
   getFailure(): ConversationFailure | null {
     return this.failure;
   }

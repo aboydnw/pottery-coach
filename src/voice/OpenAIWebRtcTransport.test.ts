@@ -162,7 +162,7 @@ it("replaces an ended microphone track on the existing sender without renegotiat
   expect(peer.addTrack).toHaveBeenCalledOnce();
 });
 
-it("sends the field-test access token as a bearer header", async () => {
+it("sends what the coach knows about the potter with the session request", async () => {
   const { peer } = fakePeer();
   const fetch = vi.fn().mockResolvedValue(new Response("v=0 answer"));
   const transport = new OpenAIWebRtcTransport({
@@ -170,12 +170,12 @@ it("sends the field-test access token as a bearer header", async () => {
     getUserMedia: vi.fn().mockResolvedValue(fakeStream().stream),
     createAudio: audio,
     fetch,
-    getAccessToken: () => "field-token",
   });
 
-  await transport.connect(config);
+  await transport.connect({ ...config, potterContext: "- Use inches" });
 
-  expect(fetch.mock.calls[0]![1].headers).toMatchObject({ authorization: "Bearer field-token" });
+  expect(JSON.parse(fetch.mock.calls[0]![1].body)).toMatchObject({ potterContext: "- Use inches" });
+  expect(fetch.mock.calls[0]![1].headers).not.toHaveProperty("authorization");
 });
 
 it("reports when the coach's audio starts, finishes, or is cut off", () => {
@@ -243,7 +243,7 @@ it("builds captions from transcript pieces and reports usage", () => {
   });
 });
 
-it("marks a refused passphrase as not worth retrying", async () => {
+it("marks a refused sign-in as not worth retrying", async () => {
   const { peer } = fakePeer();
   const transport = new OpenAIWebRtcTransport({
     createPeer: () => peer,

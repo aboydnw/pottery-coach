@@ -220,6 +220,11 @@ export function LiveSession(props: LiveSessionProps) {
     },
   });
 
+  // If the voice coach is refused or switched off, setup has to happen by touch.
+  useEffect(() => {
+    if (voice.failure === "unauthorized" || voice.failure === "disabled") setSettingsOpen(true);
+  }, [voice.failure]);
+
   function setPhase(next: WheelPhase): void {
     wheelPhaseRef.current = next;
     setWheelPhase(next);
@@ -529,23 +534,28 @@ export function LiveSession(props: LiveSessionProps) {
               </button>
             </div>
           )}
-          {paused && <p className="stale-banner">Coaching is paused. Say "resume" to carry on.</p>}
-          {sizesEnabled && props.measurementsUnverified && (
-            <p className="stale-banner">Prototype: measurements are unverified and may be wrong.</p>
-          )}
-          {!sizesEnabled && <p className="stale-banner">Sizes are disabled until the measurement gate passes.</p>}
           {momentMarked && <p role="status">Moment marked locally.</p>}
-          {camera.active && wheelPhase === "learning" && (
-            <p role="status">Looking at the empty wheel… keep it clear for a moment.</p>
-          )}
-          {wheelPhase === "ready" && <p role="status">Got the empty wheel. Put your clay on.</p>}
-          {wheelPhase === "awaiting-empty" && (
-            <p role="status">Lift the pot off; I'll look at the empty wheel again.</p>
-          )}
-          {cueToast && (
-            <p role="status" className="cue-toast">
-              {cueToast}
-            </p>
+          {/* While settings are open, only the alerts above stay on top of the sheet. */}
+          {!settingsOpen && (
+            <>
+              {paused && <p className="stale-banner">Coaching is paused. Say "resume" to carry on.</p>}
+              {sizesEnabled && props.measurementsUnverified && (
+                <p className="stale-banner">Prototype: measurements are unverified and may be wrong.</p>
+              )}
+              {!sizesEnabled && <p className="stale-banner">Sizes are disabled until the measurement gate passes.</p>}
+              {camera.active && wheelPhase === "learning" && (
+                <p role="status">Looking at the empty wheel… keep it clear for a moment.</p>
+              )}
+              {wheelPhase === "ready" && <p role="status">Got the empty wheel. Put your clay on.</p>}
+              {wheelPhase === "awaiting-empty" && (
+                <p role="status">Lift the pot off; I'll look at the empty wheel again.</p>
+              )}
+              {cueToast && (
+                <p role="status" className="cue-toast">
+                  {cueToast}
+                </p>
+              )}
+            </>
           )}
         </div>
         {wheelCheck && (

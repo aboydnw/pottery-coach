@@ -139,7 +139,7 @@ it("asks the coach to speak first once connected", async () => {
   expect(transport.startedResponses).toHaveLength(1);
 });
 
-it("stops retrying when the passphrase is refused or voice is switched off", async () => {
+it("stops retrying when the potter isn't allowed or voice is switched off", async () => {
   for (const [status, failure] of [
     [401, "unauthorized"],
     [503, "disabled"],

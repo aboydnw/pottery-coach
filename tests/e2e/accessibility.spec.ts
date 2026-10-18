@@ -8,9 +8,6 @@ test("the start screen has no serious automated accessibility violations", async
     [],
   );
   await page.keyboard.press("Tab");
-  await expect(page.getByLabel(/voice passphrase/i)).toBeFocused();
-  await page.keyboard.press("Tab");
-  await page.keyboard.press("Tab");
   await expect(page.getByRole("button", { name: /start session/i })).toBeFocused();
 });
 

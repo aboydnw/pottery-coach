@@ -5,7 +5,8 @@ Pottery Coach runs on Cloudflare Workers at **https://potterycoach.anthonynboyd.
 - **Custom domain:** `potterycoach.anthonynboyd.com`. Cloudflare creates the DNS record and TLS certificate on the first deploy, so the `anthonynboyd.com` zone must be in the same account and the hostname must not already have a conflicting DNS record. `workers.dev` and preview URLs are off.
 - **Static assets:** `dist/`, with single-page-application fallback so `/session/*` serves `index.html`. Only `/api/*` runs the Worker first ([`worker/index.ts`](../worker/index.ts)).
 - **Response headers:** [`public/_headers`](../public/_headers) sets the Content Security Policy, permissions policy and cache rules for static files. The policy includes `'wasm-unsafe-eval'` because the AprilTag detector compiles WebAssembly. `_headers` does not apply to Worker responses, so the Worker sets `no-store` on API responses itself.
-- **Rate limiting:** the `REALTIME_RATE_LIMITER` binding allows 10 voice sessions per client address per minute, using Cloudflare's rate limiting API.
+- **Rate limiting:** `REALTIME_RATE_LIMITER` allows 10 voice sessions per client address per minute, and `SYNC_RATE_LIMITER` 30 syncs per potter per minute, using Cloudflare's rate limiting API.
+- **Database:** the `DB` binding is a D1 database (`pottery-coach`) holding each potter's throw log and lasting notes. Wrangler creates it on the first deploy, and the Worker creates its tables on first use, so there are no migrations to run.
 
 ## Workers Builds (continuous deployment)
 
@@ -24,16 +25,29 @@ Workers Builds reads Node 24 from `.nvmrc` and pnpm from `packageManager` in `pa
 
 `.env.production` sets `VITE_UNVERIFIED_MEASUREMENTS=true`, so the live site shows millimetre measurements before the physical measurement gate passes. The UI labels them "unverified", and `src/release/manifest.ts` still records the gate as pending. Delete that line to return to strict gating. In that mode a session can still run in shape-only mode, but sizes are never shown.
 
-## Cloud voice secrets
+## Sign-in (Cloudflare Access)
 
-Cloud voice stays off (`503 VOICE_DISABLED`) until both secrets exist. Set them in the dashboard under the Worker's **Settings → Variables and Secrets**, or with Wrangler, which prompts for the value so it never appears in shell history:
+The whole site sits behind Cloudflare Access, which signs potters in with a one-time code sent by email. The Worker checks Access's signed token on every `/api/*` request and keys all stored data by the signed-in email; without it, voice and sync answer `401`.
+
+1. In the dashboard, open **Zero Trust** and pick a team name (this gives `https://<team>.cloudflareaccess.com`).
+2. **Access → Applications → Add an application → Self-hosted**: domain `potterycoach.anthonynboyd.com`, session duration **1 month**, identity provider **One-time PIN**.
+3. Add a policy: **Allow**, include **Emails** and list who may use the app. Inviting someone later is just adding their email here.
+4. Copy the application's **Audience (AUD) tag** from its settings.
+5. On the Worker, under **Settings → Variables and Secrets**, add these as **Secrets** (deploys never overwrite secrets, but they do reset plain variables):
+   - `ACCESS_TEAM_DOMAIN`: `https://<team>.cloudflareaccess.com`
+   - `ACCESS_POLICY_AUD`: the AUD tag
+
+On `localhost`, with no Access settings, the Worker signs everyone in as `dev@localhost` so development and tests work.
+
+## Cloud voice secret
+
+Cloud voice stays off (`503 VOICE_DISABLED`) until `OPENAI_API_KEY` exists. Set it as a Secret in the dashboard, or with Wrangler, which prompts for the value so it never appears in shell history:
 
 ```sh
 pnpm exec wrangler secret put OPENAI_API_KEY
-pnpm exec wrangler secret put REALTIME_ACCESS_TOKEN
 ```
 
-`wrangler secret put` deploys a new version immediately. `REALTIME_ACCESS_TOKEN` is the voice passphrase: type it once on the phone's start screen ("Voice passphrase") and it is remembered there and sent as `Authorization: Bearer …`. Anyone without it gets the touch-only app. `.env.production` sets `VITE_CLOUD_VOICE=true`, which shows that passphrase field; the release manifest still records the provider gate as pending.
+`wrangler secret put` deploys a new version immediately. Only signed-in potters can start a voice session. `.env.production` sets `VITE_CLOUD_VOICE=true`; the release manifest still records the provider gate as pending. Set a monthly budget on the OpenAI project too (**platform.openai.com → Settings → Limits**): the Worker never sees what a session costs, because audio goes straight from the phone to OpenAI.
 
 Plain variables in `wrangler.jsonc`:
 

@@ -5,7 +5,6 @@ type Dependencies = {
   getUserMedia(constraints: MediaStreamConstraints): Promise<MediaStream>;
   createAudio(): HTMLAudioElement;
   fetch: typeof globalThis.fetch;
-  getAccessToken?(): string;
 };
 
 const defaults: Dependencies = {
@@ -54,12 +53,10 @@ export class OpenAIWebRtcTransport implements RealtimeCoachTransport {
       });
       const offer = await peer.createOffer();
       await peer.setLocalDescription(offer);
-      const accessToken = this.dependencies.getAccessToken?.() ?? "";
       const response = await this.dependencies.fetch("/api/realtime/session", {
         method: "POST",
         headers: {
           "content-type": "application/json",
-          ...(accessToken ? { authorization: `Bearer ${accessToken}` } : {}),
         },
         credentials: "same-origin",
         body: JSON.stringify({
@@ -199,9 +196,9 @@ export class RealtimeSessionError extends Error {
   }
 }
 
-/** Browser dependencies for the real transport, with the field-test passphrase as the bearer token. */
-export function browserTransportDependencies(getAccessToken: () => string): Dependencies {
-  return { ...defaults, getAccessToken };
+/** Browser dependencies for the real transport; the Access sign-in cookie identifies the potter. */
+export function browserTransportDependencies(): Dependencies {
+  return defaults;
 }
 
 /**
