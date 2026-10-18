@@ -50,7 +50,11 @@ describe("HandsDetector", () => {
   it("releases only after the outline has been steady for a second", () => {
     const detector = new HandsDetector();
     feed(detector, [200, 240, 200, 250, 210]);
-    const steady = feed(detector, [220, 220, 220, 220, 220, 220, 220, 220, 220, 220, 220, 220, 220, 220, 220, 220], 500);
+    const steady = feed(
+      detector,
+      [220, 220, 220, 220, 220, 220, 220, 220, 220, 220, 220, 220, 220, 220, 220, 220],
+      500,
+    );
     expect(steady.slice(0, 8)).not.toContain(false);
     expect(steady.at(-1)).toBe(false);
   });
@@ -58,7 +62,11 @@ describe("HandsDetector", () => {
   it("accepts the new shape as the baseline after hands come off", () => {
     const detector = new HandsDetector();
     feed(detector, [200, 240, 200, 250, 210]);
-    feed(detector, Array.from({ length: 20 }, () => 260), 500);
+    feed(
+      detector,
+      Array.from({ length: 20 }, () => 260),
+      500,
+    );
     expect(detector.update(reading(3_000, 262))).toBe(false);
   });
 
