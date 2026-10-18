@@ -518,10 +518,24 @@ button.link-button {
 }
 
 .stage-bottom .captions {
+  display: flex;
+  flex-direction: column;
+  max-height: 25vh;
   margin: 0 0 0.5rem;
   border-left-color: #8fd0d8;
   background: rgb(30 27 25 / 55%);
   color: #fff;
+}
+
+/* A rolling caption: the newest words sit at the bottom and older lines slide off the top. */
+.stage-bottom .captions ol {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  justify-content: flex-end;
+  min-height: 0;
+  overflow: hidden;
+  mask-image: linear-gradient(transparent, #000 1.5rem);
 }
 
 .stage-bottom .voice-status {

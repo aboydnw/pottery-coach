@@ -30,6 +30,9 @@ export class MockRealtimeTransport implements RealtimeCoachTransport {
   async resumeInput(): Promise<void> {
     this.paused = false;
   }
+  isClosed(): boolean {
+    return this.closed;
+  }
   isPaused(): boolean {
     return this.paused;
   }

@@ -22,14 +22,19 @@ export class ScriptedVoice {
     throw new Error(`No result for ${name}`);
   }
 
+  /** Says a line. The coach's lines are spoken in full, as if their audio played instantly. */
   say(speaker: "user" | "assistant", text: string): void {
-    this.transport.emit({
-      type: "transcript-final",
-      eventId: `scripted-caption-${this.nextId++}`,
-      speaker,
-      text,
-      timestampMs: performance.now(),
-    });
+    const itemId = `scripted-caption-${this.nextId++}`;
+    if (speaker === "assistant")
+      this.transport.emit({ type: "output-started", itemId, timestampMs: performance.now() });
+    this.transport.emit({ type: "transcript-final", eventId: itemId, speaker, text, timestampMs: performance.now() });
+    if (speaker === "assistant")
+      this.transport.emit({ type: "output-stopped", itemId, timestampMs: performance.now(), reason: "finished" });
+  }
+
+  /** Whether the app still has the call open. */
+  get connected(): boolean {
+    return !this.transport.isClosed();
   }
 }
 

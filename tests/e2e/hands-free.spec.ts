@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { openSetup, startSession, voiceTool } from "./fixtures/session-streams";
+import { endSession, openSetup, startSession, voiceConnected, voiceTool } from "./fixtures/session-streams";
 
 test("a whole session runs by voice after the single tap", async ({ page }) => {
   await startSession(page);
@@ -24,12 +24,20 @@ test("a whole session runs by voice after the single tap", async ({ page }) => {
 
   await expect(voiceTool(page, "endSession", { confirmed: false })).resolves.toHaveProperty("needsConfirmation");
   await expect(page.getByText(/camera active/i)).toBeVisible();
-  await voiceTool(page, "endSession", { confirmed: true });
+  await expect(voiceTool(page, "endSession", { confirmed: true })).resolves.toMatchObject({
+    ended: true,
+    summary: { markedMoments: 1 },
+  });
   await expect(page.getByRole("heading", { name: /throw complete/i })).toBeVisible();
-  await expect(voiceTool(page, "getSessionSummary")).resolves.toMatchObject({ markedMoments: 1 });
+  expect(await voiceConnected(page)).toBe(true);
+  await page.evaluate(() => window.__potteryVoice!.say("assistant", "Nice pull. See you next time."));
+  await expect.poll(() => voiceConnected(page)).toBe(false);
+});
 
-  await expect(voiceTool(page, "deleteSession", { confirmed: false })).resolves.toHaveProperty("needsConfirmation");
-  await expect(voiceTool(page, "deleteSession", { confirmed: true })).resolves.toEqual({ deleted: true });
+test("ending by touch hangs up the coach straight away", async ({ page }) => {
+  await startSession(page);
+  await endSession(page);
+  await expect.poll(() => voiceConnected(page)).toBe(false);
 });
 
 test("'same as last time' brings back the previous setup for one confirmation", async ({ page }) => {
