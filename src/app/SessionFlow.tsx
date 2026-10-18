@@ -214,6 +214,10 @@ export function SessionFlow() {
           One tap starts the camera and, if it's set up, your voice coach. After that you won't need to touch the
           screen: talk to the coach through your headphones.
         </p>
+        <p className="tip">
+          <strong>Start with an empty wheel.</strong> The coach takes a quick look at it first, then tells you to put
+          your clay on.
+        </p>
         <p>
           Camera frames are processed on this phone and never stored or uploaded. It is not safety equipment.
           {voice.available && " Your voice goes to the coach's speech service while the session runs."}
