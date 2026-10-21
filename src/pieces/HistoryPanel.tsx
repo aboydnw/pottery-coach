@@ -6,7 +6,7 @@ import type { PieceRecord } from "./types";
 const dateFormat = new Intl.DateTimeFormat(undefined, { day: "numeric", month: "short" });
 
 /** The throw log, newest first: one line per pot, with its notes and size checks underneath. */
-export function HistoryPanel({ throwLog, refreshKey = 0 }: { throwLog: ThrowLog; refreshKey?: number }) {
+export function HistoryPanel({ throwLog }: { throwLog: ThrowLog }) {
   const [pieces, setPieces] = useState<PieceRecord[] | null>(null);
 
   useEffect(() => {
@@ -18,7 +18,7 @@ export function HistoryPanel({ throwLog, refreshKey = 0 }: { throwLog: ThrowLog;
     return () => {
       cancelled = true;
     };
-  }, [throwLog, refreshKey]);
+  }, [throwLog]);
 
   return (
     <section className="history" aria-labelledby="history-title">

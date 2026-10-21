@@ -686,7 +686,8 @@ export function LiveSession(props: LiveSessionProps) {
             )}
           </div>
           <NotesPanel notes={props.lastingNotes} onForget={props.onForgetNote} />
-          <HistoryPanel throwLog={props.throwLog} refreshKey={historyKey} />
+          {/* A new key remounts the panel, which reloads the log after a piece is saved. */}
+          <HistoryPanel key={historyKey} throwLog={props.throwLog} />
           {camera.active && <DiagnosticsPanel sample={pipeline.sample} />}
         </section>
       )}

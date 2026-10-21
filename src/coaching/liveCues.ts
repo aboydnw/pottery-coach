@@ -155,7 +155,8 @@ export class CueObserver {
         activeShaping: inputs.handsLikely,
       };
     });
-    for (const key of [...this.since.keys()]) if (!seen.has(key)) this.since.delete(key);
+    // Deleting the current key while iterating a Map is safe.
+    for (const key of this.since.keys()) if (!seen.has(key)) this.since.delete(key);
     return observations;
   }
 
