@@ -80,7 +80,7 @@ export function createToolRegistry(dependencies: ToolDependencies) {
       return {
         ...check,
         question: check.found
-          ? "Ask: are the yellow lines on the outer edges of the wheel head? They can say yes, or which side to move."
+          ? "Ask: are the yellow lines on the edges of the wheel head itself (not a tray or splash pan around it)? They can say yes, say they're on the tray, or say which line to move."
           : "The edges weren't clear. Ask them to say which marker to move, or to skip sizes.",
       };
     },
@@ -89,6 +89,16 @@ export function createToolRegistry(dependencies: ToolDependencies) {
       if (!dependencies.wheel) return NOT_NOW;
       dependencies.wheel.adjust(side, direction, size);
       return { moved: true, question: "Ask whether the markers are on the edges now." };
+    },
+    switchWheelEdges: (input) => {
+      const { toward } = parse(z.object({ toward: z.enum(["inner", "outer"]) }).strict(), input);
+      if (!dependencies.wheel) return NOT_NOW;
+      return dependencies.wheel.switchEdges(toward).switched
+        ? { switched: true, question: "Ask whether the lines are on the wheel head's edges now." }
+        : {
+            switched: false,
+            note: `No other edges were found ${toward === "inner" ? "inside" : "outside"}; move the lines instead.`,
+          };
     },
     confirmWheelHead: (input) => {
       parse(empty, input);

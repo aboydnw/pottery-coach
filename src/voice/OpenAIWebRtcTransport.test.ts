@@ -274,3 +274,19 @@ it("speaks a cue as a one-off reply that skips the conversation, then notes it",
   expect(sent.at(-2).response.instructions).toContain("Top's flaring.");
   expect(sent.at(-1)).toMatchObject({ type: "conversation.item.create", item: { role: "system" } });
 });
+
+it("asks for a microphone tuned for a noisy studio", async () => {
+  const { peer } = fakePeer();
+  const getUserMedia = vi.fn().mockResolvedValue(fakeStream().stream);
+  const transport = new OpenAIWebRtcTransport({
+    createPeer: () => peer,
+    getUserMedia,
+    createAudio: audio,
+    fetch: vi.fn().mockResolvedValue(new Response("v=0 answer")),
+  });
+  await transport.connect(config);
+  expect(getUserMedia).toHaveBeenCalledWith({
+    audio: expect.objectContaining({ autoGainControl: false, noiseSuppression: true, voiceIsolation: true }),
+    video: false,
+  });
+});

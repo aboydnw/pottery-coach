@@ -14,10 +14,12 @@ function Harness({
   mirrored = false,
   confidence = 0.9,
   onChange,
+  onSwitch = vi.fn(),
 }: {
   mirrored?: boolean;
   confidence?: number;
   onChange: (edges: WheelEdges) => void;
+  onSwitch?: (toward: "inner" | "outer") => void;
 }) {
   const [edges, setEdges] = useState<WheelEdges>({ left: 200, right: 800 });
   return (
@@ -30,6 +32,8 @@ function Harness({
         onChange(next);
       }}
       mirrored={mirrored}
+      canSwitch={{ inner: true, outer: false }}
+      onSwitch={onSwitch}
       onConfirm={vi.fn()}
       onRetry={vi.fn()}
     />
@@ -67,6 +71,8 @@ it("confirms or retries on request", () => {
       edges={{ left: 200, right: 800 }}
       onEdgesChange={vi.fn()}
       mirrored={false}
+      canSwitch={{ inner: false, outer: false }}
+      onSwitch={vi.fn()}
       onConfirm={onConfirm}
       onRetry={onRetry}
     />,
@@ -75,4 +81,35 @@ it("confirms or retries on request", () => {
   fireEvent.click(screen.getByRole("button", { name: /try again/i }));
   expect(onConfirm).toHaveBeenCalledOnce();
   expect(onRetry).toHaveBeenCalledOnce();
+});
+
+it("moves a line with the arrow buttons", () => {
+  const onChange = vi.fn();
+  render(<Harness onChange={onChange} />);
+  fireEvent.click(screen.getByRole("button", { name: "Move the left line right" }));
+  expect(onChange).toHaveBeenLastCalledWith({ left: 210, right: 800 });
+});
+
+it("puts the left button on the screen's left line when the still is mirrored", () => {
+  const onChange = vi.fn();
+  render(<Harness mirrored onChange={onChange} />);
+  fireEvent.click(screen.getByRole("button", { name: "Move the left line left" }));
+  expect(onChange).toHaveBeenLastCalledWith({ left: 200, right: 810 });
+});
+
+it("moves the nearer line to where the picture is tapped", () => {
+  const onChange = vi.fn();
+  const { container } = render(<Harness onChange={onChange} />);
+  const svg = container.querySelector("svg")!;
+  svg.getBoundingClientRect = () => ({ left: 0, top: 0, width: 1000, height: 500 }) as DOMRect;
+  fireEvent.pointerDown(svg, { clientX: 700, pointerId: 1 });
+  expect(onChange).toHaveBeenLastCalledWith({ left: 200, right: 700 });
+});
+
+it("offers the inner edges when the lines may be on a tray", () => {
+  const onSwitch = vi.fn();
+  render(<Harness onChange={vi.fn()} onSwitch={onSwitch} />);
+  fireEvent.click(screen.getByRole("button", { name: /try the inner edge/i }));
+  expect(onSwitch).toHaveBeenCalledWith("inner");
+  expect(screen.queryByRole("button", { name: /try the outer edge/i })).not.toBeInTheDocument();
 });

@@ -645,3 +645,29 @@ button.link-button {
 .note-form input {
   width: 100%;
 }
+
+.wheel-marker .wheel-marker-hit {
+  fill: transparent;
+  stroke: none;
+  pointer-events: all;
+}
+
+.wheel-nudges {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-bottom: 0.5rem;
+}
+
+.wheel-nudge {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.wheel-nudge button {
+  min-width: 3rem;
+  min-height: 3rem;
+  padding: 0;
+}

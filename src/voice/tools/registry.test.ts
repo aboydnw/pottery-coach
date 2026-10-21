@@ -169,6 +169,7 @@ it("checks the wheel head only after its size is confirmed, then adjusts and con
   const wheel = {
     check: vi.fn(async () => ({ found: true, confidence: 0.9 })),
     adjust: vi.fn(),
+    switchEdges: vi.fn(() => ({ switched: true })),
     confirm: vi.fn(() => ({ accepted: true, problems: [] })),
     skip: vi.fn(),
   };
@@ -180,6 +181,8 @@ it("checks the wheel head only after its size is confirmed, then adjusts and con
   await expect(registry.call("checkWheelHead", {})).resolves.toMatchObject({ found: true });
   await registry.call("adjustWheelMarker", { side: "left", direction: "out", size: "small" });
   expect(wheel.adjust).toHaveBeenCalledWith("left", "out", "small");
+  await expect(registry.call("switchWheelEdges", { toward: "inner" })).resolves.toMatchObject({ switched: true });
+  expect(wheel.switchEdges).toHaveBeenCalledWith("inner");
   await expect(registry.call("confirmWheelHead", {})).resolves.toMatchObject({ accepted: true });
 });
 

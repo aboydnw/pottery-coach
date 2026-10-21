@@ -34,7 +34,7 @@ export class OpenAIWebRtcTransport implements RealtimeCoachTransport {
     let channel: RTCDataChannel | null = null;
     try {
       stream = await this.dependencies.getUserMedia({
-        audio: { echoCancellation: true, noiseSuppression: true },
+        audio: MICROPHONE,
         video: false,
       });
       const audioTrack = stream.getAudioTracks()[0];
@@ -136,7 +136,7 @@ export class OpenAIWebRtcTransport implements RealtimeCoachTransport {
     const tracks = this.localStream?.getAudioTracks() ?? [];
     if (tracks.some((track) => track.readyState === "ended")) {
       const replacement = await this.dependencies.getUserMedia({
-        audio: { echoCancellation: true, noiseSuppression: true },
+        audio: MICROPHONE,
         video: false,
       });
       await this.audioSender?.replaceTrack(replacement.getAudioTracks()[0] ?? null);
@@ -186,6 +186,17 @@ export class OpenAIWebRtcTransport implements RealtimeCoachTransport {
     this.listeners.forEach((listener) => listener(event));
   }
 }
+
+/**
+ * Microphone settings for a noisy studio. Automatic gain is off so the phone doesn't turn up distant
+ * music between words, and voice isolation (where the browser has it) keeps only the nearest voice.
+ */
+export const MICROPHONE: MediaTrackConstraints & { voiceIsolation?: boolean } = {
+  echoCancellation: true,
+  noiseSuppression: true,
+  autoGainControl: false,
+  voiceIsolation: true,
+};
 
 /** Thrown when the session endpoint refuses the request; retrying won't help for auth or disabled voice. */
 export class RealtimeSessionError extends Error {

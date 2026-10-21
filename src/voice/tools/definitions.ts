@@ -82,6 +82,18 @@ export const REALTIME_TOOL_DEFINITIONS = [
   },
   {
     type: "function",
+    name: "switchWheelEdges",
+    description:
+      "Jump the yellow lines to the next edges found: inner when they're on a tray or splash pan around the wheel head, outer when they're inside it.",
+    parameters: {
+      type: "object",
+      properties: { toward: { enum: ["inner", "outer"] } },
+      required: ["toward"],
+      additionalProperties: false,
+    },
+  },
+  {
+    type: "function",
     name: "confirmWheelHead",
     description: "Call after the potter says the markers sit on the edges.",
     parameters: empty,

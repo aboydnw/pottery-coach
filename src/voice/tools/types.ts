@@ -35,6 +35,8 @@ export type ToolDependencies = {
   wheel?: {
     check(fresh: boolean): Promise<WheelCheck>;
     adjust(side: "left" | "right", direction: "in" | "out", size: "small" | "large"): void;
+    /** Jumps to the next edge pair found inside (wheel head within a tray) or outside the current one. */
+    switchEdges(toward: "inner" | "outer"): { switched: boolean };
     confirm(): WheelConfirmation;
     skip(): void;
   };

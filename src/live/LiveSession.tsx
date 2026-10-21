@@ -54,7 +54,15 @@ const LINES = {
 /** Where the empty-wheel snapshot is at: learning it, learned (clay can go on), or waiting for the wheel to clear. */
 type WheelPhase = "learning" | "ready" | "awaiting-empty" | "placed";
 
-type WheelCheckState = { image: ImageData; detection: WheelHeadDetection; edges: WheelEdges; adjusted: boolean };
+type WheelCheckState = {
+  image: ImageData;
+  detection: WheelHeadDetection;
+  edges: WheelEdges;
+  adjusted: boolean;
+  /** Nested edge pairs found (outermost first) and which one is shown; a tray sits outside the wheel head. */
+  candidates: WheelHeadDetection[];
+  candidateIndex: number;
+};
 
 export type LiveSessionProps = {
   setup: SetupStore;
@@ -328,11 +336,41 @@ export function LiveSession(props: LiveSessionProps) {
     const gray = toGray(image.data, image.width, image.height);
     const found = detectWheelHead(gray);
     const toFull = (value: number) => Math.round((value + 0.5) * gray.scale);
-    const detection = { ...found, leftX: toFull(found.leftX), rightX: toFull(found.rightX), row: toFull(found.row) };
-    updateWheel({ image, detection, edges: { left: detection.leftX, right: detection.rightX }, adjusted: false });
+    const candidates = found.candidates.map((candidate) => ({
+      ...candidate,
+      leftX: toFull(candidate.leftX),
+      rightX: toFull(candidate.rightX),
+      row: toFull(candidate.row),
+    }));
+    const detection = candidates[0]!;
+    updateWheel({
+      image,
+      detection,
+      edges: { left: detection.leftX, right: detection.rightX },
+      adjusted: false,
+      candidates,
+      candidateIndex: 0,
+    });
     setup.setCalibration("checking");
     setProblem(null);
     return { found: detection.confidence >= 0.5, confidence: Math.round(detection.confidence * 100) / 100 };
+  }
+
+  /** Shows the next edge pair found inside (a wheel head within a tray) or outside the current one. */
+  function switchWheelEdges(toward: "inner" | "outer"): { switched: boolean } {
+    const current = wheelRef.current;
+    if (!current) return { switched: false };
+    const index = current.candidateIndex + (toward === "inner" ? 1 : -1);
+    const detection = current.candidates[index];
+    if (!detection) return { switched: false };
+    updateWheel({
+      ...current,
+      detection,
+      edges: { left: detection.leftX, right: detection.rightX },
+      adjusted: false,
+      candidateIndex: index,
+    });
+    return { switched: true };
   }
 
   function adjustWheel(side: "left" | "right", direction: "in" | "out", size: "small" | "large"): void {
@@ -426,7 +464,13 @@ export function LiveSession(props: LiveSessionProps) {
       getWobble: () => (activeScale ? pipeline.wobbleReading : null),
       getTarget: () => target,
       getGoal: () => goal,
-      wheel: { check: checkWheel, adjust: adjustWheel, confirm: confirmWheel, skip: skipWheel },
+      wheel: {
+        check: checkWheel,
+        adjust: adjustWheel,
+        switchEdges: switchWheelEdges,
+        confirm: confirmWheel,
+        skip: skipWheel,
+      },
       setPaused,
       markMoment: ({ label }) => markMoment().then((moment) => (label ? { ...moment, label } : moment)),
       endSession: () => props.onEnd({ byVoice: true }),
@@ -535,8 +579,8 @@ export function LiveSession(props: LiveSessionProps) {
             </div>
           )}
           {momentMarked && <p role="status">Moment marked locally.</p>}
-          {/* While settings are open, only the alerts above stay on top of the sheet. */}
-          {!settingsOpen && (
+          {/* While settings or the edge check are open, only the alerts above stay on top of them. */}
+          {!settingsOpen && !wheelCheck && (
             <>
               {paused && <p className="stale-banner">Coaching is paused. Say "resume" to carry on.</p>}
               {sizesEnabled && props.measurementsUnverified && (
@@ -567,6 +611,11 @@ export function LiveSession(props: LiveSessionProps) {
               edges={wheelCheck.edges}
               onEdgesChange={(edges) => updateWheel({ ...wheelCheck, edges, adjusted: true })}
               mirrored={mirrored}
+              canSwitch={{
+                inner: wheelCheck.candidateIndex < wheelCheck.candidates.length - 1,
+                outer: wheelCheck.candidateIndex > 0,
+              }}
+              onSwitch={(toward) => void switchWheelEdges(toward)}
               onConfirm={() => void confirmWheel()}
               onRetry={() => updateWheel(null)}
             />

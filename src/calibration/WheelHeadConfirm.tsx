@@ -4,6 +4,9 @@ import { moveMarker, type WheelEdges } from "./wheelMarkers";
 
 type Edge = "left" | "right";
 
+/** One tap of an arrow button moves a line this share of the picture's width. */
+const BUTTON_STEP_FRACTION = 0.01;
+
 type Props = {
   still: ImageData;
   /** Detected edges in full-resolution image pixels; only the row and confidence are used here. */
@@ -13,12 +16,28 @@ type Props = {
   onEdgesChange(edges: WheelEdges): void;
   /** Show the still mirrored to match a front-camera preview. Marker positions stay in image pixels. */
   mirrored: boolean;
+  /** Whether there's another detected edge pair inside or outside this one (a tray around the wheel head). */
+  canSwitch: { inner: boolean; outer: boolean };
+  onSwitch(toward: "inner" | "outer"): void;
   onConfirm(): void;
   onRetry(): void;
 };
 
-/** Shows a still with draggable, keyboard-adjustable markers on the wheel head's edges. */
-export function WheelHeadConfirm({ still, detection, edges, onEdgesChange, mirrored, onConfirm, onRetry }: Props) {
+/**
+ * Shows a still with the wheel-head edges marked. Lines can be dragged anywhere along their length,
+ * moved by tapping where an edge should be, nudged with buttons, or switched to the next edges found.
+ */
+export function WheelHeadConfirm({
+  still,
+  detection,
+  edges,
+  onEdgesChange,
+  mirrored,
+  canSwitch,
+  onSwitch,
+  onConfirm,
+  onRetry,
+}: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [dragging, setDragging] = useState<Edge | null>(null);
   const { width, height } = still;
@@ -38,27 +57,39 @@ export function WheelHeadConfirm({ still, detection, edges, onEdgesChange, mirro
     return (mirrored ? 1 - fraction : fraction) * width;
   }
 
+  /** Moves a line by one step towards the screen's left or right, whichever way the still is shown. */
+  function step(edge: Edge, screenDirection: -1 | 1, fraction = BUTTON_STEP_FRACTION): void {
+    move(edge, edges[edge] + fraction * width * screenDirection * (mirrored ? -1 : 1));
+  }
+
   function nudge(edge: Edge, event: KeyboardEvent<SVGGElement>): void {
     if (event.key !== "ArrowLeft" && event.key !== "ArrowRight") return;
     event.preventDefault();
-    const step = (event.shiftKey ? 0.02 : 0.002) * width;
-    const visualDirection = event.key === "ArrowRight" ? 1 : -1;
-    move(edge, edges[edge] + step * visualDirection * (mirrored ? -1 : 1));
+    step(edge, event.key === "ArrowRight" ? 1 : -1, event.shiftKey ? 0.02 : 0.002);
   }
+
+  // Which line is on the screen's left depends on mirroring.
+  const screenOrder: Edge[] = mirrored ? ["right", "left"] : ["left", "right"];
 
   return (
     <section className="wheel-head-confirm" aria-labelledby="wheel-confirm-title">
       <h2 id="wheel-confirm-title">Check the wheel-head edges</h2>
       <p role="status">
         {confident
-          ? "Line the markers up with the outer edges of the wheel head (or bat)."
-          : "We couldn't find the edges clearly. Drag the markers onto the outer edges of the wheel head (or bat)."}
+          ? "Are the yellow lines on the outer edges of the wheel head (or bat)? Drag a line, tap where an edge should be, or use the arrows."
+          : "We couldn't find the edges clearly. Drag the yellow lines, or tap where each edge of the wheel head (or bat) is."}
       </p>
       <div className={mirrored ? "wheel-still mirrored" : "wheel-still"}>
         <canvas ref={canvasRef} width={width} height={height} aria-hidden="true" />
         <svg
           viewBox={`0 0 ${width} ${height}`}
           preserveAspectRatio="none"
+          onPointerDown={(event) => {
+            if (dragging) return;
+            // A tap away from both lines moves the nearer one there.
+            const x = pointerX(event);
+            move(Math.abs(x - edges.left) <= Math.abs(x - edges.right) ? "left" : "right", x);
+          }}
           onPointerMove={(event) => dragging && move(dragging, pointerX(event))}
           onPointerUp={() => setDragging(null)}
           onPointerCancel={() => setDragging(null)}
@@ -77,10 +108,19 @@ export function WheelHeadConfirm({ still, detection, edges, onEdgesChange, mirro
               className="wheel-marker"
               onKeyDown={(event) => nudge(edge, event)}
               onPointerDown={(event) => {
+                event.stopPropagation();
                 event.currentTarget.ownerSVGElement?.setPointerCapture(event.pointerId);
                 setDragging(edge);
               }}
             >
+              {/* A wide, invisible strip along the whole line, so it's easy to grab on a phone. */}
+              <rect
+                className="wheel-marker-hit"
+                x={edges[edge] - width * 0.06}
+                y={0}
+                width={width * 0.12}
+                height={height}
+              />
               <line x1={edges[edge]} x2={edges[edge]} y1={0} y2={height} />
               <rect
                 x={edges[edge] - width * 0.03}
@@ -93,6 +133,43 @@ export function WheelHeadConfirm({ still, detection, edges, onEdgesChange, mirro
           ))}
         </svg>
       </div>
+      <div className="wheel-nudges">
+        {screenOrder.map((edge, index) => (
+          <div key={edge} className="wheel-nudge" role="group" aria-label={`${index === 0 ? "Left" : "Right"} line`}>
+            <button
+              type="button"
+              className="secondary"
+              aria-label={`Move the ${index === 0 ? "left" : "right"} line left`}
+              onClick={() => step(edge, -1)}
+            >
+              ◀
+            </button>
+            <span aria-hidden="true">{index === 0 ? "Left line" : "Right line"}</span>
+            <button
+              type="button"
+              className="secondary"
+              aria-label={`Move the ${index === 0 ? "left" : "right"} line right`}
+              onClick={() => step(edge, 1)}
+            >
+              ▶
+            </button>
+          </div>
+        ))}
+      </div>
+      {(canSwitch.inner || canSwitch.outer) && (
+        <div className="actions">
+          {canSwitch.inner && (
+            <button type="button" className="secondary" onClick={() => onSwitch("inner")}>
+              Try the inner edge (lines are on a tray)
+            </button>
+          )}
+          {canSwitch.outer && (
+            <button type="button" className="secondary" onClick={() => onSwitch("outer")}>
+              Try the outer edge
+            </button>
+          )}
+        </div>
+      )}
       <div className="actions">
         <button type="button" onClick={() => onConfirm()}>
           Looks right
