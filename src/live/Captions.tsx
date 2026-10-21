@@ -16,6 +16,7 @@ const FAILURE_TEXT: Record<string, string> = {
   unauthorized: "The voice passphrase didn't work. Carry on by touch, or fix it on the start screen.",
   disabled: "The voice coach is switched off on the server.",
   unavailable: "Voice coach lost.",
+  "time-limit": "Voice coach hung up after an hour.",
 };
 
 export function Captions({

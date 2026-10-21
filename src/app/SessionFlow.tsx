@@ -79,9 +79,6 @@ export function SessionFlow() {
           const finished = bundleRef.current;
           return finished ? async () => spokenSummary(finished) : undefined;
         },
-        get deleteSession() {
-          return bundleRef.current ? async () => void (await deleteSession()) : undefined;
-        },
       }),
     // The registry reads everything through refs, so it is built once.
     // oxlint-disable-next-line react-hooks/exhaustive-deps

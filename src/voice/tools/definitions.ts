@@ -135,17 +135,4 @@ export const REALTIME_TOOL_DEFINITIONS = [
       "End the session. Call with confirmed: false first to get the consequence to read out; call with confirmed: true only after the potter agrees.",
     parameters: confirmed,
   },
-  {
-    type: "function",
-    name: "getSessionSummary",
-    description: "Facts for a short spoken debrief after the session ends.",
-    parameters: empty,
-  },
-  {
-    type: "function",
-    name: "deleteSession",
-    description:
-      "Delete the finished session from this device. Call with confirmed: false first, then confirmed: true only after the potter agrees.",
-    parameters: confirmed,
-  },
 ] as const;

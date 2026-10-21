@@ -11,6 +11,10 @@ const MAX_CAPTIONS = 4;
 const CAPTION_TICK_MS = 100;
 /** Hang up anyway if the goodbye never finishes playing. */
 const HANG_UP_TIMEOUT_MS = 20_000;
+/** A call left running (say, picking up studio noise) can't run up the bill past this. */
+export const MAX_CALL_MS = 60 * 60_000;
+
+export type VoiceFailure = ConversationFailure | "time-limit";
 const SESSION_CONFIG: RealtimeSessionConfig = {
   provider: "openai",
   model: "server-owned",
@@ -29,10 +33,11 @@ export function useVoiceSession(createTransport: (() => RealtimeCoachTransport) 
   const toolsRef = useRef(tools);
   const [state, setState] = useState<ConversationState | "off">("off");
   const [captions, setCaptions] = useState<Caption[]>([]);
-  const [failure, setFailure] = useState<ConversationFailure | null>(null);
+  const [failure, setFailure] = useState<VoiceFailure | null>(null);
   const pacerRef = useRef(new CaptionPacer(MAX_CAPTIONS));
   const tickerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const hangUpRef = useRef<{ heardReply: boolean; timer: ReturnType<typeof setTimeout> } | null>(null);
+  const callLimitRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     toolsRef.current = tools;
@@ -42,6 +47,7 @@ export function useVoiceSession(createTransport: (() => RealtimeCoachTransport) 
     () => () => {
       clearCaptionTicker();
       if (hangUpRef.current) clearTimeout(hangUpRef.current.timer);
+      if (callLimitRef.current) clearTimeout(callLimitRef.current);
       void controllerRef.current?.close();
     },
     // oxlint-disable-next-line react-hooks/exhaustive-deps
@@ -107,6 +113,12 @@ export function useVoiceSession(createTransport: (() => RealtimeCoachTransport) 
         if (finished && hangUpRef.current?.heardReply) void stop();
       }
     });
+    callLimitRef.current = setTimeout(() => {
+      void stop().then(() => {
+        setFailure("time-limit");
+        speakNotice(NOTICES.timeLimit);
+      });
+    }, MAX_CALL_MS);
     await controller.connect(config);
   }
 
@@ -115,6 +127,8 @@ export function useVoiceSession(createTransport: (() => RealtimeCoachTransport) 
     controllerRef.current = null;
     if (hangUpRef.current) clearTimeout(hangUpRef.current.timer);
     hangUpRef.current = null;
+    if (callLimitRef.current) clearTimeout(callLimitRef.current);
+    callLimitRef.current = null;
     await controller?.close();
     setState("off");
   }

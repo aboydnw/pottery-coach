@@ -42,5 +42,4 @@ export type ToolDependencies = {
   markMoment?(input: { label?: string }): Promise<MarkedMoment>;
   endSession?(): Promise<void>;
   getSessionSummary?(): Promise<SpokenSummary | null>;
-  deleteSession?(): Promise<void>;
 };

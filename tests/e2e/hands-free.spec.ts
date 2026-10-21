@@ -58,3 +58,15 @@ test("captions show what was said for a quick glance", async ({ page }) => {
   await page.evaluate(() => window.__potteryVoice!.say("assistant", "What are we making today?"));
   await expect(page.getByRole("region", { name: /conversation/i })).toContainText("What are we making today?");
 });
+
+test("the coach hangs up after an hour, and one tap carries on", async ({ page }) => {
+  await page.clock.install();
+  await startSession(page);
+  await page.clock.fastForward(60 * 60_000);
+  const tap = page.getByRole("button", { name: /hung up after an hour/i });
+  await expect(tap).toBeVisible();
+  expect(await voiceConnected(page)).toBe(false);
+  await tap.click();
+  await expect.poll(() => voiceConnected(page)).toBe(true);
+  await expect(tap).toHaveCount(0);
+});

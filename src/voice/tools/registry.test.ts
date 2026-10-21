@@ -183,17 +183,13 @@ it("checks the wheel head only after its size is confirmed, then adjusts and con
   await expect(registry.call("confirmWheelHead", {})).resolves.toMatchObject({ accepted: true });
 });
 
-it("asks before ending or deleting a session", async () => {
+it("asks before ending a session", async () => {
   const endSession = vi.fn(async () => undefined);
-  const deleteSession = vi.fn(async () => undefined);
-  const registry = createToolRegistry(dependencies({ endSession, deleteSession }));
+  const registry = createToolRegistry(dependencies({ endSession }));
   await expect(registry.call("endSession", { confirmed: false })).resolves.toHaveProperty("needsConfirmation");
   expect(endSession).not.toHaveBeenCalled();
   await registry.call("endSession", { confirmed: true });
   expect(endSession).toHaveBeenCalledOnce();
-  await expect(registry.call("deleteSession", { confirmed: false })).resolves.toHaveProperty("needsConfirmation");
-  await registry.call("deleteSession", { confirmed: true });
-  expect(deleteSession).toHaveBeenCalledOnce();
 });
 
 it("hands the coach the summary when the session ends, for a goodbye debrief", async () => {
@@ -213,7 +209,7 @@ it("hands the coach the summary when the session ends, for a goodbye debrief", a
 });
 
 it("says when a tool isn't available at this point in the session", async () => {
-  await expect(createToolRegistry(dependencies()).call("getSessionSummary", {})).resolves.toMatchObject({
+  await expect(createToolRegistry(dependencies()).call("markMoment", {})).resolves.toMatchObject({
     available: false,
   });
 });

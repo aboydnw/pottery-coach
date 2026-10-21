@@ -21,6 +21,7 @@ export function primeSpokenNotices(synthesis: SpeechSynthesis | undefined = glob
 
 export const NOTICES = {
   reconnecting: "Reconnecting to your coach.",
+  timeLimit: "Your coach has hung up after an hour. Tap the screen once to keep talking.",
   lostVoice: "I've lost the voice connection. Tap the screen once when your hands are clean.",
   cameraStopped: "The camera stopped. Tap the screen once when your hands are clean.",
   passphrase: "The voice passphrase didn't work. You can carry on by touch, or fix it on the start screen.",
