@@ -9,6 +9,10 @@ export type CalibrationQuality = {
   posePitchDeg: number | null;
   blurScore: number;
   contrastScore: number;
+  /** Present for complete-rim wheel calibration; null for legacy and board records. */
+  ellipseFitResidualPx95?: number | null;
+  /** Share of the wheel rim supported by image evidence. */
+  visibleArcFraction?: number | null;
 };
 
 export type CalibrationMethod = "board" | "wheel-head" | "none";
