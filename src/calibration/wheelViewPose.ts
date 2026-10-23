@@ -16,6 +16,9 @@ export type WheelViewPose = {
 
 const MIN_WORKING_HEIGHT_FRACTION = 0.35;
 const MIN_VISIBLE_ARC = 0.75;
+const MIN_DOWNWARD_ANGLE_RAD = (15 * Math.PI) / 180;
+const MAX_DOWNWARD_ANGLE_RAD = (75 * Math.PI) / 180;
+const MAX_ROLL_RAD = (12 * Math.PI) / 180;
 
 /** Derives a weak-perspective view pose from a circular wheel's observed ellipse. */
 export function deriveWheelViewPose(
@@ -35,6 +38,9 @@ export function deriveWheelViewPose(
   const reasons: string[] = [];
   if (ellipse.visibleArcFraction < MIN_VISIBLE_ARC) reasons.push("WHEEL_RIM_INCOMPLETE");
   if (region.height < frame.height * MIN_WORKING_HEIGHT_FRACTION) reasons.push("WORKING_REGION_CLIPPED");
+  if (angle < MIN_DOWNWARD_ANGLE_RAD) reasons.push("VIEW_TOO_SHALLOW");
+  if (angle > MAX_DOWNWARD_ANGLE_RAD) reasons.push("VIEW_TOO_STEEP");
+  if (Math.min(ellipse.rotationRad, Math.PI - ellipse.rotationRad) > MAX_ROLL_RAD) reasons.push("VIEW_OFF_AXIS");
   const scale = diameterMm / (2 * ellipse.radiusMajor);
   const residualMm = ellipse.fitResidualPx95 * scale;
   const coveragePenalty = (1 - ellipse.visibleArcFraction) * diameterMm * 0.1;

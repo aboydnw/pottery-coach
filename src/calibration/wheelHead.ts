@@ -2,6 +2,7 @@ import { validateCalibration } from "./quality";
 import type { CalibrationResult } from "./types";
 import { BOARD_V1 } from "./boardV1";
 import { detectWheelEllipses, type WheelEllipse } from "./wheelEllipse";
+import { deriveWheelViewPose } from "./wheelViewPose";
 
 export type GrayImage = { gray: Float32Array; width: number; height: number };
 
@@ -213,6 +214,65 @@ export function wheelHeadCalibration(input: {
     wheelHead: { leftX: input.leftX, rightX: input.rightX, row: input.row, diameterMm: input.diameterMm },
   };
   result.reasons = validateCalibration(result);
+  result.status = result.reasons.length === 0 ? "accepted" : "rejected";
+  return result;
+}
+
+/** Builds perspective-aware wheel calibration from a complete detected circular rim. */
+export function wheelEllipseCalibration(input: {
+  ellipse: WheelEllipse;
+  diameterMm: number;
+  frameWidth: number;
+  frameHeight: number;
+  adjustedByUser: boolean;
+}): CalibrationResult {
+  const pose = deriveWheelViewPose(input.ellipse, input.diameterMm, {
+    width: input.frameWidth,
+    height: input.frameHeight,
+  });
+  const mmPerPixel = pose.wheelPlaneMmPerMajorPixel;
+  const result: CalibrationResult = {
+    id: globalThis.crypto?.randomUUID?.() ?? `wheel-calibration-${Date.now()}`,
+    method: "wheel-head",
+    createdAtMs: Date.now(),
+    status: "accepted",
+    // Retained for legacy readers only. New measurement uses wheelViewPose.
+    homographyImageToMm: [mmPerPixel, 0, 0, 0, mmPerPixel, 0, 0, 0, 1],
+    wheelBaseline: [
+      { x: -input.diameterMm / 2, y: 0 },
+      { x: input.diameterMm / 2, y: 0 },
+    ],
+    wheelCenterlineXmm: 0,
+    roiImage: { x: 0, y: 0, width: input.frameWidth, height: input.frameHeight },
+    markerPlaneOffsetToleranceMm: BOARD_V1.calibration.markerPlaneOffsetToleranceMm,
+    quality: {
+      tagCount: 0,
+      reprojectionErrorPx95: input.ellipse.fitResidualPx95,
+      scaleVariationFraction: 0,
+      estimatedErrorMm95: pose.estimatedErrorMm95,
+      poseYawDeg: null,
+      posePitchDeg: (pose.downwardAngleRad * 180) / Math.PI,
+      blurScore: 1,
+      contrastScore: 1,
+      ellipseFitResidualPx95: input.ellipse.fitResidualPx95,
+      visibleArcFraction: input.ellipse.visibleArcFraction,
+    },
+    reasons: [...pose.reasons],
+    provenance: input.adjustedByUser ? "manual-assisted" : "automatic",
+    boardRevision: BOARD_V1.revision,
+    supportedBoardRevision: BOARD_V1.revision,
+    roiClipped: false,
+    imageCenterlineX: input.ellipse.centerX,
+    wheelHead: {
+      leftX: input.ellipse.centerX - input.ellipse.radiusMajor,
+      rightX: input.ellipse.centerX + input.ellipse.radiusMajor,
+      row: input.ellipse.centerY,
+      diameterMm: input.diameterMm,
+    },
+    wheelEllipse: input.ellipse,
+    wheelViewPose: pose,
+  };
+  result.reasons = [...new Set([...result.reasons, ...validateCalibration(result)])];
   result.status = result.reasons.length === 0 ? "accepted" : "rejected";
   return result;
 }

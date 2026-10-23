@@ -1,5 +1,11 @@
 import { expect, it } from "vitest";
-import { CONFIDENT_DETECTION, detectWheelHead, toGray, wheelHeadCalibration } from "./wheelHead";
+import {
+  CONFIDENT_DETECTION,
+  detectWheelHead,
+  toGray,
+  wheelEllipseCalibration,
+  wheelHeadCalibration,
+} from "./wheelHead";
 
 type Scene = {
   width: number;
@@ -131,4 +137,49 @@ it("also finds the wheel head inside a splash pan around it", () => {
   expect(detection.candidates).toHaveLength(2);
   expect(Math.abs(detection.candidates[1]!.leftX - 80)).toBeLessThanOrEqual(3);
   expect(Math.abs(detection.candidates[1]!.rightX - 240)).toBeLessThanOrEqual(3);
+});
+
+it("creates an angled calibration from a complete wheel ellipse", () => {
+  const result = wheelEllipseCalibration({
+    ellipse: {
+      centerX: 640,
+      centerY: 600,
+      radiusMajor: 400,
+      radiusMinor: 200,
+      rotationRad: 0,
+      fitResidualPx95: 1,
+      visibleArcFraction: 0.95,
+      confidence: 0.95,
+    },
+    diameterMm: 356,
+    frameWidth: 1280,
+    frameHeight: 720,
+    adjustedByUser: false,
+  });
+  expect(result.status).toBe("accepted");
+  expect(result.wheelViewPose?.downwardAngleRad).toBeCloseTo(Math.acos(0.5));
+  expect(result.wheelEllipse?.radiusMajor).toBe(400);
+  expect(result.provenance).toBe("automatic");
+});
+
+it("does not let manual ellipse adjustment bypass a clipped working region", () => {
+  const result = wheelEllipseCalibration({
+    ellipse: {
+      centerX: 640,
+      centerY: 180,
+      radiusMajor: 400,
+      radiusMinor: 160,
+      rotationRad: 0,
+      fitResidualPx95: 1,
+      visibleArcFraction: 1,
+      confidence: 0.95,
+    },
+    diameterMm: 356,
+    frameWidth: 1280,
+    frameHeight: 720,
+    adjustedByUser: true,
+  });
+  expect(result.status).toBe("rejected");
+  expect(result.reasons).toContain("WORKING_REGION_CLIPPED");
+  expect(result.provenance).toBe("manual-assisted");
 });

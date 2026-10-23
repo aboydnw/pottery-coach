@@ -79,3 +79,22 @@ describe("validateCalibration", () => {
     expect(validateCalibration(result)).toContain(reason);
   });
 });
+
+it("preserves hard angled-view failures from ellipse pose estimation", () => {
+  const result = acceptedResult();
+  result.method = "wheel-head";
+  result.reasons = ["WORKING_REGION_CLIPPED"];
+  result.wheelViewPose = {
+    wheelCenterImage: { x: 100, y: 100 },
+    majorAxisImage: { x: 1, y: 0 },
+    minorAxisImage: { x: 0, y: 1 },
+    projectedVerticalImage: { x: 0, y: -1 },
+    downwardAngleRad: 1,
+    wheelPlaneMmPerMajorPixel: 1,
+    supportedRegionImage: { x: 0, y: 0, width: 200, height: 20 },
+    estimatedErrorMm95: 2,
+    confidence: 0.9,
+    reasons: ["WORKING_REGION_CLIPPED"],
+  };
+  expect(validateCalibration(result)).toContain("WORKING_REGION_CLIPPED");
+});

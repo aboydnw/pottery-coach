@@ -101,6 +101,13 @@ export function describeCalibrationReason(reason: string): string {
     ESTIMATED_ERROR: "Estimated measurement error is too high.",
     SCALE_VARIATION: "Print scale or perspective variation is too high.",
     REPROJECTION_ERROR: "The board could not be aligned reliably.",
+    WHEEL_RIM_INCOMPLETE: "Move the phone until the whole wheel rim is visible.",
+    WORKING_REGION_CLIPPED: "Tilt or move the phone so there is more room above the wheel.",
+    VIEW_TOO_SHALLOW: "Raise the phone so more of the wheel's top is visible.",
+    VIEW_TOO_STEEP: "Lower or move the phone back so the pot's side remains visible.",
+    VIEW_OFF_AXIS: "Aim the phone more directly through the center of the wheel.",
+    ELLIPSE_UNSTABLE: "Hold the phone still while the wheel outline locks.",
+    ELLIPSE_AMBIGUOUS: "Choose the outline that matches your wheel head or bat.",
   };
   return labels[reason] ?? reason.replaceAll("_", " ").toLowerCase();
 }

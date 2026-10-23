@@ -35,3 +35,15 @@ it("propagates fit and coverage uncertainty into confidence", () => {
   expect(pose.confidence).toBeLessThan(0.5);
   expect(pose.estimatedErrorMm95).toBeGreaterThan(8);
 });
+
+it("rejects views that are too shallow, too steep, or off axis", () => {
+  expect(deriveWheelViewPose({ ...ellipse(), radiusMinor: 149 }, 300, { width: 640, height: 480 }).reasons).toContain(
+    "VIEW_TOO_SHALLOW",
+  );
+  expect(deriveWheelViewPose({ ...ellipse(), radiusMinor: 20 }, 300, { width: 640, height: 480 }).reasons).toContain(
+    "VIEW_TOO_STEEP",
+  );
+  expect(deriveWheelViewPose({ ...ellipse(), rotationRad: 0.3 }, 300, { width: 640, height: 480 }).reasons).toContain(
+    "VIEW_OFF_AXIS",
+  );
+});

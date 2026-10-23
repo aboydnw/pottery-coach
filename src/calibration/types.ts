@@ -40,6 +40,10 @@ export type CalibrationResult = {
   /** Vertical axis of the wheel in full-resolution image pixels, when the method can locate it. */
   imageCenterlineX?: number;
   wheelHead?: WheelHeadMeasurement;
+  /** Complete wheel-rim geometry used by angled-camera calibration. */
+  wheelEllipse?: import("./wheelEllipse").WheelEllipse;
+  /** Weak-perspective pose estimate; authoritative for new wheel-head metric sessions. */
+  wheelViewPose?: import("./wheelViewPose").WheelViewPose;
 };
 
 export type PointCorrespondence = { tagId: number; image: Point2; boardMm: Point2 };
