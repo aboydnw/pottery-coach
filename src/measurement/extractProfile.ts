@@ -1,5 +1,6 @@
 import type { DimensionReading, MeasurementConfidence, ProfileSample } from "./types";
 import { median, percentile } from "../shared/stats";
+import type { MeasurementTransform } from "./WheelPoseTransform";
 
 type ExtractionContext = {
   width: number;
@@ -12,6 +13,7 @@ type ExtractionContext = {
   frameId: number;
   timestampMs: number;
   confidence?: MeasurementConfidence;
+  transform?: MeasurementTransform;
 };
 
 export function extractDimensions(
@@ -33,7 +35,11 @@ export function extractDimensions(
   }
   const top = rows[0]?.y;
   const bottom = rows.at(-1)?.y;
-  const widths = rows.map((row) => row.width * context.unitsPerPixel);
+  const widthOf = (row: (typeof rows)[number]) =>
+    context.transform?.radiusAt({ x: row.left, y: row.y }, { x: row.right, y: row.y }, 0) !== undefined
+      ? (context.transform?.radiusAt({ x: row.left, y: row.y }, { x: row.right, y: row.y }, 0) ?? 0) * 2
+      : row.width * context.unitsPerPixel;
+  const widths = rows.map(widthOf);
   const bandSize = Math.max(1, Math.ceil(rows.length * 0.1));
   const profile: ProfileSample[] = Array.from({ length: 64 }, (_, index) => {
     if (top === undefined || bottom === undefined) return { heightRatio: index / 63, radius: null, confidence: 0 };
@@ -41,19 +47,36 @@ export function extractDimensions(
     const row = rows.find((candidate) => candidate.y === y);
     return {
       heightRatio: index / 63,
-      radius: row ? (row.width * context.unitsPerPixel) / 2 : null,
+      radius: row ? widthOf(row) / 2 : null,
       confidence: row ? 1 : 0,
     };
   });
   const offsets = rows.map((row) => Math.abs(row.center - context.centerlineX) * context.unitsPerPixel);
-  const confidence = context.confidence ?? defaultConfidence(rows.length > 0 ? 1 : 0);
+  let confidence = context.confidence ?? defaultConfidence(rows.length > 0 ? 1 : 0);
+  const topPoint = top === undefined ? null : context.transform?.imageToWheel({ x: context.centerlineX, y: top });
+  const bottomPoint =
+    bottom === undefined ? null : context.transform?.imageToWheel({ x: context.centerlineX, y: bottom });
+  if (context.transform && top !== undefined && bottom !== undefined) {
+    confidence = {
+      ...confidence,
+      estimatedError95: Math.max(
+        context.transform.estimatedErrorMm95At({ x: context.centerlineX, y: top }),
+        context.transform.estimatedErrorMm95At({ x: context.centerlineX, y: bottom }),
+      ),
+    };
+  }
   return {
     id: globalThis.crypto?.randomUUID?.() ?? `reading-${context.frameId}`,
     timestampMs: context.timestampMs,
     sourceFrameId: context.frameId,
     calibrationId: context.calibrationId,
     unit: context.unit,
-    height: top === undefined || bottom === undefined ? null : (bottom - top + 1) * context.unitsPerPixel,
+    height:
+      top === undefined || bottom === undefined
+        ? null
+        : topPoint && bottomPoint
+          ? Math.abs(topPoint.verticalMm - bottomPoint.verticalMm)
+          : (bottom - top + 1) * context.unitsPerPixel,
     maximumWidth: widths.length ? percentile(widths, 0.95) : null,
     rimWidth: widths.length ? median(widths.slice(0, bandSize)) : null,
     baseWidth: widths.length ? median(widths.slice(-bandSize)) : null,
