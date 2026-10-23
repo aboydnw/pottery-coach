@@ -1,5 +1,6 @@
 import { expect, it } from "vitest";
-import { proportionsOf, toMm, type SessionScale } from "./scale";
+import { proportionsOf, scaleFromCalibration, toMm, type SessionScale } from "./scale";
+import { wheelEllipseCalibration } from "../calibration/wheelHead";
 import type { DimensionReading } from "./types";
 
 const component = { score: 1, reasons: [] };
@@ -59,4 +60,24 @@ it("returns nothing for pixel readings before calibration and passes millimetre 
 
 it("reports scale-free proportions", () => {
   expect(proportionsOf(pixelReading)).toEqual({ heightToWidth: 2, rimToBase: 1.125 });
+});
+
+it("carries authoritative wheel pose into the worker scale envelope", () => {
+  const calibration = wheelEllipseCalibration({
+    ellipse: {
+      centerX: 320,
+      centerY: 400,
+      radiusMajor: 150,
+      radiusMinor: 75,
+      rotationRad: 0,
+      fitResidualPx95: 0.5,
+      visibleArcFraction: 1,
+      confidence: 0.95,
+    },
+    diameterMm: 300,
+    frameWidth: 640,
+    frameHeight: 480,
+    adjustedByUser: false,
+  });
+  expect(scaleFromCalibration(calibration)?.wheelViewPose).toEqual(calibration.wheelViewPose);
 });

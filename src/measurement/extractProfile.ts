@@ -74,8 +74,10 @@ export function extractDimensions(
     height:
       top === undefined || bottom === undefined
         ? null
-        : topPoint && bottomPoint
-          ? Math.abs(topPoint.verticalMm - bottomPoint.verticalMm)
+        : context.transform
+          ? topPoint && bottomPoint
+            ? Math.abs(topPoint.verticalMm - bottomPoint.verticalMm)
+            : null
           : (bottom - top + 1) * context.unitsPerPixel,
     maximumWidth: widths.length ? percentile(widths, 0.95) : null,
     rimWidth: widths.length ? median(widths.slice(0, bandSize)) : null,

@@ -21,6 +21,8 @@ import { WobbleService } from "../wobble/WobbleService";
 import { epochNow } from "../platform/clock";
 import { bitmapToLab } from "./lab";
 import { HandsDetector } from "./handsDetector";
+import { createWheelPoseTransform } from "../measurement/WheelPoseTransform";
+import type { WheelViewPose } from "../calibration/wheelViewPose";
 
 const BACKGROUND_FRAME_COUNT = 5;
 /** Below the cue and voice-tool confidence bar, so hands-on readings are never spoken about. */
@@ -92,26 +94,29 @@ function processFrame(request: FrameRequest): void {
   }
   const segmentation = segmentVessel(image, background, []);
   const reliableFraction = segmentation.reliableFraction;
+  const pose = scale?.wheelViewPose ? poseForProcessedFrame(scale.wheelViewPose, request.scale) : null;
+  const transform = pose ? createWheelPoseTransform(pose) : undefined;
   const confidence = scoreConfidence({
-    calibration: { score: 1, reasons: [] },
+    calibration: pose ? { score: pose.confidence, reasons: pose.reasons } : { score: 1, reasons: [] },
     segmentation: { score: reliableFraction, reasons: segmentation.reasons },
     occlusion: { score: reliableFraction, reasons: reliableFraction < 0.7 ? ["OCCLUDED_ROWS"] : [] },
     temporalStability: { score: 1, reasons: [] },
     capturedAtMs: request.capturedAtMs,
     nowMs: epochNow(),
-    calibrationError95: null,
+    calibrationError95: pose?.estimatedErrorMm95 ?? null,
     segmentationError95: (reliableFraction >= 0.7 ? 1 : 3) * request.scale,
   });
   const measured = extractDimensions(segmentation.mask, segmentation.rowReliability, {
     width: image.width,
     height: image.height,
     unitsPerPixel: request.scale,
-    unit: "px",
+    unit: transform ? "mm" : "px",
     centerlineX: imageCenterlineX === null ? image.width / 2 : imageCenterlineX / request.scale,
     calibrationId: scale?.calibrationId ?? "uncalibrated",
     frameId: request.frameId,
     timestampMs: request.capturedAtMs,
     confidence,
+    transform,
   });
   const handsLikely = handsDetector.update(measured);
   const instantaneous = handsLikely ? withHands(measured) : { ...measured, handsLikely };
@@ -132,6 +137,21 @@ function processFrame(request: FrameRequest): void {
     wobbleService.update(classifyWobble(window, fit, { periodMs: period.periodMs, cameraMotionRmsMm: null }));
     post({ type: "wobble", reading: wobbleService.getLatest(request.capturedAtMs) });
   }
+}
+
+function poseForProcessedFrame(pose: WheelViewPose, sourcePixelsPerBitmapPixel: number): WheelViewPose {
+  const divide = (value: number) => value / sourcePixelsPerBitmapPixel;
+  return {
+    ...pose,
+    wheelCenterImage: { x: divide(pose.wheelCenterImage.x), y: divide(pose.wheelCenterImage.y) },
+    wheelPlaneMmPerMajorPixel: pose.wheelPlaneMmPerMajorPixel * sourcePixelsPerBitmapPixel,
+    supportedRegionImage: {
+      x: divide(pose.supportedRegionImage.x),
+      y: divide(pose.supportedRegionImage.y),
+      width: divide(pose.supportedRegionImage.width),
+      height: divide(pose.supportedRegionImage.height),
+    },
+  };
 }
 
 function resetEvidence(reason: string): void {
