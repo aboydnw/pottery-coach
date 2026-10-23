@@ -1,6 +1,7 @@
 import { validateCalibration } from "./quality";
 import type { CalibrationResult } from "./types";
 import { BOARD_V1 } from "./boardV1";
+import { detectWheelEllipses, type WheelEllipse } from "./wheelEllipse";
 
 export type GrayImage = { gray: Float32Array; width: number; height: number };
 
@@ -11,6 +12,8 @@ export type WheelHeadDetection = {
   row: number;
   /** 0–1; below `CONFIDENT_DETECTION` the UI asks the user to place the markers. */
   confidence: number;
+  /** Complete-rim geometry when the ellipse detector can support it. */
+  ellipse?: WheelEllipse;
 };
 
 export type WheelHeadCandidates = WheelHeadDetection & {
@@ -84,6 +87,7 @@ export function detectWheelHead(image: GrayImage): WheelHeadCandidates {
   const search = { band, width, height, top, bottom, meanAbs };
   const margin = Math.max(2, Math.round(width * NESTED_MARGIN_FRACTION));
   const candidates: WheelHeadDetection[] = [];
+  const ellipses = detectWheelEllipses(image);
   let bounds = { left: 1, right: width - 2 };
   let lastSurface: number | null = null;
   while (candidates.length < MAX_CANDIDATES) {
@@ -98,7 +102,10 @@ export function detectWheelHead(image: GrayImage): WheelHeadCandidates {
     const surface = surfaceBrightness(gray, width, found);
     if (lastSurface !== null && Math.abs(surface - lastSurface) < SAME_SURFACE_DIFFERENCE) continue;
     lastSurface = surface;
-    candidates.push(detection);
+    const ellipse = ellipses.find(
+      (candidate) => Math.abs(candidate.centerX - (detection.leftX + detection.rightX) / 2) < width * 0.08,
+    );
+    candidates.push(ellipse ? { ...detection, ellipse } : detection);
   }
   const outermost = candidates[0] ?? {
     leftX: Math.round(width * 0.2),
