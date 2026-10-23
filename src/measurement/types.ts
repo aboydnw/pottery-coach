@@ -26,6 +26,13 @@ export type DimensionReading = {
   centerlineOffset: number | null;
   profile: ProfileSample[];
   visibleAsymmetry: number | null;
+  /**
+   * How far the top third's centre sits from the base's centre, in image x (positive = image right).
+   * A steady lean means one side is bulging out more than the other.
+   */
+  leanOffset?: number | null;
+  /** True when hands are probably on the pot, so the outline isn't the pot alone. */
+  handsLikely?: boolean;
   confidence: MeasurementConfidence;
 };
 export type StableDimensionReading = DimensionReading & {

@@ -24,6 +24,12 @@ it("preselects a remembered custom size and accepts centimetres", () => {
   expect(onFind.mock.calls[0]![0]).toBeCloseTo(330);
 });
 
+it("explains that remembered size does not reuse the camera view", () => {
+  render(<WheelHeadStep initialDiameterMm={355.6} busy={false} onFind={vi.fn()} />);
+  expect(screen.getByText(/remember this size/i)).toBeVisible();
+  expect(screen.getByText(/check the camera view each time/i)).toBeVisible();
+});
+
 it("explains an implausible custom size instead of searching", () => {
   render(<WheelHeadStep initialDiameterMm={null} busy={false} onFind={vi.fn()} />);
   fireEvent.click(screen.getByRole("button", { name: /other size/i }));

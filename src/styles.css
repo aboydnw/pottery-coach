@@ -272,6 +272,40 @@ fieldset {
   vector-effect: non-scaling-stroke;
 }
 
+.wheel-ellipse,
+.wheel-center {
+  fill: none;
+  stroke: var(--accent, #f5c542);
+  stroke-width: 4;
+  vector-effect: non-scaling-stroke;
+}
+
+.wheel-center {
+  fill: var(--accent, #f5c542);
+}
+
+.wheel-supported-region {
+  fill: color-mix(in srgb, var(--accent, #f5c542) 8%, transparent);
+  stroke: color-mix(in srgb, var(--accent, #f5c542) 55%, transparent);
+  stroke-dasharray: 8 8;
+  vector-effect: non-scaling-stroke;
+}
+
+.wheel-ellipse-controls {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.wheel-ellipse-controls label {
+  display: grid;
+  gap: 0.25rem;
+}
+
+.wheel-ellipse-controls input[type="range"] {
+  min-height: 44px;
+  width: 100%;
+}
+
 .wheel-marker {
   cursor: ew-resize;
 }
@@ -400,14 +434,6 @@ button.link-button {
   background: rgb(36 92 101 / 92%);
 }
 
-.voice-setup {
-  margin: 1rem 0;
-}
-
-.voice-setup input {
-  width: 100%;
-}
-
 .notice {
   min-width: 0;
 }
@@ -455,6 +481,11 @@ button.link-button {
   gap: 1rem;
   background: linear-gradient(rgb(0 0 0 / 55%), transparent);
   z-index: 6;
+  pointer-events: none;
+}
+
+.stage-top button {
+  pointer-events: auto;
 }
 
 .stage-top .readouts {
@@ -496,6 +527,15 @@ button.link-button {
   gap: 0.5rem;
   padding-top: 0;
   z-index: 6;
+}
+
+/* Banners are for reading; only alerts (which may hold a button) take taps. */
+.stage-banners {
+  pointer-events: none;
+}
+
+.stage-banners [role="alert"] {
+  pointer-events: auto;
 }
 
 .stage-banners .stale-banner,
@@ -563,7 +603,8 @@ button.link-button {
   position: absolute;
   inset: auto 0 0;
   z-index: 5;
-  max-height: 85vh;
+  /* Stops below the floating top bar, so Settings and End stay reachable. */
+  max-height: calc(100% - 5.5rem);
   overflow: auto;
   border-radius: 1.25rem 1.25rem 0 0;
   padding: 1rem 1rem max(1rem, env(safe-area-inset-bottom));
@@ -603,4 +644,64 @@ button.link-button {
 
 .end-confirm h2 {
   margin-top: 0;
+}
+
+.cue-toast {
+  font-weight: 700;
+}
+
+.history-list,
+.notes-list,
+.session-pieces ol {
+  display: grid;
+  gap: 0.75rem;
+  padding-left: 1.25rem;
+}
+
+.notes-list li {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.piece-details {
+  margin: 0.25rem 0 0;
+  color: #61574f;
+}
+
+.note-form {
+  display: grid;
+  gap: 0.5rem;
+  margin-top: 0.5rem;
+}
+
+.note-form input {
+  width: 100%;
+}
+
+.wheel-marker .wheel-marker-hit {
+  fill: transparent;
+  stroke: none;
+  pointer-events: all;
+}
+
+.wheel-nudges {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-bottom: 0.5rem;
+}
+
+.wheel-nudge {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.wheel-nudge button {
+  min-width: 3rem;
+  min-height: 3rem;
+  padding: 0;
 }

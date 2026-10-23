@@ -13,7 +13,6 @@ import type { SessionBundle } from "../session/types";
 import { SetupStore } from "../setup/SetupStore";
 import { loadTemplates } from "../targets/loadTemplates";
 import { browserTransportDependencies, OpenAIWebRtcTransport } from "../voice/OpenAIWebRtcTransport";
-import { forgetPassphrase, loadPassphrase, savePassphrase } from "../voice/passphrase";
 import { ScriptedVoice } from "../voice/scriptedVoice";
 import { createToolRegistry } from "../voice/tools/registry";
 import type { SpokenSummary, ToolDependencies } from "../voice/tools/types";
@@ -23,9 +22,16 @@ import { isCameraOnlyMode, isDemoMode } from "./demoMode";
 import { CLOUD_VOICE, deriveGatedFeatureFlags, UNVERIFIED_MEASUREMENTS } from "./featureFlags";
 import { useAppUpdate } from "./useAppUpdate";
 import { useSessionRecording } from "./useSessionRecording";
+import { useCoachMemory } from "./useCoachMemory";
+import { usePieces } from "./usePieces";
+import { SessionPieces } from "../pieces/SessionPieces";
+import { ThrowLog } from "../pieces/ThrowLog";
+import { SyncClient } from "../sync/SyncClient";
 
 const SHELL_KEY = "pottery-coach-session-shell";
 const repository = new SessionRepository();
+const throwLog = new ThrowLog();
+const syncClient = new SyncClient(throwLog);
 const flags = deriveGatedFeatureFlags(releaseManifest);
 const DEFAULT_TARGET = loadTemplates()[0]!;
 
@@ -44,13 +50,22 @@ export function SessionFlow() {
   const [cameraOnly] = useState(() => isCameraOnlyMode());
   const [setup, setSetup] = useState(() => new SetupStore());
   const [scripted] = useState(() => (demoMode ? new ScriptedVoice() : null));
-  const [passphrase, setPassphrase] = useState(() => (CLOUD_VOICE ? loadPassphrase() : null));
-  const [passphraseDraft, setPassphraseDraft] = useState("");
   const updated = useAppUpdate();
   const recording = useSessionRecording(repository, () => dispatch({ type: "STORAGE_FAILED" }));
   const bridge = useRef<Partial<ToolDependencies>>({});
   const bundleRef = useRef<SessionBundle | null>(null);
   const setupRef = useRef(setup);
+  const pieces = usePieces(throwLog, recording, () => {
+    const goal = bridge.current.getGoal?.() ?? null;
+    return {
+      targetId: setupRef.current.getSnapshot().targetId.value,
+      goalHeightMm: goal?.wetHeightMm ?? null,
+      goalBasis: goal?.goal.basis ?? null,
+    };
+  });
+  const memory = useCoachMemory(throwLog, (context) => appRef.current?.voice.setPotterContext(context));
+  // The tool registry is built once, so it reaches the latest hooks through this ref.
+  const appRef = useRef<{ pieces: typeof pieces; memory: typeof memory; voice: typeof voice } | null>(null);
   const sizesEnabled = flags.numericMeasurement || demoMode || UNVERIFIED_MEASUREMENTS;
 
   const registry = useMemo(
@@ -75,6 +90,21 @@ export function SessionFlow() {
         get endSession() {
           return bridge.current.endSession;
         },
+        get nextPiece() {
+          return bridge.current.nextPiece;
+        },
+        get reportTrueSize() {
+          return bridge.current.reportTrueSize;
+        },
+        rateLastCue: (verdict) => appRef.current?.pieces.rateLastCue(verdict) ?? Promise.resolve(false),
+        notes: {
+          remember: async (text, lasting) => {
+            if (lasting) await appRef.current?.memory.remember(text);
+            else await appRef.current?.pieces.addNote(text);
+          },
+          find: (text) => throwLog.findNote(text),
+          forget: async (id) => appRef.current?.memory.forget(id),
+        },
         get getSessionSummary() {
           const finished = bundleRef.current;
           return finished ? async () => spokenSummary(finished) : undefined;
@@ -86,10 +116,17 @@ export function SessionFlow() {
   );
   const createTransport = scripted
     ? () => scripted.transport
-    : passphrase
-      ? () => new OpenAIWebRtcTransport(browserTransportDependencies(() => passphrase))
+    : CLOUD_VOICE
+      ? () => new OpenAIWebRtcTransport(browserTransportDependencies())
       : null;
-  const voice = useVoiceSession(createTransport, registry);
+  const voice = useVoiceSession(createTransport, registry, {
+    onUsage: (usage) => void pieces.addUsage(usage).catch(() => undefined),
+    getPotterContext: memory.context,
+  });
+
+  useEffect(() => {
+    appRef.current = { pieces, memory, voice };
+  });
 
   useEffect(() => {
     setupRef.current = setup;
@@ -106,6 +143,23 @@ export function SessionFlow() {
   useEffect(() => {
     void new RetentionService(repository).expire().catch(() => undefined);
   }, []);
+
+  useEffect(() => {
+    // Demo sessions never leave the phone.
+    if (demoMode) return;
+    const syncNow = () => void sync();
+    syncNow();
+    window.addEventListener("online", syncNow);
+    return () => window.removeEventListener("online", syncNow);
+    // oxlint-disable-next-line react-hooks/exhaustive-deps
+  }, [demoMode]);
+
+  /** Pushes and pulls the throw log; when anything arrives, the coach's memory is rebuilt. */
+  async function sync(): Promise<void> {
+    if (demoMode) return;
+    const result = await syncClient.sync().catch(() => "failed" as const);
+    if (result === "synced") await memory.refresh().catch(() => undefined);
+  }
 
   useEffect(() => {
     sessionStorage.setItem(SHELL_KEY, serializeSessionShell(state));
@@ -136,7 +190,13 @@ export function SessionFlow() {
     // Ending by touch hangs up straight away; by voice, the coach says goodbye first.
     if (byVoice) voice.hangUpAfterReply();
     else void voice.stop();
-    const stored = resolveRecordedSizes(await recording.end());
+    const recorded = await recording.end();
+    const stored = resolveRecordedSizes(recorded);
+    await pieces.finish(recorded).catch(() => undefined);
+    void memory
+      .refresh()
+      .then(sync)
+      .catch(() => undefined);
     bundleRef.current = stored;
     setBundle(stored);
     dispatch({ type: "END_SESSION" });
@@ -148,6 +208,7 @@ export function SessionFlow() {
       cache: typeof caches === "undefined" ? undefined : new BrowserCacheDeletion(caches),
       syncQueue: new LocalStorageSyncQueueDeletion(localStorage),
     }).deleteSession(recording.sessionId());
+    await throwLog.deleteSession(recording.sessionId()).catch(() => undefined);
     sessionStorage.removeItem(SHELL_KEY);
     return receipt;
   }
@@ -155,6 +216,7 @@ export function SessionFlow() {
   function startAnotherSession(): void {
     void voice.stop();
     recording.reset();
+    pieces.reset();
     bundleRef.current = null;
     setBundle(null);
     setSetup(new SetupStore());
@@ -171,53 +233,15 @@ export function SessionFlow() {
           One tap starts the camera and, if it's set up, your voice coach. After that you won't need to touch the
           screen: talk to the coach through your headphones.
         </p>
+        <p className="tip">
+          <strong>Start with an empty wheel.</strong> The coach takes a quick look at it first, then tells you to put
+          your clay on.
+        </p>
         <p>
           Camera frames are processed on this phone and never stored or uploaded. It is not safety equipment.
           {voice.available && " Your voice goes to the coach's speech service while the session runs."}
+          {!demoMode && " A short log of each pot (sizes and your notes, never images) is saved to your account."}
         </p>
-        {CLOUD_VOICE && !scripted && (
-          <div className="voice-setup">
-            {passphrase ? (
-              <p>
-                Voice coach is on for this phone.{" "}
-                <button
-                  type="button"
-                  className="link-button"
-                  onClick={() => {
-                    forgetPassphrase();
-                    setPassphrase(null);
-                  }}
-                >
-                  Forget passphrase
-                </button>
-              </p>
-            ) : (
-              <form
-                onSubmit={(event) => {
-                  event.preventDefault();
-                  if (!passphraseDraft.trim()) return;
-                  savePassphrase(passphraseDraft);
-                  setPassphrase(passphraseDraft.trim());
-                  setPassphraseDraft("");
-                }}
-              >
-                <label>
-                  Voice passphrase (once per phone)
-                  <input
-                    type="password"
-                    autoComplete="current-password"
-                    value={passphraseDraft}
-                    onChange={(event) => setPassphraseDraft(event.target.value)}
-                  />
-                </label>
-                <button type="submit" className="secondary">
-                  Turn on voice coach
-                </button>
-                <p>Without it, you can still set up by touch.</p>
-              </form>
-            )}
-          </div>
-        )}
         <button type="button" className="start-button" onClick={startSession}>
           Start session
         </button>
@@ -233,6 +257,7 @@ export function SessionFlow() {
           <p className="stale-banner">This session had no wheel-head size, so only shapes were tracked.</p>
         )}
         <SessionReview bundle={bundle} />
+        <SessionPieces throwLog={throwLog} sessionId={bundle.session.id} />
         <DeleteSessionDialog onDelete={deleteSession} onFinish={startAnotherSession} />
       </section>
     );
@@ -254,7 +279,20 @@ export function SessionFlow() {
         measurementsUnverified={!flags.numericMeasurement && UNVERIFIED_MEASUREMENTS}
         demoMode={demoMode}
         cameraOnly={cameraOnly}
-        onCameraReady={() => void recording.begin()}
+        onCameraReady={() =>
+          void recording
+            .begin()
+            .then(() => pieces.ensureStarted())
+            .catch(() => undefined)
+        }
+        throwLog={throwLog}
+        pieceId={pieces.pieceId}
+        pieceNumber={pieces.pieceNumber}
+        lastingNotes={memory.notes}
+        onForgetNote={(id) => void memory.forget(id)}
+        onNextPiece={() => pieces.next().then(() => void sync())}
+        onCorrection={(correction) => void pieces.addCorrection(correction).catch(() => undefined)}
+        onCue={(policyId, text) => void pieces.logCue(policyId, text).catch(() => undefined)}
         onCameraDenied={() => dispatch({ type: "CAMERA_DENIED" })}
         onReading={recording.recordReading}
         onWobble={recording.recordWobble}

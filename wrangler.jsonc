@@ -28,7 +28,14 @@
       "namespace_id": "1001",
       "simple": { "limit": 10, "period": 60 },
     },
+    {
+      "name": "SYNC_RATE_LIMITER",
+      "namespace_id": "1002",
+      "simple": { "limit": 30, "period": 60 },
+    },
   ],
+  // The throw log and notes, per signed-in potter. Created on first deploy; the Worker creates its tables.
+  "d1_databases": [{ "binding": "DB", "database_name": "pottery-coach" }],
   "observability": {
     "enabled": true,
   },

@@ -13,7 +13,7 @@ const STATUS_TEXT: Record<string, string> = {
 
 /** Shows what the coach and potter just said, plus the connection state, for a quick glance. */
 const FAILURE_TEXT: Record<string, string> = {
-  unauthorized: "The voice passphrase didn't work. Carry on by touch, or fix it on the start screen.",
+  unauthorized: "The voice coach isn't available for this account. Carry on by touch.",
   disabled: "The voice coach is switched off on the server.",
   unavailable: "Voice coach lost.",
   "time-limit": "Voice coach hung up after an hour.",

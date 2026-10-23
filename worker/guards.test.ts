@@ -1,14 +1,8 @@
 import { expect, it } from "vitest";
-import { clientAddress, hasBearerToken, isSameOrigin } from "./guards";
+import { clientAddress, isSameOrigin } from "./guards";
 
 const request = (headers: Record<string, string>) =>
   new Request("https://coach.example/api/realtime/session", { method: "POST", headers });
-
-it("accepts only the exact bearer token", async () => {
-  expect(await hasBearerToken(request({ authorization: "Bearer field-token" }), "field-token")).toBe(true);
-  expect(await hasBearerToken(request({ authorization: "Bearer field-tokeN" }), "field-token")).toBe(false);
-  expect(await hasBearerToken(request({}), "field-token")).toBe(false);
-});
 
 it("requires a same-origin or explicitly allowed Origin header", () => {
   expect(isSameOrigin(request({ origin: "https://coach.example" }))).toBe(true);

@@ -9,6 +9,10 @@ export type CalibrationQuality = {
   posePitchDeg: number | null;
   blurScore: number;
   contrastScore: number;
+  /** Present for complete-rim wheel calibration; null for legacy and board records. */
+  ellipseFitResidualPx95?: number | null;
+  /** Share of the wheel rim supported by image evidence. */
+  visibleArcFraction?: number | null;
 };
 
 export type CalibrationMethod = "board" | "wheel-head" | "none";
@@ -36,6 +40,10 @@ export type CalibrationResult = {
   /** Vertical axis of the wheel in full-resolution image pixels, when the method can locate it. */
   imageCenterlineX?: number;
   wheelHead?: WheelHeadMeasurement;
+  /** Complete wheel-rim geometry used by angled-camera calibration. */
+  wheelEllipse?: import("./wheelEllipse").WheelEllipse;
+  /** Weak-perspective pose estimate; authoritative for new wheel-head metric sessions. */
+  wheelViewPose?: import("./wheelViewPose").WheelViewPose;
 };
 
 export type PointCorrespondence = { tagId: number; image: Point2; boardMm: Point2 };

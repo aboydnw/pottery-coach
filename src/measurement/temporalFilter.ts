@@ -63,7 +63,7 @@ export class TemporalFilter {
     const smooth = (
       key: keyof Pick<
         DimensionReading,
-        "height" | "maximumWidth" | "rimWidth" | "baseWidth" | "centerlineOffset" | "visibleAsymmetry"
+        "height" | "maximumWidth" | "rimWidth" | "baseWidth" | "centerlineOffset" | "visibleAsymmetry" | "leanOffset"
       >,
     ): number | null => {
       const values = readings
@@ -93,6 +93,7 @@ export class TemporalFilter {
       baseWidth: smooth("baseWidth"),
       centerlineOffset: smooth("centerlineOffset"),
       visibleAsymmetry: smooth("visibleAsymmetry"),
+      leanOffset: smooth("leanOffset"),
       profile,
       confidence: {
         ...latest.confidence,

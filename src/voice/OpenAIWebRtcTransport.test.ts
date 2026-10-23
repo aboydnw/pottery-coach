@@ -162,7 +162,7 @@ it("replaces an ended microphone track on the existing sender without renegotiat
   expect(peer.addTrack).toHaveBeenCalledOnce();
 });
 
-it("sends the field-test access token as a bearer header", async () => {
+it("sends what the coach knows about the potter with the session request", async () => {
   const { peer } = fakePeer();
   const fetch = vi.fn().mockResolvedValue(new Response("v=0 answer"));
   const transport = new OpenAIWebRtcTransport({
@@ -170,12 +170,12 @@ it("sends the field-test access token as a bearer header", async () => {
     getUserMedia: vi.fn().mockResolvedValue(fakeStream().stream),
     createAudio: audio,
     fetch,
-    getAccessToken: () => "field-token",
   });
 
-  await transport.connect(config);
+  await transport.connect({ ...config, potterContext: "- Use inches" });
 
-  expect(fetch.mock.calls[0]![1].headers).toMatchObject({ authorization: "Bearer field-token" });
+  expect(JSON.parse(fetch.mock.calls[0]![1].body)).toMatchObject({ potterContext: "- Use inches" });
+  expect(fetch.mock.calls[0]![1].headers).not.toHaveProperty("authorization");
 });
 
 it("reports when the coach's audio starts, finishes, or is cut off", () => {
@@ -223,7 +223,7 @@ it("builds captions from transcript pieces and reports usage", () => {
         type: "response.done",
         response: {
           usage: {
-            input_token_details: { audio_tokens: 40, text_tokens: 5 },
+            input_token_details: { audio_tokens: 40, text_tokens: 5, cached_tokens_details: { audio_tokens: 30 } },
             output_token_details: { audio_tokens: 90, text_tokens: 12 },
           },
         },
@@ -232,11 +232,18 @@ it("builds captions from transcript pieces and reports usage", () => {
     ),
   ).toEqual({
     type: "usage",
-    usage: { inputTextTokens: 5, inputAudioTokens: 40, outputTextTokens: 12, outputAudioTokens: 90 },
+    usage: {
+      inputTextTokens: 5,
+      inputAudioTokens: 40,
+      outputTextTokens: 12,
+      outputAudioTokens: 90,
+      cachedInputTextTokens: 0,
+      cachedInputAudioTokens: 30,
+    },
   });
 });
 
-it("marks a refused passphrase as not worth retrying", async () => {
+it("marks a refused sign-in as not worth retrying", async () => {
   const { peer } = fakePeer();
   const transport = new OpenAIWebRtcTransport({
     createPeer: () => peer,
@@ -245,4 +252,41 @@ it("marks a refused passphrase as not worth retrying", async () => {
     fetch: vi.fn().mockResolvedValue(new Response("{}", { status: 401 })),
   });
   await expect(transport.connect(config)).rejects.toMatchObject({ status: 401, retryable: false });
+});
+
+it("speaks a cue as a one-off reply that skips the conversation, then notes it", async () => {
+  const { peer, channel } = fakePeer();
+  const transport = new OpenAIWebRtcTransport({
+    createPeer: () => peer,
+    getUserMedia: vi.fn().mockResolvedValue(fakeStream().stream),
+    createAudio: audio,
+    fetch: vi.fn().mockResolvedValue(new Response("v=0 answer")),
+  });
+  await transport.connect(config);
+
+  await transport.speakApprovedCue({ id: "cue-1", text: "Top's flaring.", evidenceIds: ["r1"] });
+
+  const sent = (channel.send as ReturnType<typeof vi.fn>).mock.calls.map(([message]) => JSON.parse(String(message)));
+  expect(sent.at(-2)).toMatchObject({
+    type: "response.create",
+    response: { conversation: "none", input: [], metadata: { cueId: "cue-1" } },
+  });
+  expect(sent.at(-2).response.instructions).toContain("Top's flaring.");
+  expect(sent.at(-1)).toMatchObject({ type: "conversation.item.create", item: { role: "system" } });
+});
+
+it("asks for a microphone tuned for a noisy studio", async () => {
+  const { peer } = fakePeer();
+  const getUserMedia = vi.fn().mockResolvedValue(fakeStream().stream);
+  const transport = new OpenAIWebRtcTransport({
+    createPeer: () => peer,
+    getUserMedia,
+    createAudio: audio,
+    fetch: vi.fn().mockResolvedValue(new Response("v=0 answer")),
+  });
+  await transport.connect(config);
+  expect(getUserMedia).toHaveBeenCalledWith({
+    audio: expect.objectContaining({ autoGainControl: false, noiseSuppression: true, voiceIsolation: true }),
+    video: false,
+  });
 });

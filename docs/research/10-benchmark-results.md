@@ -41,4 +41,8 @@ Until this date the dimension, segmentation, wobble, voice and integrated runner
 
 These are synthetic results and cannot pass any gate. They show two real gaps: the worker never estimates camera pose or motion (`cameraMotionRmsMm` is always null and `estimateCameraTransform` is unused), so neither pose rejection nor camera-motion suppression can work yet.
 
+## Angled-camera implementation — 2026-10-23
+
+The prototype now detects a complete wheel-rim ellipse, estimates a constrained weak-perspective view pose from the known wheel diameter, rejects incomplete or unsupported views, and carries that pose into metric extraction. The setup overlay reacquires the camera view every session while remembering the diameter. Synthetic tests cover the geometry and rejection rules, but no physical known-object or phone run has validated a supported angle range or real-world accuracy. Gate 2 remains closed.
+
 The 2026-10-09 camera harness result above reported zero dropped frames because the dropped-frame counter could never increase; it now counts frames the worker refused.

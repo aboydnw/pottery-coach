@@ -5,6 +5,7 @@ import { extractDimensions } from "../measurement/extractProfile";
 import { scoreConfidence } from "../measurement/confidence";
 import { TemporalFilter } from "../measurement/temporalFilter";
 import { toMm, type SessionScale } from "../measurement/scale";
+import type { DimensionReading } from "../measurement/types";
 import type {
   DiagnosticResponse,
   FrameRequest,
@@ -19,8 +20,13 @@ import { classifyWobble } from "../wobble/classifyWobble";
 import { WobbleService } from "../wobble/WobbleService";
 import { epochNow } from "../platform/clock";
 import { bitmapToLab } from "./lab";
+import { HandsDetector } from "./handsDetector";
+import { createWheelPoseTransform } from "../measurement/WheelPoseTransform";
+import type { WheelViewPose } from "../calibration/wheelViewPose";
 
 const BACKGROUND_FRAME_COUNT = 5;
+/** Below the cue and voice-tool confidence bar, so hands-on readings are never spoken about. */
+const HANDS_ON_CONFIDENCE = 0.5;
 const worker = self as unknown as DedicatedWorkerGlobalScope;
 let scale: SessionScale | null = null;
 let imageCenterlineX: number | null = null;
@@ -29,6 +35,7 @@ let background: ReturnType<typeof buildBackground> | null = null;
 const temporalFilter = new TemporalFilter();
 const contourBuffer = new TemporalContourBuffer();
 const wobbleService = new WobbleService();
+const handsDetector = new HandsDetector();
 
 worker.addEventListener("message", (event: MessageEvent<MeasurementWorkerRequest>) => {
   const request = event.data;
@@ -37,6 +44,11 @@ worker.addEventListener("message", (event: MessageEvent<MeasurementWorkerRequest
     scale = request.scale;
     imageCenterlineX = request.imageCenterlineX ?? null;
     contourBuffer.clear("scale-change");
+    return;
+  }
+  if (request?.type === "background") {
+    resetEvidence("background-restored");
+    background = request.model;
     return;
   }
   if (request?.type === "reset") {
@@ -76,33 +88,41 @@ function processFrame(request: FrameRequest): void {
     if (backgroundFrames.length >= BACKGROUND_FRAME_COUNT) {
       background = buildBackground(backgroundFrames);
       backgroundFrames = [];
+      post({ type: "background-ready", model: background });
     }
     return;
   }
   const segmentation = segmentVessel(image, background, []);
   const reliableFraction = segmentation.reliableFraction;
+  const pose = scale?.wheelViewPose ? poseForProcessedFrame(scale.wheelViewPose, request.scale) : null;
+  const transform = pose ? createWheelPoseTransform(pose) : undefined;
   const confidence = scoreConfidence({
-    calibration: { score: 1, reasons: [] },
+    calibration: pose ? { score: pose.confidence, reasons: pose.reasons } : { score: 1, reasons: [] },
     segmentation: { score: reliableFraction, reasons: segmentation.reasons },
     occlusion: { score: reliableFraction, reasons: reliableFraction < 0.7 ? ["OCCLUDED_ROWS"] : [] },
     temporalStability: { score: 1, reasons: [] },
     capturedAtMs: request.capturedAtMs,
     nowMs: epochNow(),
-    calibrationError95: null,
+    calibrationError95: pose?.estimatedErrorMm95 ?? null,
     segmentationError95: (reliableFraction >= 0.7 ? 1 : 3) * request.scale,
   });
-  const instantaneous = extractDimensions(segmentation.mask, segmentation.rowReliability, {
+  const measured = extractDimensions(segmentation.mask, segmentation.rowReliability, {
     width: image.width,
     height: image.height,
     unitsPerPixel: request.scale,
-    unit: "px",
+    unit: transform ? "mm" : "px",
     centerlineX: imageCenterlineX === null ? image.width / 2 : imageCenterlineX / request.scale,
     calibrationId: scale?.calibrationId ?? "uncalibrated",
     frameId: request.frameId,
     timestampMs: request.capturedAtMs,
     confidence,
+    transform,
   });
-  post({ type: "reading", instantaneous, stable: temporalFilter.push(instantaneous) });
+  const handsLikely = handsDetector.update(measured);
+  const instantaneous = handsLikely ? withHands(measured) : { ...measured, handsLikely };
+  // Hands-on frames would drag the steady reading towards the hands, so they don't feed it.
+  post({ type: "reading", instantaneous, stable: handsLikely ? null : temporalFilter.push(instantaneous) });
+  if (handsLikely) return;
   // Wobble thresholds are physical sizes, so oscillation is only tracked once a scale exists.
   const instantaneousMm = toMm(instantaneous, scale);
   if (!instantaneousMm) return;
@@ -119,11 +139,40 @@ function processFrame(request: FrameRequest): void {
   }
 }
 
+function poseForProcessedFrame(pose: WheelViewPose, sourcePixelsPerBitmapPixel: number): WheelViewPose {
+  const divide = (value: number) => value / sourcePixelsPerBitmapPixel;
+  return {
+    ...pose,
+    wheelCenterImage: { x: divide(pose.wheelCenterImage.x), y: divide(pose.wheelCenterImage.y) },
+    wheelPlaneMmPerMajorPixel: pose.wheelPlaneMmPerMajorPixel * sourcePixelsPerBitmapPixel,
+    supportedRegionImage: {
+      x: divide(pose.supportedRegionImage.x),
+      y: divide(pose.supportedRegionImage.y),
+      width: divide(pose.supportedRegionImage.width),
+      height: divide(pose.supportedRegionImage.height),
+    },
+  };
+}
+
 function resetEvidence(reason: string): void {
   backgroundFrames = [];
   background = null;
   temporalFilter.reset(reason);
   contourBuffer.clear(reason);
+  handsDetector.reset();
+}
+
+function withHands(reading: DimensionReading): DimensionReading {
+  const occlusion = { score: HANDS_ON_CONFIDENCE, reasons: ["HANDS_LIKELY"] };
+  return {
+    ...reading,
+    handsLikely: true,
+    confidence: {
+      ...reading.confidence,
+      occlusion,
+      overall: Math.min(reading.confidence.overall, HANDS_ON_CONFIDENCE),
+    },
+  };
 }
 
 function post(message: MeasurementWorkerEvent): void {

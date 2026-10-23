@@ -36,7 +36,7 @@ export function validateCalibration(result: CalibrationResult): string[] {
 }
 
 function validateWheelHead(result: CalibrationResult): string[] {
-  const reasons: string[] = [];
+  const reasons: string[] = [...(result.wheelViewPose?.reasons ?? [])];
   const wheel = result.wheelHead;
   const span = wheel ? wheel.rightX - wheel.leftX : 0;
   if (!wheel || span <= 0 || wheel.diameterMm <= 0 || wheel.leftX < 0 || wheel.rightX > result.roiImage.width) {

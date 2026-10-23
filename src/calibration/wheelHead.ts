@@ -1,6 +1,8 @@
 import { validateCalibration } from "./quality";
 import type { CalibrationResult } from "./types";
 import { BOARD_V1 } from "./boardV1";
+import { detectWheelEllipses, type WheelEllipse } from "./wheelEllipse";
+import { deriveWheelViewPose } from "./wheelViewPose";
 
 export type GrayImage = { gray: Float32Array; width: number; height: number };
 
@@ -11,6 +13,16 @@ export type WheelHeadDetection = {
   row: number;
   /** 0–1; below `CONFIDENT_DETECTION` the UI asks the user to place the markers. */
   confidence: number;
+  /** Complete-rim geometry when the ellipse detector can support it. */
+  ellipse?: WheelEllipse;
+};
+
+export type WheelHeadCandidates = WheelHeadDetection & {
+  /**
+   * Edge pairs found nested inside one another, outermost first (this detection is the first). A
+   * splash pan or tray around the wheel head shows up as an outer pair with the wheel head inside it.
+   */
+  candidates: WheelHeadDetection[];
 };
 
 export const CONFIDENT_DETECTION = 0.5;
@@ -21,6 +33,11 @@ const EDGE_UNCERTAINTY_PX = 2;
 const BAND_HALF_HEIGHT = 2;
 const SEARCH_TOP_FRACTION = 0.35;
 const MIN_HALF_WIDTH_FRACTION = 0.12;
+/** A nested pair must sit at least this far inside the one around it, on both sides. */
+const NESTED_MARGIN_FRACTION = 0.03;
+const MAX_CANDIDATES = 3;
+/** Mean brightness difference (0–255) below which two nested pairs are taken to be the same surface. */
+const SAME_SURFACE_DIFFERENCE = 12;
 
 /** Converts RGBA pixels to luminance, downscaling (by area averaging) to at most `maxWidth` columns. */
 export function toGray(
@@ -51,13 +68,14 @@ export function toGray(
 /**
  * Finds the wheel head in a side view: the widest pair of vertical edges in the lower part of the
  * frame where both edges change brightness the same way (the same disc material lies between them).
- * Edge strength is the horizontal gradient summed over a five-row band.
+ * Edge strength is the horizontal gradient summed over a five-row band. Narrower pairs nested inside
+ * it are returned too, so a tray around the wheel head can be stepped past.
  */
-export function detectWheelHead({ gray, width, height }: GrayImage): WheelHeadDetection {
+export function detectWheelHead(image: GrayImage): WheelHeadCandidates {
+  const { gray, width, height } = image;
   const band = signedBandGradient(gray, width, height);
   const top = Math.max(BAND_HALF_HEIGHT + 1, Math.floor(height * SEARCH_TOP_FRACTION));
   const bottom = height - BAND_HALF_HEIGHT - 1;
-  const minHalfWidth = Math.max(3, Math.floor(width * MIN_HALF_WIDTH_FRACTION));
   let meanAbs = 0;
   let samples = 0;
   for (let y = top; y < bottom; y += 1) {
@@ -67,34 +85,86 @@ export function detectWheelHead({ gray, width, height }: GrayImage): WheelHeadDe
     }
   }
   meanAbs = samples ? meanAbs / samples : 0;
-  let best = {
+  const search = { band, width, height, top, bottom, meanAbs };
+  const margin = Math.max(2, Math.round(width * NESTED_MARGIN_FRACTION));
+  const candidates: WheelHeadDetection[] = [];
+  const ellipses = detectWheelEllipses(image);
+  let bounds = { left: 1, right: width - 2 };
+  let lastSurface: number | null = null;
+  while (candidates.length < MAX_CANDIDATES) {
+    const found = widestPair(search, bounds);
+    if (!found) break;
+    bounds = { left: found.leftX + margin, right: found.rightX - margin };
+    const detection = refine(gray, width, height, found, meanAbs);
+    // Only the outermost guess is kept when it's weak; inner ones must be real edges.
+    if (candidates.length && detection.confidence < CONFIDENT_DETECTION) continue;
+    // The same disc seen again at a narrower row has the same surface between its edges; a wheel
+    // head inside a tray (or a bat on a wheel head) doesn't.
+    const surface = surfaceBrightness(gray, width, found);
+    if (lastSurface !== null && Math.abs(surface - lastSurface) < SAME_SURFACE_DIFFERENCE) continue;
+    lastSurface = surface;
+    const ellipse = ellipses.find(
+      (candidate) => Math.abs(candidate.centerX - (detection.leftX + detection.rightX) / 2) < width * 0.08,
+    );
+    candidates.push(ellipse ? { ...detection, ellipse } : detection);
+  }
+  const outermost = candidates[0] ?? {
     leftX: Math.round(width * 0.2),
     rightX: Math.round(width * 0.8),
     row: Math.round(height * 0.75),
-    raw: 0,
-    score: 0,
+    confidence: 0,
   };
+  return { ...outermost, candidates: candidates.length ? candidates : [outermost] };
+}
+
+type Search = { band: Float32Array; width: number; height: number; top: number; bottom: number; meanAbs: number };
+type Pair = { leftX: number; rightX: number; row: number; raw: number };
+
+function widestPair(
+  { band, width, top, bottom, meanAbs }: Search,
+  bounds: { left: number; right: number },
+): Pair | null {
+  const minHalfWidth = Math.max(3, Math.floor(width * MIN_HALF_WIDTH_FRACTION));
+  let best: (Pair & { score: number }) | null = null;
   for (let y = top; y < bottom; y += 1) {
     const row = y * width;
-    for (let left = 1; left < width - 1 - 2 * minHalfWidth; left += 1) {
+    for (let left = bounds.left; left < bounds.right - 2 * minHalfWidth; left += 1) {
       const leftEdge = band[row + left]!;
       if (Math.abs(leftEdge) < meanAbs * 2) continue;
-      for (let right = left + 2 * minHalfWidth; right < width - 1; right += 1) {
+      for (let right = left + 2 * minHalfWidth; right <= bounds.right; right += 1) {
         const rightEdge = band[row + right]!;
         // Entering the disc and leaving it change brightness in opposite directions.
         const raw = leftEdge > 0 ? Math.min(leftEdge, -rightEdge) : Math.min(-leftEdge, rightEdge);
         if (raw <= 0) continue;
         const score = raw * (0.5 + (right - left) / width);
-        if (score > best.score) best = { leftX: left, rightX: right, row: y, raw, score };
+        if (!best || score > best.score) best = { leftX: left, rightX: right, row: y, raw, score };
       }
     }
   }
-  const ratio = meanAbs > 0 ? best.raw / meanAbs : 0;
+  return best;
+}
+
+/** Brightness just inside both edges: the surface the pair encloses, without whatever sits nested in it. */
+function surfaceBrightness(gray: Float32Array, width: number, pair: Pair): number {
+  const span = pair.rightX - pair.leftX;
+  const from = Math.max(1, Math.round(span * 0.02));
+  const to = Math.max(from + 1, Math.round(span * 0.06));
+  let sum = 0;
+  let count = 0;
+  for (let offset = from; offset <= to; offset += 1) {
+    sum += gray[pair.row * width + pair.leftX + offset]! + gray[pair.row * width + pair.rightX - offset]!;
+    count += 2;
+  }
+  return sum / count;
+}
+
+function refine(gray: Float32Array, width: number, height: number, pair: Pair, meanAbs: number): WheelHeadDetection {
+  const ratio = meanAbs > 0 ? pair.raw / meanAbs : 0;
   // The band blurs the disc's curved ends inward; snap each edge to the sharpest single-row gradient
   // nearby, choosing the outermost row in the band where the edge is still strong.
-  const leftX = refineEdge(gray, width, height, best.row, best.leftX, -1);
-  const rightX = refineEdge(gray, width, height, best.row, best.rightX, 1);
-  return { leftX, rightX, row: best.row, confidence: clamp((ratio - 3) / 7, 0, 1) };
+  const leftX = refineEdge(gray, width, height, pair.row, pair.leftX, -1);
+  const rightX = refineEdge(gray, width, height, pair.row, pair.rightX, 1);
+  return { leftX, rightX, row: pair.row, confidence: clamp((ratio - 3) / 7, 0, 1) };
 }
 
 /**
@@ -144,6 +214,65 @@ export function wheelHeadCalibration(input: {
     wheelHead: { leftX: input.leftX, rightX: input.rightX, row: input.row, diameterMm: input.diameterMm },
   };
   result.reasons = validateCalibration(result);
+  result.status = result.reasons.length === 0 ? "accepted" : "rejected";
+  return result;
+}
+
+/** Builds perspective-aware wheel calibration from a complete detected circular rim. */
+export function wheelEllipseCalibration(input: {
+  ellipse: WheelEllipse;
+  diameterMm: number;
+  frameWidth: number;
+  frameHeight: number;
+  adjustedByUser: boolean;
+}): CalibrationResult {
+  const pose = deriveWheelViewPose(input.ellipse, input.diameterMm, {
+    width: input.frameWidth,
+    height: input.frameHeight,
+  });
+  const mmPerPixel = pose.wheelPlaneMmPerMajorPixel;
+  const result: CalibrationResult = {
+    id: globalThis.crypto?.randomUUID?.() ?? `wheel-calibration-${Date.now()}`,
+    method: "wheel-head",
+    createdAtMs: Date.now(),
+    status: "accepted",
+    // Retained for legacy readers only. New measurement uses wheelViewPose.
+    homographyImageToMm: [mmPerPixel, 0, 0, 0, mmPerPixel, 0, 0, 0, 1],
+    wheelBaseline: [
+      { x: -input.diameterMm / 2, y: 0 },
+      { x: input.diameterMm / 2, y: 0 },
+    ],
+    wheelCenterlineXmm: 0,
+    roiImage: { x: 0, y: 0, width: input.frameWidth, height: input.frameHeight },
+    markerPlaneOffsetToleranceMm: BOARD_V1.calibration.markerPlaneOffsetToleranceMm,
+    quality: {
+      tagCount: 0,
+      reprojectionErrorPx95: input.ellipse.fitResidualPx95,
+      scaleVariationFraction: 0,
+      estimatedErrorMm95: pose.estimatedErrorMm95,
+      poseYawDeg: null,
+      posePitchDeg: (pose.downwardAngleRad * 180) / Math.PI,
+      blurScore: 1,
+      contrastScore: 1,
+      ellipseFitResidualPx95: input.ellipse.fitResidualPx95,
+      visibleArcFraction: input.ellipse.visibleArcFraction,
+    },
+    reasons: [...pose.reasons],
+    provenance: input.adjustedByUser ? "manual-assisted" : "automatic",
+    boardRevision: BOARD_V1.revision,
+    supportedBoardRevision: BOARD_V1.revision,
+    roiClipped: false,
+    imageCenterlineX: input.ellipse.centerX,
+    wheelHead: {
+      leftX: input.ellipse.centerX - input.ellipse.radiusMajor,
+      rightX: input.ellipse.centerX + input.ellipse.radiusMajor,
+      row: input.ellipse.centerY,
+      diameterMm: input.diameterMm,
+    },
+    wheelEllipse: input.ellipse,
+    wheelViewPose: pose,
+  };
+  result.reasons = [...new Set([...result.reasons, ...validateCalibration(result)])];
   result.status = result.reasons.length === 0 ? "accepted" : "rejected";
   return result;
 }

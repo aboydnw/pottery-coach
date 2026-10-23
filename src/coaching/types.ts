@@ -36,4 +36,6 @@ export type CueCandidate = {
   evidenceIds: string[];
   facts: Readonly<Record<string, string | number | boolean | null>>;
   priority: CuePriority;
+  /** How long before the same policy may speak again; falls back to the arbiter's defaults. */
+  cooldownMs?: number;
 };

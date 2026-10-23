@@ -1,5 +1,5 @@
 import { realtimeSessionRequestSchema } from "../src/voice/sessionSchema";
-import { COACH_INSTRUCTIONS } from "../src/voice/instructions";
+import { buildInstructions } from "../src/voice/instructions";
 import { REALTIME_TOOL_DEFINITIONS } from "../src/voice/tools/definitions";
 
 const VOICE = "marin";
@@ -77,7 +77,7 @@ export async function handleRealtimeSession(
           retention_ratio: 0.8,
           token_limits: { post_instructions: MAX_HISTORY_TOKENS },
         },
-        instructions: COACH_INSTRUCTIONS,
+        instructions: buildInstructions(parsed.data.potterContext),
         tools: REALTIME_TOOL_DEFINITIONS,
       }),
     );

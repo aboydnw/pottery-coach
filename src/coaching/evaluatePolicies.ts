@@ -7,6 +7,7 @@ export type CoachingObservation = {
     | "target-deviation"
     | "target-milestone"
     | "visible-oscillation"
+    | "uneven-walls"
     | "session-control";
   evidenceIds: string[];
   confidence: number;
@@ -40,5 +41,6 @@ export function evaluatePolicies(
       evidenceIds: [...observation.evidenceIds],
       facts: Object.freeze({ ...observation.facts }),
       priority: observation.directQuestion ? 2 : policy.priority,
+      cooldownMs: policy.cooldownMs,
     }));
 }

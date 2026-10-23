@@ -32,6 +32,11 @@ export class ScriptedVoice {
       this.transport.emit({ type: "output-stopped", itemId, timestampMs: performance.now(), reason: "finished" });
   }
 
+  /** Cue lines the app asked the coach to say, in order. */
+  get spokenCues(): string[] {
+    return this.transport.spokenCues.map((cue) => cue.text);
+  }
+
   /** Whether the app still has the call open. */
   get connected(): boolean {
     return !this.transport.isClosed();

@@ -5,7 +5,6 @@ type Dependencies = {
   getUserMedia(constraints: MediaStreamConstraints): Promise<MediaStream>;
   createAudio(): HTMLAudioElement;
   fetch: typeof globalThis.fetch;
-  getAccessToken?(): string;
 };
 
 const defaults: Dependencies = {
@@ -28,14 +27,14 @@ export class OpenAIWebRtcTransport implements RealtimeCoachTransport {
 
   constructor(private readonly dependencies: Dependencies = defaults) {}
 
-  async connect(_config: RealtimeSessionConfig): Promise<void> {
+  async connect(config: RealtimeSessionConfig): Promise<void> {
     this.closed = false;
     const peer = this.dependencies.createPeer();
     let stream: MediaStream | null = null;
     let channel: RTCDataChannel | null = null;
     try {
       stream = await this.dependencies.getUserMedia({
-        audio: { echoCancellation: true, noiseSuppression: true },
+        audio: MICROPHONE,
         video: false,
       });
       const audioTrack = stream.getAudioTracks()[0];
@@ -54,15 +53,18 @@ export class OpenAIWebRtcTransport implements RealtimeCoachTransport {
       });
       const offer = await peer.createOffer();
       await peer.setLocalDescription(offer);
-      const accessToken = this.dependencies.getAccessToken?.() ?? "";
       const response = await this.dependencies.fetch("/api/realtime/session", {
         method: "POST",
         headers: {
           "content-type": "application/json",
-          ...(accessToken ? { authorization: `Bearer ${accessToken}` } : {}),
         },
         credentials: "same-origin",
-        body: JSON.stringify({ sdp: offer.sdp, sessionId: crypto.randomUUID(), clientConfigVersion: "voice-v1" }),
+        body: JSON.stringify({
+          sdp: offer.sdp,
+          sessionId: crypto.randomUUID(),
+          clientConfigVersion: "voice-v1",
+          ...(config.potterContext ? { potterContext: config.potterContext } : {}),
+        }),
       });
       if (!response.ok) throw new RealtimeSessionError(response.status);
       await peer.setRemoteDescription({ type: "answer", sdp: await response.text() });
@@ -92,10 +94,31 @@ export class OpenAIWebRtcTransport implements RealtimeCoachTransport {
     this.send({ type: "response.create" });
   }
 
+  async updateInstructions(instructions: string): Promise<void> {
+    this.send({ type: "session.update", session: { type: "realtime", instructions } });
+  }
+
+  /**
+   * Says one approved line as an out-of-band reply: it doesn't re-read the conversation, so a cue
+   * costs a few hundred tokens. A short note then tells the coach what it said, for follow-ups.
+   */
   async speakApprovedCue(cue: ApprovedCue): Promise<void> {
     this.send({
       type: "response.create",
-      response: { instructions: cue.text, metadata: { cueId: cue.id, evidenceIds: cue.evidenceIds } },
+      response: {
+        conversation: "none",
+        input: [],
+        instructions: `Say exactly this to the potter, in your usual voice, and nothing else: "${cue.text}"`,
+        metadata: { cueId: cue.id },
+      },
+    });
+    this.send({
+      type: "conversation.item.create",
+      item: {
+        type: "message",
+        role: "system",
+        content: [{ type: "input_text", text: `You just told the potter, unprompted: "${cue.text}"` }],
+      },
     });
   }
   async cancelOutput(reason: string): Promise<void> {
@@ -113,7 +136,7 @@ export class OpenAIWebRtcTransport implements RealtimeCoachTransport {
     const tracks = this.localStream?.getAudioTracks() ?? [];
     if (tracks.some((track) => track.readyState === "ended")) {
       const replacement = await this.dependencies.getUserMedia({
-        audio: { echoCancellation: true, noiseSuppression: true },
+        audio: MICROPHONE,
         video: false,
       });
       await this.audioSender?.replaceTrack(replacement.getAudioTracks()[0] ?? null);
@@ -164,6 +187,17 @@ export class OpenAIWebRtcTransport implements RealtimeCoachTransport {
   }
 }
 
+/**
+ * Microphone settings for a noisy studio. Automatic gain is off so the phone doesn't turn up distant
+ * music between words, and voice isolation (where the browser has it) keeps only the nearest voice.
+ */
+export const MICROPHONE: MediaTrackConstraints & { voiceIsolation?: boolean } = {
+  echoCancellation: true,
+  noiseSuppression: true,
+  autoGainControl: false,
+  voiceIsolation: true,
+};
+
 /** Thrown when the session endpoint refuses the request; retrying won't help for auth or disabled voice. */
 export class RealtimeSessionError extends Error {
   readonly retryable: boolean;
@@ -173,9 +207,9 @@ export class RealtimeSessionError extends Error {
   }
 }
 
-/** Browser dependencies for the real transport, with the field-test passphrase as the bearer token. */
-export function browserTransportDependencies(getAccessToken: () => string): Dependencies {
-  return { ...defaults, getAccessToken };
+/** Browser dependencies for the real transport; the Access sign-in cookie identifies the potter. */
+export function browserTransportDependencies(): Dependencies {
+  return defaults;
 }
 
 /**
@@ -227,6 +261,8 @@ export function mapProviderEvent(raw: Record<string, unknown>, transcripts: Map<
     if (!usage) return null;
     const input = (usage.input_token_details ?? {}) as Record<string, number>;
     const output = (usage.output_token_details ?? {}) as Record<string, number>;
+    const cached = ((usage.input_token_details as Record<string, unknown> | undefined)?.cached_tokens_details ??
+      {}) as Record<string, number>;
     return {
       type: "usage",
       usage: {
@@ -234,6 +270,8 @@ export function mapProviderEvent(raw: Record<string, unknown>, transcripts: Map<
         inputAudioTokens: input.audio_tokens ?? 0,
         outputTextTokens: output.text_tokens ?? 0,
         outputAudioTokens: output.audio_tokens ?? 0,
+        cachedInputTextTokens: cached.text_tokens ?? 0,
+        cachedInputAudioTokens: cached.audio_tokens ?? 0,
       },
     };
   }

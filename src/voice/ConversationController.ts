@@ -1,4 +1,11 @@
-import type { ConversationState, RealtimeCoachTransport, RealtimeEvent, RealtimeSessionConfig } from "./types";
+import { buildInstructions } from "./instructions";
+import type {
+  ApprovedCue,
+  ConversationState,
+  RealtimeCoachTransport,
+  RealtimeEvent,
+  RealtimeSessionConfig,
+} from "./types";
 import { validateSpokenClaim, type ClaimValidation } from "../coaching/ClaimValidator";
 import type { CueCandidate } from "../coaching/types";
 
@@ -44,7 +51,18 @@ export class ConversationController {
     await this.transport?.sendToolResult(callId, result);
   }
 
-  /** Why the conversation failed: a wrong passphrase, voice switched off on the server, or no connection. */
+  /** Speaks one approved cue line; dropped while reconnecting. */
+  async speakCue(cue: ApprovedCue): Promise<void> {
+    await this.transport?.speakApprovedCue(cue);
+  }
+
+  /** Updates what the coach knows about the potter, now and for any reconnect. */
+  async setPotterContext(potterContext: string): Promise<void> {
+    if (this.config) this.config = { ...this.config, potterContext };
+    await this.transport?.updateInstructions(buildInstructions(potterContext));
+  }
+
+  /** Why the conversation failed: not signed in, voice switched off on the server, or no connection. */
   getFailure(): ConversationFailure | null {
     return this.failure;
   }

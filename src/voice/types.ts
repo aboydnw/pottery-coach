@@ -6,12 +6,17 @@ export type RealtimeSessionConfig = {
   language: string;
   instructionsRevision: string;
   toolsRevision: string;
+  /** Lasting notes and a recent-pieces digest, appended to the coach's instructions by the server. */
+  potterContext?: string;
 };
 export type ProviderUsage = {
   inputTextTokens: number;
   outputTextTokens: number;
   inputAudioTokens: number;
   outputAudioTokens: number;
+  /** Parts of the input served from the prompt cache, billed at a lower rate. */
+  cachedInputTextTokens?: number;
+  cachedInputAudioTokens?: number;
 };
 export type ApprovedCue = { id: string; text: string; evidenceIds: string[] };
 export type RealtimeEvent =
@@ -33,6 +38,8 @@ export interface RealtimeCoachTransport {
   speakApprovedCue(cue: ApprovedCue): Promise<void>;
   /** Prompts the model to speak first (greeting, or picking up after a reconnect). */
   startResponse(): Promise<void>;
+  /** Replaces the coach's instructions mid-call (when what it knows about the potter changes). */
+  updateInstructions(instructions: string): Promise<void>;
   cancelOutput(reason: string): Promise<void>;
   pauseInput(): Promise<void>;
   resumeInput(): Promise<void>;

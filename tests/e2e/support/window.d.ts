@@ -4,5 +4,6 @@ interface Window {
     callTool(name: string, args?: Record<string, unknown>): Promise<unknown>;
     say(speaker: "user" | "assistant", text: string): void;
     readonly connected: boolean;
+    readonly spokenCues: string[];
   };
 }

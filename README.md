@@ -15,7 +15,7 @@ pnpm dev
 
 Open the printed URL. Camera access needs HTTPS except on `localhost`, and the app only asks for it after you tap **Start session**. To walk through the flow without a pot, open `/?mode=demo`. Demo mode adds a fixed calibration and reading, and a scripted stand-in voice you can drive from the browser console (`await window.__potteryVoice.callTool("getSetupStatus")`). It only exists in development builds (or builds made with `VITE_ENABLE_DEMO=true`).
 
-Sizes are optional and can come at any time, even after you've finished throwing: earlier measurements are rescaled. The app uses your wheel head as a ruler. Tell the coach the wheel head's (or bat's) diameter, check the two markers it places on the edges ("left one out a bit… yes"), and you're done. The size is remembered on the device. For the best accuracy you can instead print [`public/calibration/board-v1.svg`](public/calibration/board-v1.svg) at 100% scale and check that its reference line measures 100 mm. Or skip calibration entirely for a shape-only session.
+Sizes are optional. The app treats the circular wheel head as a ruler for the practical camera position above and beside the wheel. Tell the coach the wheel head's (or bat's) diameter once; the size is remembered, while every session reacquires the wheel outline because the phone may have moved. The camera view shows the detected ellipse and only accepts a complete, supported rim. This angled-camera calibration is experimental until the real-phone and known-object gate passes. For the best controlled accuracy you can instead print [`public/calibration/board-v1.svg`](public/calibration/board-v1.svg) at 100% scale, or skip metric calibration for a shape-only session.
 
 ## Deployment
 
@@ -51,7 +51,7 @@ camera ──▶ CanvasFrameSource ──▶ measurement worker ──▶ stable
 - `src/camera/`, `src/vision/`, `src/measurement/` and `src/wobble/` hold the camera, the worker pipeline, dimension extraction and oscillation detection.
 - `src/calibration/` holds wheel-head detection and sizing (`wheelHead.ts`, `wheelSize.ts`), the board definition, the AprilTag worker (vendored WebAssembly in `public/vendor/apriltag`) and the homography.
 - `src/session/`, `src/privacy/` and `src/review/` hold local storage, retention and deletion, and the post-session review.
-- `worker/` is the Cloudflare Worker. It serves the built app and exchanges a WebRTC offer with the voice provider at `/api/realtime/session`, which returns 503 until its secrets are configured.
+- `worker/` is the Cloudflare Worker. It serves the built app and exchanges a WebRTC offer with the voice provider at `/api/realtime/session` (503 until its secret is configured) and syncs the throw log at `/api/sync`, both for potters signed in with Cloudflare Access.
 
 ### Built but not yet wired into the app
 

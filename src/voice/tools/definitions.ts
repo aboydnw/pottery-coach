@@ -82,6 +82,18 @@ export const REALTIME_TOOL_DEFINITIONS = [
   },
   {
     type: "function",
+    name: "switchWheelEdges",
+    description:
+      "Jump the yellow lines to the next edges found: inner when they're on a tray or splash pan around the wheel head, outer when they're inside it.",
+    parameters: {
+      type: "object",
+      properties: { toward: { enum: ["inner", "outer"] } },
+      required: ["toward"],
+      additionalProperties: false,
+    },
+  },
+  {
+    type: "function",
     name: "confirmWheelHead",
     description: "Call after the potter says the markers sit on the edges.",
     parameters: empty,
@@ -125,6 +137,64 @@ export const REALTIME_TOOL_DEFINITIONS = [
     parameters: {
       type: "object",
       properties: { label: { type: "string", maxLength: 100 } },
+      additionalProperties: false,
+    },
+  },
+  {
+    type: "function",
+    name: "nextPiece",
+    description:
+      "Save the current pot to the throw log and start the next one; the empty wheel is looked at again. Call with confirmed: false first, then confirmed: true after the potter agrees.",
+    parameters: confirmed,
+  },
+  {
+    type: "function",
+    name: "reportTrueSize",
+    description:
+      "Record a size the potter measured themselves (numbers and units exactly as spoken), to check the app's accuracy. Doesn't change any readings.",
+    parameters: {
+      type: "object",
+      properties: {
+        dimension: { enum: ["height", "width"] },
+        value: { type: "number" },
+        unit: { enum: ["mm", "cm", "in"] },
+      },
+      required: ["dimension", "value", "unit"],
+      additionalProperties: false,
+    },
+  },
+  {
+    type: "function",
+    name: "rateLastCue",
+    description: "Record how the potter reacted to the most recent unprompted cue.",
+    parameters: {
+      type: "object",
+      properties: { verdict: { enum: ["helpful", "wrong", "not-now"] } },
+      required: ["verdict"],
+      additionalProperties: false,
+    },
+  },
+  {
+    type: "function",
+    name: "rememberNote",
+    description:
+      "Remember something the potter said, in their words, under 100 characters. lasting: true for preferences and things they're working on in general (kept across sessions); false for this pot only.",
+    parameters: {
+      type: "object",
+      properties: { text: { type: "string" }, lasting: { type: "boolean" } },
+      required: ["text", "lasting"],
+      additionalProperties: false,
+    },
+  },
+  {
+    type: "function",
+    name: "forgetNote",
+    description:
+      "Forget a lasting note. Call with confirmed: false to find the closest match and read it back, then confirmed: true after a yes.",
+    parameters: {
+      type: "object",
+      properties: { text: { type: "string" }, confirmed: { type: "boolean" } },
+      required: ["text", "confirmed"],
       additionalProperties: false,
     },
   },

@@ -1,20 +1,7 @@
-/** Accepts a bearer token only when it matches `expected` using a constant-time comparison. */
-export async function hasBearerToken(request: Request, expected: string): Promise<boolean> {
-  const supplied = request.headers.get("authorization")?.match(/^Bearer\s+(.+)$/i)?.[1] ?? "";
-  const encoder = new TextEncoder();
-  const [left, right] = await Promise.all(
-    [supplied, expected].map((value) => crypto.subtle.digest("SHA-256", encoder.encode(value))),
-  );
-  const leftBytes = new Uint8Array(left!);
-  const rightBytes = new Uint8Array(right!);
-  let difference = supplied.length === 0 ? 1 : 0;
-  for (let index = 0; index < leftBytes.length; index += 1) difference |= leftBytes[index]! ^ rightBytes[index]!;
-  return difference === 0;
-}
-
 /**
  * Blocks cross-site requests by requiring an Origin header that matches the request's own origin
- * or one of `allowedOrigins`. This replaces a CSRF token because the endpoint has no cookie session.
+ * or one of `allowedOrigins`. Access signs the potter in with a cookie, so this is what stops other
+ * sites from making requests with their session (CSRF).
  */
 export function isSameOrigin(request: Request, allowedOrigins: readonly string[] = []): boolean {
   const origin = request.headers.get("origin");

@@ -1,5 +1,11 @@
 import { expect, it } from "vitest";
-import { CONFIDENT_DETECTION, detectWheelHead, toGray, wheelHeadCalibration } from "./wheelHead";
+import {
+  CONFIDENT_DETECTION,
+  detectWheelHead,
+  toGray,
+  wheelEllipseCalibration,
+  wheelHeadCalibration,
+} from "./wheelHead";
 
 type Scene = {
   width: number;
@@ -10,9 +16,21 @@ type Scene = {
   withPot?: boolean;
   noise?: number;
   seed?: number;
+  /** Half-width of a splash pan drawn around the wheel head. */
+  trayHalfWidth?: number;
 };
 
-function renderScene({ width, height, centerX, row, halfWidth, withPot = true, noise = 4, seed = 1 }: Scene) {
+function renderScene({
+  width,
+  height,
+  centerX,
+  row,
+  halfWidth,
+  withPot = true,
+  noise = 4,
+  seed = 1,
+  trayHalfWidth,
+}: Scene) {
   let state = seed;
   const random = () => (state = (1664525 * state + 1013904223) >>> 0) / 2 ** 32;
   const gray = new Float32Array(width * height);
@@ -21,6 +39,9 @@ function renderScene({ width, height, centerX, row, halfWidth, withPot = true, n
       let value = 150;
       const dx = (x - centerX) / halfWidth;
       const dy = (y - row) / 5;
+      const tx = trayHalfWidth ? (x - centerX) / trayHalfWidth : Infinity;
+      const ty = (y - row) / 9;
+      if (tx * tx + ty * ty <= 1) value = 110;
       if (dx * dx + dy * dy <= 1) value = 70;
       if (y < row - 2 && y < height && y > row - 70 && Math.abs(x - centerX) < halfWidth * 0.35) value = 205;
       if (!withPot && value === 205) value = 150;
@@ -106,4 +127,59 @@ it("rejects edges in the wrong order", () => {
     adjustedByUser: true,
   });
   expect(result.reasons).toContain("WHEEL_IMPLAUSIBLE");
+});
+
+it("also finds the wheel head inside a splash pan around it", () => {
+  const detection = detectWheelHead(
+    renderScene({ width: 320, height: 180, centerX: 160, row: 130, halfWidth: 80, trayHalfWidth: 140, withPot: false }),
+  );
+  expect(Math.abs(detection.leftX - 20)).toBeLessThanOrEqual(3);
+  expect(detection.candidates).toHaveLength(2);
+  expect(Math.abs(detection.candidates[1]!.leftX - 80)).toBeLessThanOrEqual(3);
+  expect(Math.abs(detection.candidates[1]!.rightX - 240)).toBeLessThanOrEqual(3);
+});
+
+it("creates an angled calibration from a complete wheel ellipse", () => {
+  const result = wheelEllipseCalibration({
+    ellipse: {
+      centerX: 640,
+      centerY: 600,
+      radiusMajor: 400,
+      radiusMinor: 200,
+      rotationRad: 0,
+      fitResidualPx95: 1,
+      visibleArcFraction: 0.95,
+      confidence: 0.95,
+    },
+    diameterMm: 356,
+    frameWidth: 1280,
+    frameHeight: 720,
+    adjustedByUser: false,
+  });
+  expect(result.status).toBe("accepted");
+  expect(result.wheelViewPose?.downwardAngleRad).toBeCloseTo(Math.acos(0.5));
+  expect(result.wheelEllipse?.radiusMajor).toBe(400);
+  expect(result.provenance).toBe("automatic");
+});
+
+it("does not let manual ellipse adjustment bypass a clipped working region", () => {
+  const result = wheelEllipseCalibration({
+    ellipse: {
+      centerX: 640,
+      centerY: 180,
+      radiusMajor: 400,
+      radiusMinor: 160,
+      rotationRad: 0,
+      fitResidualPx95: 1,
+      visibleArcFraction: 1,
+      confidence: 0.95,
+    },
+    diameterMm: 356,
+    frameWidth: 1280,
+    frameHeight: 720,
+    adjustedByUser: true,
+  });
+  expect(result.status).toBe("rejected");
+  expect(result.reasons).toContain("WORKING_REGION_CLIPPED");
+  expect(result.provenance).toBe("manual-assisted");
 });
