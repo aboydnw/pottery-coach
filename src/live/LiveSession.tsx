@@ -40,8 +40,6 @@ import type { ThrowLog } from "../pieces/ThrowLog";
 import type { LastingNote, SizeCorrection } from "../pieces/types";
 
 const TEMPLATES = loadTemplates();
-/** Wait for the camera's exposure to settle before keeping the empty-wheel reference still. */
-const PLATE_STILL_DELAY_MS = 700;
 /** After "next piece", the wheel must look empty this long before it is learned again. */
 const EMPTY_WHEEL_MS = 1_000;
 /** If the old background has drifted and the wheel never looks empty, learn it again anyway. */
@@ -149,8 +147,8 @@ export function LiveSession(props: LiveSessionProps) {
   const [problem, setProblem] = useState<string | null>(null);
   const [paused, setPaused] = useState(false);
   const [momentMarked, setMomentMarked] = useState(false);
-  // Without voice, setup has to be done by touch, so settings start open.
-  const [settingsOpen, setSettingsOpen] = useState(!voice.available);
+  // Keep the camera primary. Touch setup stays one explicit tap away when voice is unavailable.
+  const [settingsOpen, setSettingsOpen] = useState(false);
   const [confirmingEnd, setConfirmingEnd] = useState(false);
   const [wheelPhase, setWheelPhase] = useState<WheelPhase>("learning");
   const [cueToast, setCueToast] = useState<string | null>(null);
@@ -158,7 +156,6 @@ export function LiveSession(props: LiveSessionProps) {
   const wheelPhaseRef = useRef<WheelPhase>("learning");
   const announceWheelRef = useRef(false);
   const demoTimerRef = useRef<number | null>(null);
-  const plateRef = useRef<ImageData | null>(null);
   const wheelRef = useRef<WheelCheckState | null>(null);
 
   const target = TEMPLATES.find((template) => template.id === slots.targetId.value) ?? TEMPLATES[0]!;
@@ -182,6 +179,7 @@ export function LiveSession(props: LiveSessionProps) {
     [sized, goal, target],
   );
   const mirrored = camera.facing === "user" && camera.settings?.facingMode !== "environment";
+  const voiceNeedsReconnect = voice.failure === "unavailable" || voice.failure === "time-limit";
 
   useEffect(() => {
     if (goal) props.onGoal(goal);
@@ -243,11 +241,6 @@ export function LiveSession(props: LiveSessionProps) {
       props.onCue(policyId, text);
     },
   });
-
-  // If the voice coach is refused or switched off, setup has to happen by touch.
-  useEffect(() => {
-    if (voice.failure === "unauthorized" || voice.failure === "disabled") setSettingsOpen(true);
-  }, [voice.failure]);
 
   function setPhase(next: WheelPhase): void {
     wheelPhaseRef.current = next;
@@ -314,9 +307,6 @@ export function LiveSession(props: LiveSessionProps) {
     if (!settings) return false;
     props.onCameraReady();
     if (!cameraOnly && videoRef.current) pipeline.start(videoRef.current);
-    window.setTimeout(() => {
-      if (videoRef.current) plateRef.current = safeCapture(videoRef.current);
-    }, PLATE_STILL_DELAY_MS);
     return true;
   }
 
@@ -327,7 +317,6 @@ export function LiveSession(props: LiveSessionProps) {
     // A different lens sees the wheel from a different place: the scale no longer applies.
     applyScale(null);
     setup.setCalibration("none");
-    plateRef.current = null;
   }
 
   function applyScale(next: SessionScale | null, imageCenterlineX?: number): void {
@@ -343,12 +332,12 @@ export function LiveSession(props: LiveSessionProps) {
     if (next) setSettingsOpen(false);
   }
 
-  async function checkWheel(fresh: boolean) {
+  async function checkWheel() {
     const video = videoRef.current;
     if (!video) return { found: false, confidence: 0, problem: "The camera isn't running." };
-    const image = fresh || !plateRef.current ? safeCapture(video) : plateRef.current;
+    // Wheel finding is an explicit action, so it must reflect what the camera shows at this moment.
+    const image = safeCapture(video);
     if (!image) return { found: false, confidence: 0, problem: "The camera hasn't shown a picture yet." };
-    plateRef.current = image;
     const gray = toGray(image.data, image.width, image.height);
     const found = detectWheelHead(gray);
     const toFull = (value: number) => Math.round((value + 0.5) * gray.scale);
@@ -545,7 +534,7 @@ export function LiveSession(props: LiveSessionProps) {
               busy={busy}
               onFind={(diameterMm) => {
                 setup.apply({ wheelHeadDiameter: { value: diameterMm, unit: "mm" } });
-                void checkWheel(false);
+                void checkWheel();
               }}
             />
             <button type="button" className="link-button" onClick={() => setBoardMode(true)}>
@@ -603,6 +592,14 @@ export function LiveSession(props: LiveSessionProps) {
         </div>
         <div className="stage-banners">
           {camera.error && <p role="alert">{camera.error}</p>}
+          {voiceNeedsReconnect && (
+            <div role="alert" className="stale-banner">
+              {voice.failure === "time-limit" ? "Voice coach hung up after an hour." : "Voice coach lost."}
+              <button type="button" onClick={() => void voice.restart()}>
+                Reconnect voice
+              </button>
+            </div>
+          )}
           {camera.interrupted && (
             <div role="alert" className="stale-banner">
               The camera stopped. Tap here once when your hands are clean.
@@ -742,15 +739,6 @@ export function LiveSession(props: LiveSessionProps) {
             </button>
           </div>
         </div>
-      )}
-
-      {(voice.failure === "unavailable" || voice.failure === "time-limit") && (
-        // The one tap a lost connection needs: the whole screen is the target, reachable with a knuckle.
-        <button type="button" className="tap-anywhere" onClick={() => void voice.restart()}>
-          {voice.failure === "time-limit"
-            ? "Voice coach hung up after an hour. Tap anywhere once to keep talking."
-            : "Voice coach lost. Tap anywhere once to reconnect."}
-        </button>
       )}
     </section>
   );
