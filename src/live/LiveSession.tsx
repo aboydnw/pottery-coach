@@ -5,8 +5,9 @@ import { CalibrationFlow, describeCalibrationReason } from "../calibration/Calib
 import { calibrateFromVideo } from "../calibration/calibrateFromVideo";
 import type { CalibrationResult } from "../calibration/types";
 import { WasmTagDetector } from "../calibration/WasmTagDetector";
-import { detectWheelHead, toGray, wheelHeadCalibration, type WheelHeadDetection } from "../calibration/wheelHead";
-import { WheelHeadConfirm } from "../calibration/WheelHeadConfirm";
+import { detectWheelHead, toGray, wheelEllipseCalibration, type WheelHeadDetection } from "../calibration/wheelHead";
+import { WheelEllipseConfirm } from "../calibration/WheelEllipseConfirm";
+import type { WheelEllipse } from "../calibration/wheelEllipse";
 import { nudgeMarker, type WheelEdges } from "../calibration/wheelMarkers";
 import { WheelHeadStep } from "../calibration/WheelHeadStep";
 import { loadRememberedDiameterMm } from "../calibration/wheelSize";
@@ -51,6 +52,20 @@ const LINES = {
   wheelSeen: "Got a look at the empty wheel. Put your clay on.",
 } as const;
 
+function fallbackEllipse(detection: WheelHeadDetection): WheelEllipse {
+  const radiusMajor = Math.max(1, (detection.rightX - detection.leftX) / 2);
+  return {
+    centerX: (detection.leftX + detection.rightX) / 2,
+    centerY: detection.row,
+    radiusMajor,
+    radiusMinor: radiusMajor * 0.4,
+    rotationRad: 0,
+    fitResidualPx95: radiusMajor,
+    visibleArcFraction: 0,
+    confidence: 0,
+  };
+}
+
 /** Where the empty-wheel snapshot is at: learning it, learned (clay can go on), or waiting for the wheel to clear. */
 type WheelPhase = "learning" | "ready" | "awaiting-empty" | "placed";
 
@@ -62,6 +77,7 @@ type WheelCheckState = {
   /** Nested edge pairs found (outermost first) and which one is shown; a tray sits outside the wheel head. */
   candidates: WheelHeadDetection[];
   candidateIndex: number;
+  ellipse: WheelEllipse;
 };
 
 export type LiveSessionProps = {
@@ -341,8 +357,19 @@ export function LiveSession(props: LiveSessionProps) {
       leftX: toFull(candidate.leftX),
       rightX: toFull(candidate.rightX),
       row: toFull(candidate.row),
+      ellipse: candidate.ellipse
+        ? {
+            ...candidate.ellipse,
+            centerX: toFull(candidate.ellipse.centerX),
+            centerY: toFull(candidate.ellipse.centerY),
+            radiusMajor: candidate.ellipse.radiusMajor * gray.scale,
+            radiusMinor: candidate.ellipse.radiusMinor * gray.scale,
+            fitResidualPx95: candidate.ellipse.fitResidualPx95 * gray.scale,
+          }
+        : undefined,
     }));
     const detection = candidates[0]!;
+    const ellipse = detection.ellipse ?? fallbackEllipse(detection);
     updateWheel({
       image,
       detection,
@@ -350,6 +377,7 @@ export function LiveSession(props: LiveSessionProps) {
       adjusted: false,
       candidates,
       candidateIndex: 0,
+      ellipse,
     });
     setup.setCalibration("checking");
     setProblem(null);
@@ -369,6 +397,7 @@ export function LiveSession(props: LiveSessionProps) {
       edges: { left: detection.leftX, right: detection.rightX },
       adjusted: false,
       candidateIndex: index,
+      ellipse: detection.ellipse ?? fallbackEllipse(detection),
     });
     return { switched: true };
   }
@@ -387,10 +416,8 @@ export function LiveSession(props: LiveSessionProps) {
     const current = wheelRef.current;
     const diameter = setup.getSnapshot().wheelHeadDiameterMm;
     if (!current || !diameter?.confirmed) return { accepted: false, problems: ["Check the wheel head first."] };
-    const result = wheelHeadCalibration({
-      leftX: current.edges.left,
-      rightX: current.edges.right,
-      row: current.detection.row,
+    const result = wheelEllipseCalibration({
+      ellipse: current.ellipse,
       diameterMm: diameter.value,
       frameWidth: current.image.width,
       frameHeight: current.image.height,
@@ -605,18 +632,22 @@ export function LiveSession(props: LiveSessionProps) {
         {wheelCheck && (
           // Shown over the video, not in settings: the coach asks about these lines.
           <div className="stage-panel">
-            <WheelHeadConfirm
+            <WheelEllipseConfirm
               still={wheelCheck.image}
-              detection={wheelCheck.detection}
-              edges={wheelCheck.edges}
-              onEdgesChange={(edges) => updateWheel({ ...wheelCheck, edges, adjusted: true })}
+              ellipse={wheelCheck.ellipse}
+              diameterMm={slots.wheelHeadDiameterMm?.value ?? 0}
+              onEllipseChange={(ellipse) => updateWheel({ ...wheelCheck, ellipse, adjusted: true })}
               mirrored={mirrored}
               canSwitch={{
                 inner: wheelCheck.candidateIndex < wheelCheck.candidates.length - 1,
                 outer: wheelCheck.candidateIndex > 0,
               }}
               onSwitch={(toward) => void switchWheelEdges(toward)}
-              onConfirm={() => void confirmWheel()}
+              onConfirm={(ellipse) => {
+                updateWheel({ ...wheelCheck, ellipse });
+                wheelRef.current = { ...wheelCheck, ellipse };
+                void confirmWheel();
+              }}
               onRetry={() => updateWheel(null)}
             />
           </div>
