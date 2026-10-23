@@ -59,14 +59,14 @@ test("captions show what was said for a quick glance", async ({ page }) => {
   await expect(page.getByRole("region", { name: /conversation/i })).toContainText("What are we making today?");
 });
 
-test("the coach hangs up after an hour, and one tap carries on", async ({ page }) => {
+test("the coach hangs up after an hour, and reconnect carries on", async ({ page }) => {
   await page.clock.install();
   await startSession(page);
   await page.clock.fastForward(60 * 60_000);
-  const tap = page.getByRole("button", { name: /hung up after an hour/i });
-  await expect(tap).toBeVisible();
+  const reconnect = page.getByRole("button", { name: /reconnect voice/i });
+  await expect(reconnect).toBeVisible();
   expect(await voiceConnected(page)).toBe(false);
-  await tap.click();
+  await reconnect.click();
   await expect.poll(() => voiceConnected(page)).toBe(true);
-  await expect(tap).toHaveCount(0);
+  await expect(reconnect).toHaveCount(0);
 });

@@ -13,7 +13,7 @@ test("a refused sign-in is explained and the session carries on by touch", async
   await expect(page.getByText(/camera active/i)).toBeVisible();
 });
 
-test("a lost voice connection asks for one tap anywhere, which tries again", async ({ page }) => {
+test("a lost voice connection offers reconnect without blocking the camera controls", async ({ page }) => {
   test.setTimeout(60_000);
   let attempts = 0;
   await page.route("**/api/realtime/session", (route) => {
@@ -23,9 +23,10 @@ test("a lost voice connection asks for one tap anywhere, which tries again", asy
   await page.goto("/");
   await page.getByRole("button", { name: /start session/i }).click();
 
-  const tapAnywhere = page.getByRole("button", { name: /tap anywhere once to reconnect/i });
-  await expect(tapAnywhere).toBeVisible({ timeout: 30_000 });
+  const reconnect = page.getByRole("button", { name: /reconnect voice/i });
+  await expect(reconnect).toBeVisible({ timeout: 30_000 });
+  await expect(page.getByRole("button", { name: "Settings" })).toBeVisible();
   const before = attempts;
-  await tapAnywhere.click();
+  await reconnect.click();
   await expect.poll(() => attempts).toBeGreaterThan(before);
 });

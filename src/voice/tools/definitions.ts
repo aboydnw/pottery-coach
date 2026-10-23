@@ -61,8 +61,8 @@ export const REALTIME_TOOL_DEFINITIONS = [
     type: "function",
     name: "checkWheelHead",
     description:
-      "Find the wheel head's edges and show two yellow markers on screen. Needs a confirmed wheel-head diameter. Use fresh: true if the phone moved.",
-    parameters: { type: "object", properties: { fresh: { type: "boolean" } }, additionalProperties: false },
+      "Capture the current camera view, find the wheel head's edges, and show two yellow markers on screen. Needs a confirmed wheel-head diameter.",
+    parameters: empty,
   },
   {
     type: "function",

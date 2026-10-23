@@ -10,11 +10,10 @@ export async function startSession(page: Page, { demo = true }: { demo?: boolean
   await page.goto(demo ? "/?mode=demo" : "/");
   await page.getByRole("button", { name: /start session/i }).click();
   await expect(page.getByText(/camera active.*frames stay/i)).toBeVisible();
-  // Settings open by themselves once voice is known to be off; wait so tests never race that.
-  if (!demo) await expect(page.getByRole("region", { name: /session settings/i })).toBeVisible();
+  await expect(page.getByRole("region", { name: /session settings/i })).toHaveCount(0);
 }
 
-/** Opens the settings sheet (the touch fallback for setup); it starts closed when voice is available. */
+/** Opens the settings sheet: the explicit touch fallback while the camera remains primary. */
 export async function openSetup(page: Page) {
   const settings = page.getByRole("button", { name: "Settings", exact: true });
   if ((await settings.getAttribute("aria-expanded")) !== "true") await settings.click();

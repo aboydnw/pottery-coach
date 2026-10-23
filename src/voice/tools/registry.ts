@@ -71,12 +71,12 @@ export function createToolRegistry(dependencies: ToolDependencies) {
       return setup.loadLast() ?? { found: false };
     },
     checkWheelHead: async (input) => {
-      const { fresh = false } = parse(z.object({ fresh: z.boolean().optional() }).strict(), input);
+      parse(empty, input);
       if (!dependencies.wheel) return NOT_NOW;
       if (!setup.getSnapshot().wheelHeadDiameterMm?.confirmed) {
         return { found: false, problem: "Ask for the wheel-head (or bat) diameter and confirm it first." };
       }
-      const check = await dependencies.wheel.check(fresh);
+      const check = await dependencies.wheel.check();
       return {
         ...check,
         question: check.found

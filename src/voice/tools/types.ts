@@ -33,7 +33,8 @@ export type ToolDependencies = {
   getGoal(): GoalConfirmation | null;
   setup: SetupStore;
   wheel?: {
-    check(fresh: boolean): Promise<WheelCheck>;
+    /** Captures and checks what the camera shows at the moment this is called. */
+    check(): Promise<WheelCheck>;
     adjust(side: "left" | "right", direction: "in" | "out", size: "small" | "large"): void;
     /** Jumps to the next edge pair found inside (wheel head within a tray) or outside the current one. */
     switchEdges(toward: "inner" | "outer"): { switched: boolean };

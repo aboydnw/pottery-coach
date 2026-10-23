@@ -179,6 +179,7 @@ it("checks the wheel head only after its size is confirmed, then adjusts and con
   expect(wheel.check).not.toHaveBeenCalled();
   deps.setup.apply({ wheelHeadDiameter: { value: 14, unit: "in" } });
   await expect(registry.call("checkWheelHead", {})).resolves.toMatchObject({ found: true });
+  expect(wheel.check).toHaveBeenCalledWith();
   await registry.call("adjustWheelMarker", { side: "left", direction: "out", size: "small" });
   expect(wheel.adjust).toHaveBeenCalledWith("left", "out", "small");
   await expect(registry.call("switchWheelEdges", { toward: "inner" })).resolves.toMatchObject({ switched: true });
