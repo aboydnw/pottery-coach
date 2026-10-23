@@ -32,6 +32,7 @@
 ### Task 1: Define and validate wheel ellipse and view-pose geometry
 
 **Files:**
+
 - Create: `src/calibration/wheelEllipse.ts`
 - Create: `src/calibration/wheelEllipse.test.ts`
 - Create: `src/calibration/wheelViewPose.ts`
@@ -39,6 +40,7 @@
 - Modify: `src/calibration/types.ts`
 
 **Interfaces:**
+
 - Produces: `WheelEllipse`, `WheelEllipseCandidate`, `WheelViewPose`, `deriveWheelViewPose(ellipse, diameterMm, frame)`, and `CALIBRATION_REASON` values consumed by later tasks.
 
 - [ ] **Step 1: Write failing canonicalization and pose tests**
@@ -46,8 +48,16 @@
 ```ts
 it("derives downward angle and wheel-plane scale from a known circle", () => {
   const pose = deriveWheelViewPose(
-    { centerX: 320, centerY: 300, radiusMajor: 150, radiusMinor: 75, rotationRad: 0,
-      fitResidualPx95: 0.5, visibleArcFraction: 1, confidence: 0.95 },
+    {
+      centerX: 320,
+      centerY: 300,
+      radiusMajor: 150,
+      radiusMinor: 75,
+      rotationRad: 0,
+      fitResidualPx95: 0.5,
+      visibleArcFraction: 1,
+      confidence: 0.95,
+    },
     300,
     { width: 640, height: 480 },
   );
@@ -84,12 +94,14 @@ git commit -m "feat: define angled wheel view geometry"
 ### Task 2: Detect and rank complete wheel-rim ellipses
 
 **Files:**
+
 - Modify: `src/calibration/wheelEllipse.ts`
 - Modify: `src/calibration/wheelEllipse.test.ts`
 - Modify: `src/calibration/wheelHead.ts`
 - Modify: `src/calibration/wheelHead.test.ts`
 
 **Interfaces:**
+
 - Consumes: canonical types from Task 1.
 - Produces: `detectWheelEllipses(image: GrayImage): WheelEllipseCandidate[]`; keeps `detectWheelHead` as a compatibility adapter during migration.
 
@@ -121,6 +133,7 @@ git commit -m "feat: detect complete wheel rim ellipses"
 ### Task 3: Build ellipse-based calibration with hard quality gates
 
 **Files:**
+
 - Modify: `src/calibration/wheelHead.ts`
 - Modify: `src/calibration/wheelHead.test.ts`
 - Modify: `src/calibration/quality.ts`
@@ -128,6 +141,7 @@ git commit -m "feat: detect complete wheel rim ellipses"
 - Modify: `src/calibration/CalibrationFlow.tsx`
 
 **Interfaces:**
+
 - Produces: `wheelEllipseCalibration({ ellipse, diameterMm, frameWidth, frameHeight, adjustedByUser })` returning `CalibrationResult` with `wheelEllipse` and `wheelViewPose`.
 
 - [ ] **Step 1: Write failing calibration and reason-code tests**
@@ -154,6 +168,7 @@ git commit -m "feat: calibrate from angled wheel pose"
 ### Task 4: Replace line confirmation with an automatic ellipse overlay
 
 **Files:**
+
 - Create: `src/calibration/WheelEllipseConfirm.tsx`
 - Create: `src/calibration/WheelEllipseConfirm.test.tsx`
 - Modify: `src/app/SessionFlow.tsx`
@@ -162,6 +177,7 @@ git commit -m "feat: calibrate from angled wheel pose"
 - Delete after migration: `src/calibration/WheelHeadConfirm.test.tsx`
 
 **Interfaces:**
+
 - Consumes: ranked candidates and `deriveWheelViewPose`.
 - Produces: `onConfirm(ellipse)`, `onSwitch(index)`, `onRetry()`, and `onAdjustingChange(boolean)` events.
 
@@ -193,6 +209,7 @@ git commit -m "feat: guide setup with a wheel ellipse overlay"
 ### Task 5: Add a pose-aware measurement transform
 
 **Files:**
+
 - Create: `src/measurement/WheelPoseTransform.ts`
 - Create: `src/measurement/WheelPoseTransform.test.ts`
 - Modify: `src/measurement/extractProfile.ts`
@@ -200,13 +217,18 @@ git commit -m "feat: guide setup with a wheel ellipse overlay"
 - Modify: `src/measurement/types.ts`
 
 **Interfaces:**
+
 - Produces: `SerializedMeasurementTransform`, `MeasurementTransform`, `createWheelPoseTransform(pose)`, and `extractDimensions(..., { transform })`.
 
 ```ts
 type SerializedMeasurementCalibration =
   | { kind: "wheel-pose"; calibrationId: string; pose: WheelViewPose }
-  | { kind: "board-homography"; calibrationId: string; imageToMm: CalibrationResult["homographyImageToMm"];
-      estimatedErrorMm95: number };
+  | {
+      kind: "board-homography";
+      calibrationId: string;
+      imageToMm: CalibrationResult["homographyImageToMm"];
+      estimatedErrorMm95: number;
+    };
 type MeasurementTransform = {
   imageToWheel(point: Point2): { radialMm: number; verticalMm: number } | null;
   radiusAt(left: Point2, right: Point2, verticalMm: number): number | null;
@@ -242,6 +264,7 @@ git commit -m "feat: measure profiles in wheel pose coordinates"
 ### Task 6: Carry view pose through the worker without breaking shape-only mode
 
 **Files:**
+
 - Modify: `src/vision/workerProtocol.ts`
 - Modify: `src/vision/workerProtocol.test.ts`
 - Modify: `src/vision/measurement.worker.ts`
@@ -250,6 +273,7 @@ git commit -m "feat: measure profiles in wheel pose coordinates"
 - Modify: `src/measurement/scale.test.ts`
 
 **Interfaces:**
+
 - Replaces the worker `scale` message with `{ type: "calibration"; calibration: SerializedMeasurementCalibration | null }`.
 - Produces metric readings directly when pose calibration exists and pixel readings in shape-only mode.
 
@@ -277,6 +301,7 @@ git commit -m "feat: apply wheel pose in the measurement worker"
 ### Task 7: Preserve one-time diameter setup and migrate legacy records
 
 **Files:**
+
 - Modify: `src/setup/SetupStore.ts`
 - Modify: `src/setup/SetupStore.test.ts`
 - Modify: `src/session/migrations.ts`
@@ -285,6 +310,7 @@ git commit -m "feat: apply wheel pose in the measurement worker"
 - Modify: `src/calibration/WheelHeadStep.test.tsx`
 
 **Interfaces:**
+
 - Produces remembered diameter/unit preference while never restoring a trusted live pose.
 
 - [ ] **Step 1: Write failing persistence and migration tests**
@@ -311,6 +337,7 @@ git commit -m "feat: remember wheel size without reusing camera pose"
 ### Task 8: Extend benchmarks, browser journeys, and public documentation
 
 **Files:**
+
 - Modify: `benchmarks/shared/syntheticScene.ts`
 - Modify: `benchmarks/shared/measureScene.ts`
 - Modify: `benchmarks/dimensions/fixtures.json`
@@ -325,6 +352,7 @@ git commit -m "feat: remember wheel size without reusing camera pose"
 - Modify: `docs/specs/measurement-engine-spec.md`
 
 **Interfaces:**
+
 - Produces angle-stratified synthetic evidence without upgrading the physical validation status.
 
 - [ ] **Step 1: Add failing benchmark-summary tests**
@@ -373,9 +401,11 @@ git commit -m "test: validate angled camera calibration"
 ### Task 9: Review the complete PR and publish the branch
 
 **Files:**
+
 - Review all files changed since commit `67871e2`.
 
 **Interfaces:**
+
 - Produces: a clean, verified PR 12 branch with no unsupported claims.
 
 - [ ] **Step 1: Inspect the final diff and repository status**
