@@ -66,7 +66,10 @@ export function WheelHeadStep({ initialDiameterMm, busy, onFind }: Props) {
         )}
         {customInvalid && <p role="alert">Enter a size between 20 and 50 cm (8 and 19.5 in).</p>}
       </fieldset>
-      <p>Measure across the top of the wheel head, or the bat if you throw on one. Most wheels are 12–14 in.</p>
+      <p>
+        Measure across the top of the wheel head, or the bat if you throw on one. Most wheels are 12–14 in. We remember
+        this size, but check the camera view each time.
+      </p>
       <button
         type="button"
         disabled={busy || diameterMm === null}

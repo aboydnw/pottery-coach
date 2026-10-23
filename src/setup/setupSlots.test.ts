@@ -75,6 +75,7 @@ it("remembers a confirmed setup so 'same as last time' needs one confirmation", 
   const loaded = next.loadLast();
   expect(loaded?.readback).toContain("13 inches");
   expect(next.getSnapshot().goal).toMatchObject({ source: "preset", confirmed: false });
+  expect(next.getSnapshot().calibration).toBe("none");
   next.confirm();
   expect(next.status().unconfirmed).toEqual([]);
 });
