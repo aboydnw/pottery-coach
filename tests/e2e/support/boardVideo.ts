@@ -44,8 +44,8 @@ export async function writeBoardVideo(): Promise<void> {
 }
 
 /**
- * Renders a side view of a pot on a dark wheel head against a studio wall into a fake camera feed,
- * so tests exercise wheel-head detection and the confirm step.
+ * Renders the empty circular wheel head from a supported elevated camera position so tests exercise
+ * complete-rim detection and the ellipse overlay.
  */
 export async function writeWheelVideo(): Promise<void> {
   const browser = await chromium.launch();
@@ -64,10 +64,8 @@ export async function writeWheelVideo(): Promise<void> {
         const centerX = (scene.leftX + scene.rightX) / 2;
         context.fillStyle = "#4a4d52";
         context.beginPath();
-        context.ellipse(centerX, scene.row, (scene.rightX - scene.leftX) / 2, 18, 0, 0, Math.PI * 2);
+        context.ellipse(centerX, scene.row, (scene.rightX - scene.leftX) / 2, 120, 0, 0, Math.PI * 2);
         context.fill();
-        context.fillStyle = "#a8643f";
-        context.fillRect(centerX - 120, scene.row - 260, 240, 250);
         return Array.from(context.getImageData(0, 0, width, height).data);
       },
       { width: WIDTH, height: HEIGHT, scene: WHEEL_SCENE },

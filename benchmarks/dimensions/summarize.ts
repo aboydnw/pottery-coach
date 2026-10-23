@@ -1,5 +1,5 @@
 import { quantile, ratio } from "../shared/stats";
-export type DimensionResult = { errorMm: number | null; supported: boolean; accepted: boolean };
+export type DimensionResult = { errorMm: number | null; supported: boolean; accepted: boolean; angleDeg?: number };
 export function summarizeDimensions(rows: DimensionResult[]) {
   const errors = rows.flatMap((row) => (row.errorMm == null ? [] : [row.errorMm]));
   const absolute = errors.map(Math.abs);
@@ -10,12 +10,29 @@ export function summarizeDimensions(rows: DimensionResult[]) {
   const unsupported = rows.filter((row) => !row.supported);
   const supportedAcceptance = ratio(supported.filter((row) => row.accepted).length, supported.length);
   const unsupportedRejection = ratio(unsupported.filter((row) => !row.accepted).length, unsupported.length);
+  const angles = [...new Set(rows.flatMap((row) => (row.angleDeg === undefined ? [] : [row.angleDeg])))].sort(
+    (left, right) => left - right,
+  );
+  const byAngle = angles.map((angleDeg) => {
+    const group = rows.filter((row) => row.angleDeg === angleDeg);
+    return {
+      angleDeg,
+      cases: group.length,
+      measurable: group.filter((row) => row.errorMm !== null).length,
+      accepted: group.filter((row) => row.accepted).length,
+      medianAbsErrorMm: quantile(
+        group.flatMap((row) => (row.errorMm === null ? [] : [Math.abs(row.errorMm)])),
+        0.5,
+      ),
+    };
+  });
   return {
     medianMm,
     p95Mm,
     biasMm,
     supportedAcceptance,
     unsupportedRejection,
+    byAngle,
     gates: {
       median: medianMm !== null && medianMm <= 5,
       p95: p95Mm !== null && p95Mm <= 10,

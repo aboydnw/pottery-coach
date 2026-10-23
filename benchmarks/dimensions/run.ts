@@ -40,6 +40,7 @@ const records = cases.map((fixture, index) => {
     errorMm: reading.height === null ? null : reading.height - fixture.sizeMm,
     supported: fixture.angleDeg <= SUPPORTED_MAX_ANGLE_DEG,
     accepted: measurable,
+    angleDeg: fixture.angleDeg,
   };
   return { fixture, row };
 });

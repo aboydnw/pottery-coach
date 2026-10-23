@@ -405,9 +405,15 @@ export function LiveSession(props: LiveSessionProps) {
   function adjustWheel(side: "left" | "right", direction: "in" | "out", size: "small" | "large"): void {
     const current = wheelRef.current;
     if (!current) return;
+    const edges = nudgeMarker(current.edges, side, direction, size, current.image.width);
     updateWheel({
       ...current,
-      edges: nudgeMarker(current.edges, side, direction, size, current.image.width),
+      edges,
+      ellipse: {
+        ...current.ellipse,
+        centerX: (edges.left + edges.right) / 2,
+        radiusMajor: (edges.right - edges.left) / 2,
+      },
       adjusted: true,
     });
   }
