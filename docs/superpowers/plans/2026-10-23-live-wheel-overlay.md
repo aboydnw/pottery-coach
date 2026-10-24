@@ -21,10 +21,12 @@
 ### Task 1: Live wheel detection state
 
 **Files:**
+
 - Create: `src/calibration/useLiveWheelDetection.ts`
 - Create: `src/calibration/useLiveWheelDetection.test.tsx`
 
 **Interfaces:**
+
 - Consumes: `captureFrame(video)`, `toGray`, `detectWheelHead`, `deriveWheelViewPose`, and an `HTMLVideoElement` ref.
 - Produces: `useLiveWheelDetection({ videoRef, diameterMm, onStable }): { active, status, frameSize, candidates, candidateIndex, ellipse, adjusted, error, start, stop, retry, switchCandidate, adjustEllipse }`.
 
@@ -59,6 +61,7 @@ Expected: PASS.
 ### Task 2: Live camera overlay component
 
 **Files:**
+
 - Create: `src/calibration/WheelLiveOverlay.tsx`
 - Create: `src/calibration/WheelLiveOverlay.test.tsx`
 - Delete: `src/calibration/WheelEllipseConfirm.tsx`
@@ -66,6 +69,7 @@ Expected: PASS.
 - Modify: `src/styles.css`
 
 **Interfaces:**
+
 - Consumes: intrinsic `{ width, height }`, current `WheelEllipse`, diameter, status, mirror state, candidate bounds, and callbacks.
 - Produces: an SVG overlay and compact controls with no canvas, bitmap, modal, or duplicated camera surface.
 
@@ -96,10 +100,12 @@ Expected: PASS.
 ### Task 3: Integrate shared voice/touch calibration and caption preference
 
 **Files:**
+
 - Modify: `src/live/LiveSession.tsx`
 - Modify: `src/live/LiveSession.test.tsx`
 
 **Interfaces:**
+
 - Consumes: `useLiveWheelDetection` and `WheelLiveOverlay` from Tasks 1 and 2.
 - Produces: shared `checkWheel`, `switchWheelEdges`, `adjustWheel`, `confirmWheel`, and `skipWheel` tool operations backed by current live geometry.
 
@@ -130,11 +136,13 @@ Expected: PASS.
 ### Task 4: Browser behavior and regression verification
 
 **Files:**
+
 - Modify: `tests/e2e/wheel-head.spec.ts`
 - Modify: `tests/e2e/hands-free.spec.ts`
 - Modify: `tests/e2e/fixtures/session-streams.ts` only if selectors need a shared helper.
 
 **Interfaces:**
+
 - Consumes: the public UI and mocked voice tool stream.
 - Produces: browser-level proof of live overlay, shared voice/touch flow, and opt-in captions.
 
@@ -163,9 +171,11 @@ Stage only the live calibration, captions, tests, spec, and plan changes. Commit
 ### Task 5: Pull request and CI monitoring
 
 **Files:**
+
 - No source changes unless CI reveals a reproducible issue.
 
 **Interfaces:**
+
 - Produces: a pushed branch and reviewed GitHub pull request targeting `main`.
 
 - [ ] **Step 1: Push and open the pull request**

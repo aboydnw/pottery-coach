@@ -12,8 +12,9 @@ test("calibrates from the wheel head by touch: size, ellipse, confirm", async ({
   await page.getByRole("button", { name: "14 in", exact: true }).click();
   await page.getByRole("button", { name: /find 14 in wheel head/i }).click();
 
-  await expect(page.getByRole("heading", { name: /check the wheel outline/i })).toBeVisible();
-  await page.getByRole("button", { name: /adjust/i }).click();
+  await expect(page.getByRole("region", { name: /live wheel-head calibration/i })).toBeVisible();
+  await expect(page.locator(".wheel-live-overlay canvas, .wheel-live-overlay img")).toHaveCount(0);
+  await page.getByRole("button", { name: /adjust manually/i }).click();
   expect(
     Math.abs((await sliderValue(page, /wheel center horizontal/i)) - (WHEEL_SCENE.leftX + WHEEL_SCENE.rightX) / 2),
   ).toBeLessThanOrEqual(10);
@@ -30,7 +31,7 @@ test("calibrates from the wheel head entirely by voice", async ({ page }) => {
   await voiceTool(page, "proposeSetup", { wheelHeadDiameter: { value: 14, unit: "in" } });
   await voiceTool(page, "confirmSetup");
   await expect(voiceTool(page, "checkWheelHead")).resolves.toMatchObject({ found: true });
-  await page.getByRole("button", { name: /adjust/i }).click();
+  await page.getByRole("button", { name: /adjust manually/i }).click();
   const before = await sliderValue(page, /wheel width/i);
   await voiceTool(page, "adjustWheelMarker", { side: "left", direction: "out", size: "small" });
   await expect.poll(() => sliderValue(page, /wheel width/i)).toBeGreaterThan(before);
@@ -38,7 +39,7 @@ test("calibrates from the wheel head entirely by voice", async ({ page }) => {
   await expect(voiceTool(page, "confirmWheelHead")).resolves.toMatchObject({ accepted: true });
   await openSetup(page);
   await expect(page.locator(".setup-summary")).toContainText(/sizes are in centimetres/i);
-  await expect(page.getByRole("heading", { name: /check the wheel outline/i })).toHaveCount(0);
+  await expect(page.getByRole("region", { name: /live wheel-head calibration/i })).toHaveCount(0);
 });
 
 test("remembers the wheel size on this device", async ({ page }) => {

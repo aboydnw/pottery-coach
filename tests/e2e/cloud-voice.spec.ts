@@ -8,7 +8,7 @@ test("a refused sign-in is explained and the session carries on by touch", async
   await expect(page.getByLabel(/passphrase/i)).toHaveCount(0);
   await page.getByRole("button", { name: /start session/i }).click();
 
-  await expect(page.getByRole("region", { name: /conversation/i })).toContainText(/isn't available for this account/i);
+  await expect(page.getByRole("alert")).toContainText(/isn't available for this account/i);
   await expect(page.getByRole("button", { name: /tap anywhere/i })).toHaveCount(0);
   await expect(page.getByText(/camera active/i)).toBeVisible();
 });
