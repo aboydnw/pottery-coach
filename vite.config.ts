@@ -16,7 +16,7 @@ export default defineConfig({
         clientsClaim: true,
         // Only app routes fall back to index.html offline. Without this, opening the printable board
         // (or any other static file) in a new tab showed the app's first screen instead of the file.
-        navigateFallbackAllowlist: [/^\/$/, /^\/session(\/|$)/],
+        navigateFallbackAllowlist: [/^\/$/, /^\/about$/, /^\/session(\/|$)/],
       },
     }),
   ],

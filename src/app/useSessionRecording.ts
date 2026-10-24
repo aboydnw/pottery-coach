@@ -14,7 +14,9 @@ const WOBBLE_EVENT_INTERVAL_MS = 2_000;
 type ActiveSession = {
   id: string;
   created: boolean;
+  beginning: Promise<void> | null;
   recorder: SessionRecorder | null;
+  pendingReadings: StableDimensionReading[];
   lastWobble: { classification: WobbleReading["classification"]; recordedAtMs: number } | null;
 };
 
@@ -26,36 +28,59 @@ export function useSessionRecording(repository: SessionRepository, onStorageFail
   const sessionRef = useRef<ActiveSession | null>(null);
 
   function current(): ActiveSession {
-    sessionRef.current ??= { id: newId("session"), created: false, recorder: null, lastWobble: null };
+    sessionRef.current ??= {
+      id: newId("session"),
+      created: false,
+      beginning: null,
+      recorder: null,
+      pendingReadings: [],
+      lastWobble: null,
+    };
     return sessionRef.current;
   }
 
   async function begin(): Promise<void> {
     const session = current();
     if (session.created) return;
-    const now = Date.now();
-    const record: SessionRecord = {
-      id: session.id,
-      schemaVersion: 2,
-      startedAtMs: now,
-      endedAtMs: null,
-      goal: null,
-      deviceClass: navigator.userAgent.includes("Mobile") ? "phone" : "desktop",
-      calibrationId: null,
-      outcome: null,
-      consent: emptyConsent(now),
-    };
-    try {
-      await repository.create(record);
-      session.created = true;
-      session.recorder = new SessionRecorder(repository, record.id, { onStorageUnavailable: onStorageFailed });
-    } catch {
-      onStorageFailed();
-    }
+    if (session.beginning) return session.beginning;
+    session.beginning = (async () => {
+      const now = Date.now();
+      const record: SessionRecord = {
+        id: session.id,
+        schemaVersion: 2,
+        startedAtMs: now,
+        endedAtMs: null,
+        goal: null,
+        deviceClass: navigator.userAgent.includes("Mobile") ? "phone" : "desktop",
+        calibrationId: null,
+        outcome: null,
+        consent: emptyConsent(now),
+      };
+      try {
+        await repository.create(record);
+        session.created = true;
+        session.recorder = new SessionRecorder(repository, record.id, { onStorageUnavailable: onStorageFailed });
+        for (const reading of session.pendingReadings) recordReadingTo(session, reading);
+        session.pendingReadings = [];
+      } catch {
+        onStorageFailed();
+      } finally {
+        session.beginning = null;
+      }
+    })();
+    return session.beginning;
   }
 
   function recordReading(reading: StableDimensionReading): void {
     const session = current();
+    if (!session.recorder) {
+      session.pendingReadings = [...session.pendingReadings.slice(-9), reading];
+      return;
+    }
+    recordReadingTo(session, reading);
+  }
+
+  function recordReadingTo(session: ActiveSession, reading: StableDimensionReading): void {
     session.recorder?.recordReading({
       id: reading.id,
       sessionId: session.id,
@@ -163,6 +188,7 @@ export function useSessionRecording(repository: SessionRepository, onStorageFail
   async function snapshot(): Promise<SessionBundle> {
     const session = current();
     try {
+      await session.beginning;
       await session.recorder?.flush();
       const stored = session.created ? await repository.get(session.id) : null;
       if (stored) return stored;
@@ -177,6 +203,7 @@ export function useSessionRecording(repository: SessionRepository, onStorageFail
     const session = current();
     const now = Date.now();
     try {
+      await session.beginning;
       await session.recorder?.flush();
       if (session.created) {
         await repository.update(session.id, { endedAtMs: now, outcome: "completed" });

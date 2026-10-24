@@ -1,7 +1,11 @@
-export type SessionStep = "notice" | "live" | "review";
+export type SessionStep = "home" | "about" | "live" | "review";
 
 export type SessionEventType =
   | "START_SESSION"
+  | "START_NEW_SESSION"
+  | "SHOW_ABOUT"
+  | "GO_HOME"
+  | "OPEN_REVIEW"
   | "CAMERA_DENIED"
   | "END_SESSION"
   | "DELETE_SESSION"
@@ -10,25 +14,35 @@ export type SessionEventType =
   | "BACKGROUND"
   | "RESUME";
 
-export type SessionEvent = { type: SessionEventType };
+export type SessionEvent =
+  | { type: "END_SESSION" | "OPEN_REVIEW"; sessionId?: string }
+  | { type: Exclude<SessionEventType, "END_SESSION" | "OPEN_REVIEW"> };
 
 export type SessionState = {
   step: SessionStep;
   modes: { voice: boolean; storage: boolean; paused: boolean };
   cameraError: "permission-denied" | null;
+  reviewSessionId: string | null;
   audit: Array<{ event: SessionEventType; accepted: boolean }>;
 };
 
 const AUDIT_LIMIT = 100;
 
 export function createSessionState(): SessionState {
-  return { step: "notice", modes: { voice: true, storage: true, paused: false }, cameraError: null, audit: [] };
+  return {
+    step: "home",
+    modes: { voice: true, storage: true, paused: false },
+    cameraError: null,
+    reviewSessionId: null,
+    audit: [],
+  };
 }
 
 const path: Partial<Record<SessionStep, Partial<Record<SessionEventType, SessionStep>>>> = {
-  notice: { START_SESSION: "live" },
+  home: { START_SESSION: "live", SHOW_ABOUT: "about", OPEN_REVIEW: "review" },
+  about: { GO_HOME: "home", START_SESSION: "live" },
   live: { END_SESSION: "review" },
-  review: { DELETE_SESSION: "notice" },
+  review: { START_NEW_SESSION: "live", GO_HOME: "home" },
 };
 
 /**
@@ -44,11 +58,15 @@ export function transition(state: SessionState, event: SessionEvent): SessionSta
     return update(state, event, { modes: { ...state.modes, paused: true } });
   if (event.type === "RESUME" && state.step === "live")
     return update(state, event, { modes: { ...state.modes, paused: false } });
+  if (event.type === "OPEN_REVIEW" && state.step === "home" && event.sessionId)
+    return update(state, event, { step: "review", reviewSessionId: event.sessionId });
+  if (event.type === "END_SESSION" && state.step === "live" && event.sessionId)
+    return update(state, event, { step: "review", reviewSessionId: event.sessionId });
   const next = path[state.step]?.[event.type];
   if (!next) return { ...state, audit: appendAudit(state.audit, event.type, false) };
-  if (event.type === "DELETE_SESSION")
-    return { ...createSessionState(), audit: appendAudit(state.audit, event.type, true) };
-  if (event.type === "START_SESSION") return update(state, event, { step: next, cameraError: null });
+  if (event.type === "START_SESSION" || event.type === "START_NEW_SESSION")
+    return update(state, event, { step: next, cameraError: null, reviewSessionId: null });
+  if (event.type === "GO_HOME") return update(state, event, { step: next, reviewSessionId: null });
   return update(state, event, { step: next });
 }
 

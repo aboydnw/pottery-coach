@@ -28,6 +28,7 @@ test("remains usable at narrow mobile width and 200% zoom proxy", async ({ page 
 test("respects reduced motion and explains privacy in words", async ({ page }) => {
   await page.emulateMedia({ reducedMotion: "reduce" });
   await page.goto("/");
+  await page.getByRole("button", { name: "About" }).click();
   await expect(page.getByText(/never stored or uploaded/i)).toBeVisible();
   expect(await page.evaluate(() => getComputedStyle(document.documentElement).scrollBehavior)).not.toBe("smooth");
 });

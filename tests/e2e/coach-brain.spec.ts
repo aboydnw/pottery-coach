@@ -60,8 +60,9 @@ test("a measured size and the potter's own notes end up in the throw log", async
   await expect(pieces).toContainText("Base cracked while drying");
 });
 
-test("the start screen asks for an empty wheel, and the live screen says when it's been seen", async ({ page }) => {
+test("About asks for an empty wheel, and the live screen says when it's been seen", async ({ page }) => {
   await page.goto("/?mode=demo");
+  await page.getByRole("button", { name: "About" }).click();
   await expect(page.getByText(/start with an empty wheel/i)).toBeVisible();
   await page.getByRole("button", { name: /start session/i }).click();
   await expect(page.getByText(/looking at the empty wheel|got the empty wheel/i).first()).toBeVisible();

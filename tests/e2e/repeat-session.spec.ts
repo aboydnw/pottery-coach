@@ -6,21 +6,21 @@ async function completeSession(page: Page) {
   await endSession(page);
 }
 
-test("a second session after deletion records and reviews normally", async ({ page }) => {
+test("a new session preserves the completed session in history", async ({ page }) => {
   const errors: string[] = [];
   page.on("pageerror", (error) => errors.push(error.message));
   await beginDemoSession(page);
   await completeSession(page);
-  await page.getByRole("button", { name: /^delete session$/i }).click();
-  await page.getByRole("button", { name: /confirm deletion/i }).click();
-  await page.getByRole("button", { name: /start another session/i }).click();
-
-  await page.getByRole("button", { name: /start session/i }).click();
+  await page.getByRole("button", { name: /start new session/i }).click();
   await openSetup(page);
   await page.getByRole("button", { name: /load deterministic demo calibration/i }).click();
+  await expect(page.getByRole("region", { name: /live measurements/i })).toContainText("12.0 cm");
   await completeSession(page);
 
-  await expect(page.getByRole("table", { name: /measurement data/i })).toContainText("120 mm");
+  await expect(page.getByRole("heading", { name: /throw complete/i })).toBeVisible();
+  await page.getByRole("button", { name: /go home/i }).click();
+  await expect(page.getByRole("heading", { name: /past sessions/i })).toBeVisible();
+  await expect(page.getByRole("button", { name: /open session/i })).toHaveCount(2);
   expect(errors).toEqual([]);
 });
 
