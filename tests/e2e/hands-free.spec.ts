@@ -3,7 +3,8 @@ import { endSession, openSetup, startSession, voiceConnected, voiceTool } from "
 
 test("a whole session runs by voice after the single tap", async ({ page }) => {
   await startSession(page);
-  await expect(page.getByRole("region", { name: /conversation/i })).toContainText(/coach is listening/i);
+  await expect(page.getByRole("region", { name: /conversation/i })).toHaveCount(0);
+  await expect.poll(() => voiceConnected(page)).toBe(true);
   await expect(page.getByRole("region", { name: /session settings/i })).toHaveCount(0);
   await expect(page.getByRole("button", { name: /^end session$/i })).toBeVisible();
 
@@ -53,9 +54,12 @@ test("'same as last time' brings back the previous setup for one confirmation", 
   expect(loaded.readback).toMatch(/13 inches.*tapered cylinder/);
 });
 
-test("captions show what was said for a quick glance", async ({ page }) => {
+test("captions stay off the camera until enabled in Settings", async ({ page }) => {
   await startSession(page);
   await page.evaluate(() => window.__potteryVoice!.say("assistant", "What are we making today?"));
+  await expect(page.getByRole("region", { name: /conversation/i })).toHaveCount(0);
+  await openSetup(page);
+  await page.getByRole("checkbox", { name: /show captions/i }).check();
   await expect(page.getByRole("region", { name: /conversation/i })).toContainText("What are we making today?");
 });
 

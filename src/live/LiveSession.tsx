@@ -5,13 +5,13 @@ import { CalibrationFlow, describeCalibrationReason } from "../calibration/Calib
 import { calibrateFromVideo } from "../calibration/calibrateFromVideo";
 import type { CalibrationResult } from "../calibration/types";
 import { WasmTagDetector } from "../calibration/WasmTagDetector";
-import { detectWheelHead, toGray, wheelEllipseCalibration, type WheelHeadDetection } from "../calibration/wheelHead";
-import { WheelEllipseConfirm } from "../calibration/WheelEllipseConfirm";
+import { wheelEllipseCalibration } from "../calibration/wheelHead";
+import { WheelLiveOverlay } from "../calibration/WheelLiveOverlay";
 import type { WheelEllipse } from "../calibration/wheelEllipse";
 import { nudgeMarker, type WheelEdges } from "../calibration/wheelMarkers";
 import { WheelHeadStep } from "../calibration/WheelHeadStep";
 import { loadRememberedDiameterMm } from "../calibration/wheelSize";
-import { captureFrame } from "../camera/captureFrame";
+import { useLiveWheelDetection } from "../calibration/useLiveWheelDetection";
 import { useCamera } from "../camera/useCamera";
 import { DiagnosticsPanel } from "../diagnostics/DiagnosticsPanel";
 import { toWetGoal } from "../goals/sizeGoal";
@@ -30,7 +30,7 @@ import type { Caption } from "../voice/useVoiceSession";
 import { NOTICES, speakNotice } from "../voice/spokenNotice";
 import { StabilityStatus } from "../wobble/StabilityStatus";
 import type { WobbleReading } from "../wobble/types";
-import { Captions } from "./Captions";
+import { Captions, voiceFailureText } from "./Captions";
 import { LiveReadouts } from "./LiveReadouts";
 import { SetupChecklist } from "./SetupChecklist";
 import { useLiveCues } from "./useLiveCues";
@@ -50,33 +50,8 @@ const LINES = {
   wheelSeen: "Got a look at the empty wheel. Put your clay on.",
 } as const;
 
-function fallbackEllipse(detection: WheelHeadDetection): WheelEllipse {
-  const radiusMajor = Math.max(1, (detection.rightX - detection.leftX) / 2);
-  return {
-    centerX: (detection.leftX + detection.rightX) / 2,
-    centerY: detection.row,
-    radiusMajor,
-    radiusMinor: radiusMajor * 0.4,
-    rotationRad: 0,
-    fitResidualPx95: radiusMajor,
-    visibleArcFraction: 0,
-    confidence: 0,
-  };
-}
-
 /** Where the empty-wheel snapshot is at: learning it, learned (clay can go on), or waiting for the wheel to clear. */
 type WheelPhase = "learning" | "ready" | "awaiting-empty" | "placed";
-
-type WheelCheckState = {
-  image: ImageData;
-  detection: WheelHeadDetection;
-  edges: WheelEdges;
-  adjusted: boolean;
-  /** Nested edge pairs found (outermost first) and which one is shown; a tray sits outside the wheel head. */
-  candidates: WheelHeadDetection[];
-  candidateIndex: number;
-  ellipse: WheelEllipse;
-};
 
 export type LiveSessionProps = {
   setup: SetupStore;
@@ -139,7 +114,6 @@ export function LiveSession(props: LiveSessionProps) {
   });
   const slots = useSyncExternalStore(setup.subscribe, setup.getSnapshot);
   const [scale, setScaleState] = useState<SessionScale | null>(null);
-  const [wheelCheck, setWheelCheck] = useState<WheelCheckState | null>(null);
   const [boardMode, setBoardMode] = useState(false);
   const [boardCandidate, setBoardCandidate] = useState<CalibrationResult | null>(null);
   const [detector, setDetector] = useState<WasmTagDetector | null>(null);
@@ -149,6 +123,7 @@ export function LiveSession(props: LiveSessionProps) {
   const [momentMarked, setMomentMarked] = useState(false);
   // Keep the camera primary. Touch setup stays one explicit tap away when voice is unavailable.
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [showCaptions, setShowCaptions] = useState(false);
   const [confirmingEnd, setConfirmingEnd] = useState(false);
   const [wheelPhase, setWheelPhase] = useState<WheelPhase>("learning");
   const [cueToast, setCueToast] = useState<string | null>(null);
@@ -156,7 +131,13 @@ export function LiveSession(props: LiveSessionProps) {
   const wheelPhaseRef = useRef<WheelPhase>("learning");
   const announceWheelRef = useRef(false);
   const demoTimerRef = useRef<number | null>(null);
-  const wheelRef = useRef<WheelCheckState | null>(null);
+  const liveWheel = useLiveWheelDetection({
+    videoRef,
+    diameterMm: slots.wheelHeadDiameterMm?.value ?? 0,
+    onStable: (ellipse) => confirmWheel(ellipse),
+  });
+  const liveWheelActive = liveWheel.active;
+  const stopLiveWheel = liveWheel.stop;
 
   const target = TEMPLATES.find((template) => template.id === slots.targetId.value) ?? TEMPLATES[0]!;
   const goal = useMemo<GoalConfirmation | null>(() => {
@@ -284,6 +265,12 @@ export function LiveSession(props: LiveSessionProps) {
   // as the page is visible again; if that fails, say out loud that one tap is needed.
   const resumeTriedRef = useRef(false);
   useEffect(() => {
+    if (!camera.interrupted || !liveWheelActive) return;
+    stopLiveWheel();
+    setup.setCalibration("none");
+  }, [camera.interrupted, liveWheelActive, setup, stopLiveWheel]);
+
+  useEffect(() => {
     if (!camera.interrupted) {
       resumeTriedRef.current = false;
       return;
@@ -311,6 +298,7 @@ export function LiveSession(props: LiveSessionProps) {
   }
 
   async function switchCamera(): Promise<void> {
+    liveWheel.stop();
     const settings = await camera.switchFacing();
     if (!settings) return;
     if (!cameraOnly && videoRef.current) pipeline.start(videoRef.current, { freshBackground: true });
@@ -325,98 +313,46 @@ export function LiveSession(props: LiveSessionProps) {
     props.onScale(next);
   }
 
-  function updateWheel(next: WheelCheckState | null): void {
-    wheelRef.current = next;
-    setWheelCheck(next);
-    // The edge check is shown over the video, so get the settings sheet out of its way.
-    if (next) setSettingsOpen(false);
-  }
-
-  async function checkWheel() {
+  async function checkWheel(diameterOverride?: number) {
     const video = videoRef.current;
     if (!video) return { found: false, confidence: 0, problem: "The camera isn't running." };
-    // Wheel finding is an explicit action, so it must reflect what the camera shows at this moment.
-    const image = safeCapture(video);
-    if (!image) return { found: false, confidence: 0, problem: "The camera hasn't shown a picture yet." };
-    const gray = toGray(image.data, image.width, image.height);
-    const found = detectWheelHead(gray);
-    const toFull = (value: number) => Math.round((value + 0.5) * gray.scale);
-    const candidates = found.candidates.map((candidate) => ({
-      ...candidate,
-      leftX: toFull(candidate.leftX),
-      rightX: toFull(candidate.rightX),
-      row: toFull(candidate.row),
-      ellipse: candidate.ellipse
-        ? {
-            ...candidate.ellipse,
-            centerX: toFull(candidate.ellipse.centerX),
-            centerY: toFull(candidate.ellipse.centerY),
-            radiusMajor: candidate.ellipse.radiusMajor * gray.scale,
-            radiusMinor: candidate.ellipse.radiusMinor * gray.scale,
-            fitResidualPx95: candidate.ellipse.fitResidualPx95 * gray.scale,
-          }
-        : undefined,
-    }));
-    const detection = candidates[0]!;
-    const ellipse = detection.ellipse ?? fallbackEllipse(detection);
-    updateWheel({
-      image,
-      detection,
-      edges: { left: detection.leftX, right: detection.rightX },
-      adjusted: false,
-      candidates,
-      candidateIndex: 0,
-      ellipse,
-    });
+    setSettingsOpen(false);
     setup.setCalibration("checking");
     setProblem(null);
-    return { found: detection.confidence >= 0.5, confidence: Math.round(detection.confidence * 100) / 100 };
+    return liveWheel.start(diameterOverride ?? setup.getSnapshot().wheelHeadDiameterMm?.value);
   }
 
   /** Shows the next edge pair found inside (a wheel head within a tray) or outside the current one. */
   function switchWheelEdges(toward: "inner" | "outer"): { switched: boolean } {
-    const current = wheelRef.current;
-    if (!current) return { switched: false };
-    const index = current.candidateIndex + (toward === "inner" ? 1 : -1);
-    const detection = current.candidates[index];
-    if (!detection) return { switched: false };
-    updateWheel({
-      ...current,
-      detection,
-      edges: { left: detection.leftX, right: detection.rightX },
-      adjusted: false,
-      candidateIndex: index,
-      ellipse: detection.ellipse ?? fallbackEllipse(detection),
-    });
-    return { switched: true };
+    return { switched: liveWheel.switchCandidate(toward) };
   }
 
   function adjustWheel(side: "left" | "right", direction: "in" | "out", size: "small" | "large"): void {
-    const current = wheelRef.current;
-    if (!current) return;
-    const edges = nudgeMarker(current.edges, side, direction, size, current.image.width);
-    updateWheel({
-      ...current,
-      edges,
-      ellipse: {
-        ...current.ellipse,
-        centerX: (edges.left + edges.right) / 2,
-        radiusMajor: (edges.right - edges.left) / 2,
-      },
-      adjusted: true,
+    if (!liveWheel.ellipse || !liveWheel.frameSize) return;
+    const currentEdges: WheelEdges = {
+      left: liveWheel.ellipse.centerX - liveWheel.ellipse.radiusMajor,
+      right: liveWheel.ellipse.centerX + liveWheel.ellipse.radiusMajor,
+    };
+    const edges = nudgeMarker(currentEdges, side, direction, size, liveWheel.frameSize.width);
+    liveWheel.adjustEllipse({
+      ...liveWheel.ellipse,
+      centerX: (edges.left + edges.right) / 2,
+      radiusMajor: (edges.right - edges.left) / 2,
     });
   }
 
-  function confirmWheel(): { accepted: boolean; problems: string[] } {
-    const current = wheelRef.current;
+  function confirmWheel(ellipseOverride?: WheelEllipse): { accepted: boolean; problems: string[] } {
+    const ellipse = ellipseOverride ?? liveWheel.ellipse;
     const diameter = setup.getSnapshot().wheelHeadDiameterMm;
-    if (!current || !diameter?.confirmed) return { accepted: false, problems: ["Check the wheel head first."] };
+    const frame = liveWheel.frameSize;
+    if (!ellipse || !frame || !diameter?.confirmed)
+      return { accepted: false, problems: ["Check the wheel head first."] };
     const result = wheelEllipseCalibration({
-      ellipse: current.ellipse,
+      ellipse,
       diameterMm: diameter.value,
-      frameWidth: current.image.width,
-      frameHeight: current.image.height,
-      adjustedByUser: current.adjusted,
+      frameWidth: frame.width,
+      frameHeight: frame.height,
+      adjustedByUser: liveWheel.adjusted,
     });
     if (result.status !== "accepted") {
       const problems = result.reasons.map(describeCalibrationReason);
@@ -425,12 +361,12 @@ export function LiveSession(props: LiveSessionProps) {
     }
     applyScale(scaleFromCalibration(result), result.imageCenterlineX);
     setup.setCalibration("confirmed");
-    updateWheel(null);
+    liveWheel.stop();
     return { accepted: true, problems: [] };
   }
 
   function skipWheel(): void {
-    updateWheel(null);
+    liveWheel.stop();
     setup.setCalibration("skipped");
   }
 
@@ -504,7 +440,7 @@ export function LiveSession(props: LiveSessionProps) {
   const calibrationArea = (
     <div className="calibration-area">
       {problem && <p role="alert">{problem}</p>}
-      {wheelCheck ? null : boardCandidate ? (
+      {liveWheel.active ? null : boardCandidate ? (
         <CalibrationFlow
           result={boardCandidate}
           onAccepted={acceptBoard}
@@ -534,7 +470,7 @@ export function LiveSession(props: LiveSessionProps) {
               busy={busy}
               onFind={(diameterMm) => {
                 setup.apply({ wheelHeadDiameter: { value: diameterMm, unit: "mm" } });
-                void checkWheel();
+                void checkWheel(diameterMm);
               }}
             />
             <button type="button" className="link-button" onClick={() => setBoardMode(true)}>
@@ -592,6 +528,11 @@ export function LiveSession(props: LiveSessionProps) {
         </div>
         <div className="stage-banners">
           {camera.error && <p role="alert">{camera.error}</p>}
+          {(voice.failure === "unauthorized" || voice.failure === "disabled") && (
+            <p role="alert" className="stale-banner">
+              {voiceFailureText(voice.failure)}
+            </p>
+          )}
           {voiceNeedsReconnect && (
             <div role="alert" className="stale-banner">
               {voice.failure === "time-limit" ? "Voice coach hung up after an hour." : "Voice coach lost."}
@@ -609,8 +550,8 @@ export function LiveSession(props: LiveSessionProps) {
             </div>
           )}
           {momentMarked && <p role="status">Moment marked locally.</p>}
-          {/* While settings or the edge check are open, only the alerts above stay on top of them. */}
-          {!settingsOpen && !wheelCheck && (
+          {/* While settings or wheel calibration is open, only the alerts above stay on top of them. */}
+          {!settingsOpen && !liveWheel.active && (
             <>
               {paused && <p className="stale-banner">Coaching is paused. Say "resume" to carry on.</p>}
               {sizesEnabled && props.measurementsUnverified && (
@@ -632,31 +573,43 @@ export function LiveSession(props: LiveSessionProps) {
             </>
           )}
         </div>
-        {wheelCheck && (
-          // Shown over the video, not in settings: the coach asks about these lines.
-          <div className="stage-panel">
-            <WheelEllipseConfirm
-              still={wheelCheck.image}
-              ellipse={wheelCheck.ellipse}
-              diameterMm={slots.wheelHeadDiameterMm?.value ?? 0}
-              onEllipseChange={(ellipse) => updateWheel({ ...wheelCheck, ellipse, adjusted: true })}
-              mirrored={mirrored}
-              canSwitch={{
-                inner: wheelCheck.candidateIndex < wheelCheck.candidates.length - 1,
-                outer: wheelCheck.candidateIndex > 0,
-              }}
-              onSwitch={(toward) => void switchWheelEdges(toward)}
-              onConfirm={(ellipse) => {
-                updateWheel({ ...wheelCheck, ellipse });
-                wheelRef.current = { ...wheelCheck, ellipse };
-                void confirmWheel();
-              }}
-              onRetry={() => updateWheel(null)}
-            />
-          </div>
+        {liveWheel.active && liveWheel.ellipse && liveWheel.frameSize && (
+          <WheelLiveOverlay
+            frameSize={liveWheel.frameSize}
+            ellipse={liveWheel.ellipse}
+            diameterMm={slots.wheelHeadDiameterMm?.value ?? 0}
+            status={liveWheel.status}
+            mirrored={mirrored}
+            adjusted={liveWheel.adjusted}
+            canSwitch={{
+              inner: liveWheel.candidateIndex < liveWheel.candidates.length - 1,
+              outer: liveWheel.candidateIndex > 0,
+            }}
+            onEllipseChange={liveWheel.adjustEllipse}
+            onAdjustStart={() => liveWheel.adjustEllipse(liveWheel.ellipse!)}
+            onSwitch={(toward) => void switchWheelEdges(toward)}
+            onConfirm={(ellipse) => void confirmWheel(ellipse)}
+            onRetry={() => void liveWheel.retry()}
+          />
+        )}
+        {liveWheel.active && (!liveWheel.ellipse || !liveWheel.frameSize) && (
+          <section className="wheel-live-overlay" aria-label="Live wheel-head calibration">
+            <div className="wheel-live-controls">
+              <p role={liveWheel.error ? "alert" : "status"}>
+                {liveWheel.error ? `Wheel detection failed: ${liveWheel.error}` : "Finding wheel…"}
+              </p>
+              {liveWheel.error && (
+                <button type="button" className="secondary" onClick={() => void liveWheel.retry()}>
+                  Try again
+                </button>
+              )}
+            </div>
+          </section>
         )}
         <div className="stage-bottom">
-          {voice.available && <Captions state={voice.state} failure={voice.failure} captions={voice.captions} />}
+          {voice.available && showCaptions && (
+            <Captions state={voice.state} failure={voice.failure} captions={voice.captions} />
+          )}
           {camera.active && (
             <p className="capture-indicator" role="status">
               Camera active · frames stay on this device
@@ -688,6 +641,16 @@ export function LiveSession(props: LiveSessionProps) {
               })
             }
           />
+          {voice.available && (
+            <label className="caption-toggle">
+              <input
+                type="checkbox"
+                checked={showCaptions}
+                onChange={(event) => setShowCaptions(event.target.checked)}
+              />
+              Show captions
+            </label>
+          )}
           {reading && (
             <section className="live-target" aria-label={sized ? "Live target comparison" : "Live shape comparison"}>
               <ProfileOverlay target={target} reading={sized ?? reading} mode={sized ? "millimetres" : "normalized"} />
@@ -742,12 +705,4 @@ export function LiveSession(props: LiveSessionProps) {
       )}
     </section>
   );
-}
-
-function safeCapture(video: HTMLVideoElement): ImageData | null {
-  try {
-    return captureFrame(video);
-  } catch {
-    return null;
-  }
 }

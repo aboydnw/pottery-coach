@@ -19,6 +19,10 @@ const FAILURE_TEXT: Record<string, string> = {
   "time-limit": "Voice coach hung up after an hour.",
 };
 
+export function voiceFailureText(failure: string): string | null {
+  return FAILURE_TEXT[failure] ?? null;
+}
+
 export function Captions({
   state,
   failure = null,
@@ -31,7 +35,7 @@ export function Captions({
   return (
     <section className="captions" aria-label="Conversation">
       <p className="voice-status" role="status">
-        {(failure && FAILURE_TEXT[failure]) ?? STATUS_TEXT[state] ?? state}
+        {(failure && voiceFailureText(failure)) || STATUS_TEXT[state] || state}
       </p>
       <ol aria-live="polite">
         {captions.map((caption) => (

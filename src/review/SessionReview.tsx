@@ -1,9 +1,10 @@
+import type { ReactNode } from "react";
 import type { SessionBundle } from "../session/types";
 import { MarkedMoments } from "./MarkedMoments";
 import { MeasurementChart } from "./MeasurementChart";
 import { Timeline } from "./Timeline";
 
-export function SessionReview({ bundle }: { bundle: SessionBundle }) {
+export function SessionReview({ bundle, actions }: { bundle: SessionBundle; actions?: ReactNode }) {
   return (
     <article className="session-review">
       <p className="eyebrow">Session review</p>
@@ -12,6 +13,7 @@ export function SessionReview({ bundle }: { bundle: SessionBundle }) {
         Measurements show what the camera could support. Missing or low-confidence periods remain blank and are not
         estimated.
       </p>
+      {actions}
       <MeasurementChart readings={bundle.readings} sessionStartMs={bundle.session.startedAtMs} />
       <Timeline events={bundle.events} sessionStartMs={bundle.session.startedAtMs} />
       <MarkedMoments moments={bundle.moments} />

@@ -5,8 +5,9 @@ import { SetupStore } from "../setup/SetupStore";
 import type { ToolDependencies } from "../voice/tools/types";
 import { LiveSession, type LiveSessionProps } from "./LiveSession";
 
-const { captureFrame } = vi.hoisted(() => ({
+const { captureFrame, cameraState } = vi.hoisted(() => ({
   captureFrame: vi.fn(() => ({ width: 10, height: 10, data: new Uint8ClampedArray(400) }) as ImageData),
+  cameraState: { interrupted: false },
 }));
 
 vi.mock("../camera/captureFrame", () => ({ captureFrame }));
@@ -27,7 +28,7 @@ vi.mock("../camera/useCamera", () => ({
     error: null,
     active: true,
     starting: false,
-    interrupted: false,
+    interrupted: cameraState.interrupted,
     start: vi.fn(async () => ({ width: 10, height: 10, facingMode: "environment" })),
     switchFacing: vi.fn(async () => null),
   }),
@@ -56,6 +57,7 @@ afterEach(() => {
   cleanup();
   vi.useRealTimers();
   captureFrame.mockClear();
+  cameraState.interrupted = false;
 });
 
 function memoryStorage(): Storage {
@@ -110,8 +112,17 @@ function props(): LiveSessionProps {
   };
 }
 
+function deliverCameraFrame(): void {
+  const video = screen.getByLabelText(/camera preview/i);
+  Object.defineProperties(video, {
+    videoWidth: { value: 10, configurable: true },
+    videoHeight: { value: 10, configurable: true },
+  });
+}
+
 it("keeps the camera visible until the potter explicitly opens touch settings", () => {
   render(<LiveSession {...props()} />);
+  deliverCameraFrame();
 
   expect(screen.queryByRole("region", { name: "Session settings" })).toBeNull();
   expect(screen.getByRole("button", { name: "Settings" }).getAttribute("aria-expanded")).toBe("false");
@@ -132,6 +143,7 @@ it("keeps touch settings reachable when voice needs reconnecting", () => {
 it("captures the current camera view when touch starts a wheel-head check", async () => {
   vi.useFakeTimers();
   render(<LiveSession {...props()} />);
+  deliverCameraFrame();
   await act(async () => {
     await Promise.resolve();
     vi.advanceTimersByTime(1_000);
@@ -143,4 +155,57 @@ it("captures the current camera view when touch starts a wheel-head check", asyn
   fireEvent.click(screen.getByRole("button", { name: /find 14 in wheel head/i }));
 
   expect(captureFrame).toHaveBeenCalledOnce();
+  expect(screen.getByRole("region", { name: /live wheel-head calibration/i })).not.toBeNull();
+  expect(document.querySelector("canvas")).toBeNull();
+
+  await act(async () => vi.advanceTimersByTimeAsync(200));
+  expect(captureFrame).toHaveBeenCalledTimes(2);
+});
+
+it("uses the same current-frame loop when voice starts the wheel-head check", async () => {
+  vi.useFakeTimers();
+  const session = props();
+  session.setup.apply({ wheelHeadDiameter: { value: 355.6, unit: "mm" } });
+  render(<LiveSession {...session} />);
+  deliverCameraFrame();
+  await act(async () => Promise.resolve());
+
+  await act(async () => session.toolBridge.current.wheel!.check());
+  expect(captureFrame).toHaveBeenCalledOnce();
+  await act(async () => vi.advanceTimersByTimeAsync(400));
+  expect(captureFrame).toHaveBeenCalledTimes(3);
+  expect(screen.getByRole("region", { name: /live wheel-head calibration/i })).not.toBeNull();
+});
+
+it("hides live captions by default and offers an explicit Settings toggle", () => {
+  const session = props();
+  session.voice.available = true;
+  session.voice.state = "connected";
+  session.voice.failure = null;
+  session.voice.captions = [{ id: "caption-1", speaker: "assistant", text: "Center the wheel", final: true }];
+  render(<LiveSession {...session} />);
+
+  expect(screen.queryByText("Center the wheel")).toBeNull();
+  fireEvent.click(screen.getByRole("button", { name: "Settings" }));
+  fireEvent.click(screen.getByRole("checkbox", { name: /show captions/i }));
+  expect(screen.getByText("Center the wheel")).not.toBeNull();
+});
+
+it("discards the live outline and sampling state when the camera is interrupted", async () => {
+  vi.useFakeTimers();
+  const session = props();
+  session.setup.apply({ wheelHeadDiameter: { value: 355.6, unit: "mm" } });
+  const view = render(<LiveSession {...session} />);
+  deliverCameraFrame();
+  await act(async () => Promise.resolve());
+  await act(async () => session.toolBridge.current.wheel!.check());
+  expect(screen.getByRole("region", { name: /live wheel-head calibration/i })).not.toBeNull();
+
+  cameraState.interrupted = true;
+  view.rerender(<LiveSession {...session} />);
+  await act(async () => Promise.resolve());
+  expect(screen.queryByRole("region", { name: /live wheel-head calibration/i })).toBeNull();
+  const captures = captureFrame.mock.calls.length;
+  await act(async () => vi.advanceTimersByTimeAsync(600));
+  expect(captureFrame).toHaveBeenCalledTimes(captures);
 });

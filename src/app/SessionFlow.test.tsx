@@ -1,16 +1,41 @@
 import "@testing-library/jest-dom/vitest";
-import { fireEvent, render, screen } from "@testing-library/react";
-import { beforeEach, expect, it, vi } from "vitest";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { SessionFlow } from "./SessionFlow";
 
 vi.mock("../live/LiveSession", () => ({ LiveSession: () => <div>live session</div> }));
-beforeEach(() => sessionStorage.clear());
+beforeEach(() => {
+  sessionStorage.clear();
+  window.history.replaceState(null, "", "/");
+});
+afterEach(cleanup);
 
 it("waits for one deliberate tap, then goes straight to the live session", () => {
   render(<SessionFlow />);
-  expect(screen.getByRole("heading", { name: /ready when your hands are clean/i })).toBeInTheDocument();
+  expect(screen.getByRole("heading", { name: /ready at the wheel/i })).toBeInTheDocument();
   expect(screen.queryByText("live session")).not.toBeInTheDocument();
   fireEvent.click(screen.getByRole("button", { name: /start session/i }));
   expect(screen.getByText("live session")).toBeInTheDocument();
   expect(window.location.pathname).toBe("/session/live");
+});
+
+it("opens the explanatory About page and returns home", () => {
+  render(<SessionFlow />);
+  fireEvent.click(screen.getByRole("button", { name: "About" }));
+  expect(screen.getByRole("heading", { name: /hands-free second set of eyes/i })).toBeInTheDocument();
+  expect(window.location.pathname).toBe("/about");
+  fireEvent.click(screen.getByRole("button", { name: /go home/i }));
+  expect(screen.getByRole("heading", { name: /ready at the wheel/i })).toBeInTheDocument();
+  expect(window.location.pathname).toBe("/");
+});
+
+it("honors browser navigation back to Home from a live session", () => {
+  render(<SessionFlow />);
+  fireEvent.click(screen.getByRole("button", { name: /start session/i }));
+  expect(screen.getByText("live session")).toBeInTheDocument();
+
+  window.history.replaceState(null, "", "/");
+  fireEvent(window, new PopStateEvent("popstate"));
+
+  expect(screen.getByRole("heading", { name: /ready at the wheel/i })).toBeInTheDocument();
 });

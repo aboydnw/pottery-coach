@@ -1,15 +1,15 @@
 import { useEffect, useMemo, useReducer, useRef, useState } from "react";
 import { LiveSession } from "../live/LiveSession";
-import { DeleteSessionDialog } from "../privacy/DeleteSessionDialog";
 import { DeletionService } from "../privacy/DeletionService";
 import { RetentionService } from "../privacy/RetentionService";
 import { BrowserCacheDeletion, LocalStorageSyncQueueDeletion } from "../privacy/localDeletion";
 import { releaseManifest } from "../release/manifest";
 import { buildSummary } from "../review/buildSummary";
 import { SessionReview } from "../review/SessionReview";
+import { DeletionReceiptStatus, ReviewActions } from "../review/ReviewActions";
 import { resolveRecordedSizes, sizesUnavailable } from "../session/recordedSizes";
 import { SessionRepository } from "../session/SessionRepository";
-import type { SessionBundle } from "../session/types";
+import type { DeletionReceipt, SessionBundle } from "../session/types";
 import { SetupStore } from "../setup/SetupStore";
 import { loadTemplates } from "../targets/loadTemplates";
 import { browserTransportDependencies, OpenAIWebRtcTransport } from "../voice/OpenAIWebRtcTransport";
@@ -27,6 +27,9 @@ import { usePieces } from "./usePieces";
 import { SessionPieces } from "../pieces/SessionPieces";
 import { ThrowLog } from "../pieces/ThrowLog";
 import { SyncClient } from "../sync/SyncClient";
+import { AboutScreen } from "./AboutScreen";
+import { HomeScreen } from "./HomeScreen";
+import { buildSessionHistory, type SessionHistoryItem } from "../history/sessionHistory";
 
 const SHELL_KEY = "pottery-coach-session-shell";
 const repository = new SessionRepository();
@@ -40,12 +43,11 @@ const DEFAULT_TARGET = loadTemplates()[0]!;
  * a review. The voice coach spans both, so it can give the spoken debrief after the camera stops.
  */
 export function SessionFlow() {
-  const [state, dispatch] = useReducer(transition, undefined, () =>
-    typeof sessionStorage === "undefined"
-      ? createSessionState()
-      : restoreSessionShell(sessionStorage.getItem(SHELL_KEY)),
-  );
+  const [state, dispatch] = useReducer(transition, undefined, () => initialSessionState());
   const [bundle, setBundle] = useState<SessionBundle | null>(null);
+  const [history, setHistory] = useState<SessionHistoryItem[]>([]);
+  const [homeStatus, setHomeStatus] = useState<string | null>(null);
+  const [deletionReceipt, setDeletionReceipt] = useState<DeletionReceipt | null>(null);
   const [demoMode] = useState(() => isDemoMode());
   const [cameraOnly] = useState(() => isCameraOnlyMode());
   const [setup, setSetup] = useState(() => new SetupStore());
@@ -163,16 +165,58 @@ export function SessionFlow() {
 
   useEffect(() => {
     sessionStorage.setItem(SHELL_KEY, serializeSessionShell(state));
-    const path = state.step === "notice" ? "/" : `/session/${state.step}`;
-    if (window.location.pathname !== path) window.history.replaceState(null, "", `${path}${window.location.search}`);
+    const path = pathForState(state.step, state.reviewSessionId);
+    if (window.location.pathname !== path) window.history.pushState(null, "", `${path}${window.location.search}`);
   }, [state]);
 
   useEffect(() => {
+    const navigateFromHistory = () => {
+      const path = window.location.pathname;
+      if (path === "/about") dispatch({ type: "NAVIGATE", step: "about", sessionId: null });
+      else if (path.startsWith("/session/review/"))
+        dispatch({
+          type: "NAVIGATE",
+          step: "review",
+          sessionId: decodeURIComponent(path.slice("/session/review/".length)),
+        });
+      else if (path === "/session/live") dispatch({ type: "NAVIGATE", step: "live", sessionId: null });
+      else if (path === "/") dispatch({ type: "NAVIGATE", step: "home", sessionId: null });
+    };
+    window.addEventListener("popstate", navigateFromHistory);
+    return () => window.removeEventListener("popstate", navigateFromHistory);
+  }, []);
+
+  useEffect(() => {
+    if (state.step !== "home") return;
+    void refreshHistory();
+    // oxlint-disable-next-line react-hooks/exhaustive-deps
+  }, [state.step]);
+
+  useEffect(() => {
+    if (state.step !== "review" || !state.reviewSessionId) return;
+    if (bundle?.session.id === state.reviewSessionId) return;
+    let cancelled = false;
+    void repository.get(state.reviewSessionId).then((stored) => {
+      if (cancelled) return;
+      if (stored) {
+        bundleRef.current = stored;
+        setBundle(stored);
+      } else {
+        setHomeStatus("That session is no longer available on this device.");
+        dispatch({ type: "GO_HOME" });
+      }
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [bundle, state.reviewSessionId, state.step]);
+
+  useEffect(() => {
     // Nothing is in progress on the welcome screen, so pick up a new version straight away.
-    if (updated && state.step === "notice") window.location.reload();
+    if (updated && state.step === "home") window.location.reload();
   }, [updated, state.step]);
 
-  const updateBanner = updated && state.step !== "notice" && (
+  const updateBanner = updated && state.step !== "home" && (
     <div className="stale-banner" role="status">
       Pottery Coach has been updated. Reload when you're ready to use the new version.
       <button type="button" onClick={() => window.location.reload()}>
@@ -182,6 +226,7 @@ export function SessionFlow() {
   );
 
   function startSession(): void {
+    setHomeStatus(null);
     dispatch({ type: "START_SESSION" });
     void voice.start();
   }
@@ -199,55 +244,78 @@ export function SessionFlow() {
       .catch(() => undefined);
     bundleRef.current = stored;
     setBundle(stored);
-    dispatch({ type: "END_SESSION" });
+    dispatch({ type: "END_SESSION", sessionId: stored.session.id });
     void new RetentionService(repository).expire().catch(() => undefined);
   }
 
-  async function deleteSession() {
+  async function deleteSession(sessionId: string) {
     const receipt = await new DeletionService(repository, {
       cache: typeof caches === "undefined" ? undefined : new BrowserCacheDeletion(caches),
       syncQueue: new LocalStorageSyncQueueDeletion(localStorage),
-    }).deleteSession(recording.sessionId());
-    await throwLog.deleteSession(recording.sessionId()).catch(() => undefined);
+    }).deleteSession(sessionId);
+    await throwLog.deleteSession(sessionId).catch(() => undefined);
     sessionStorage.removeItem(SHELL_KEY);
+    setDeletionReceipt(receipt);
+    bundleRef.current = null;
+    setBundle(null);
+    dispatch({ type: "GO_HOME" });
     return receipt;
   }
 
   function startAnotherSession(): void {
+    setDeletionReceipt(null);
     void voice.stop();
     recording.reset();
     pieces.reset();
     bundleRef.current = null;
     setBundle(null);
     setSetup(new SetupStore());
-    dispatch({ type: "DELETE_SESSION" });
+    dispatch({ type: "START_NEW_SESSION" });
+    void voice.start();
   }
 
-  if (state.step === "notice") {
+  async function refreshHistory(): Promise<void> {
+    const [sessions, loggedPieces] = await Promise.all([repository.list(), throwLog.listPieces()]).catch(() => [
+      [],
+      [],
+    ]);
+    setHistory(buildSessionHistory(sessions, loggedPieces));
+  }
+
+  function goHome(): void {
+    bundleRef.current = null;
+    setBundle(null);
+    dispatch({ type: "GO_HOME" });
+  }
+
+  function openReview(sessionId: string): void {
+    setHomeStatus(null);
+    setDeletionReceipt(null);
+    dispatch({ type: "OPEN_REVIEW", sessionId });
+  }
+
+  if (state.step === "home") {
     return (
-      <section className="notice" aria-labelledby="notice-title">
+      <div className="home-container">
         {updateBanner}
-        <p className="eyebrow">Controlled prototype</p>
-        <h1 id="notice-title">Ready when your hands are clean</h1>
-        <p>
-          One tap starts the camera and, if it's set up, your voice coach. After that you won't need to touch the
-          screen: talk to the coach through your headphones.
-        </p>
-        <p className="tip">
-          <strong>Start with an empty wheel.</strong> The coach takes a quick look at it first, then tells you to put
-          your clay on.
-        </p>
-        <p>
-          Camera frames are processed on this phone and never stored or uploaded. It is not safety equipment.
-          {voice.available && " Your voice goes to the coach's speech service while the session runs."}
-          {!demoMode && " A short log of each pot (sizes and your notes, never images) is saved to your account."}
-        </p>
-        <button type="button" className="start-button" onClick={startSession}>
-          Start session
-        </button>
-      </section>
+        {homeStatus && (
+          <p className="home-status" role="status">
+            {homeStatus}
+          </p>
+        )}
+        {deletionReceipt && <DeletionReceiptStatus receipt={deletionReceipt} />}
+        <HomeScreen
+          sessions={history}
+          onStart={startSession}
+          onAbout={() => dispatch({ type: "SHOW_ABOUT" })}
+          onOpenSession={openReview}
+        />
+      </div>
     );
   }
+
+  if (state.step === "about")
+    return <AboutScreen voiceAvailable={voice.available} demoMode={demoMode} onHome={goHome} onStart={startSession} />;
 
   if (state.step === "review" && bundle) {
     return (
@@ -256,12 +324,22 @@ export function SessionFlow() {
         {sizesUnavailable(bundle) && (
           <p className="stale-banner">This session had no wheel-head size, so only shapes were tracked.</p>
         )}
-        <SessionReview bundle={bundle} />
+        <SessionReview
+          bundle={bundle}
+          actions={
+            <ReviewActions
+              onStartNew={startAnotherSession}
+              onDelete={() => deleteSession(bundle.session.id)}
+              onHome={goHome}
+            />
+          }
+        />
         <SessionPieces throwLog={throwLog} sessionId={bundle.session.id} />
-        <DeleteSessionDialog onDelete={deleteSession} onFinish={startAnotherSession} />
       </section>
     );
   }
+
+  if (state.step === "review") return <p role="status">Loading session…</p>;
 
   return (
     <>
@@ -305,6 +383,28 @@ export function SessionFlow() {
       />
     </>
   );
+}
+
+function initialSessionState() {
+  const state =
+    typeof sessionStorage === "undefined"
+      ? createSessionState()
+      : restoreSessionShell(sessionStorage.getItem(SHELL_KEY));
+  if (typeof window === "undefined") return state;
+  if (window.location.pathname === "/about") return transition(state, { type: "SHOW_ABOUT" });
+  if (window.location.pathname.startsWith("/session/review/"))
+    return transition(state, {
+      type: "OPEN_REVIEW",
+      sessionId: decodeURIComponent(window.location.pathname.slice("/session/review/".length)),
+    });
+  return state;
+}
+
+function pathForState(step: string, reviewSessionId: string | null): string {
+  if (step === "home") return "/";
+  if (step === "about") return "/about";
+  if (step === "review" && reviewSessionId) return `/session/review/${encodeURIComponent(reviewSessionId)}`;
+  return "/session/live";
 }
 
 function spokenSummary(bundle: SessionBundle): SpokenSummary {
