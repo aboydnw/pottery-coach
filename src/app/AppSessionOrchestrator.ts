@@ -6,6 +6,7 @@ export type SessionEventType =
   | "SHOW_ABOUT"
   | "GO_HOME"
   | "OPEN_REVIEW"
+  | "NAVIGATE"
   | "CAMERA_DENIED"
   | "END_SESSION"
   | "DELETE_SESSION"
@@ -16,7 +17,8 @@ export type SessionEventType =
 
 export type SessionEvent =
   | { type: "END_SESSION" | "OPEN_REVIEW"; sessionId?: string }
-  | { type: Exclude<SessionEventType, "END_SESSION" | "OPEN_REVIEW"> };
+  | { type: "NAVIGATE"; step: SessionStep; sessionId: string | null }
+  | { type: Exclude<SessionEventType, "END_SESSION" | "OPEN_REVIEW" | "NAVIGATE"> };
 
 export type SessionState = {
   step: SessionStep;
@@ -50,6 +52,12 @@ const path: Partial<Record<SessionStep, Partial<Record<SessionEventType, Session
  * calibration, target, goal) lives in setup slots that can be filled at any time while live.
  */
 export function transition(state: SessionState, event: SessionEvent): SessionState {
+  if (event.type === "NAVIGATE")
+    return update(state, event, {
+      step: event.step,
+      reviewSessionId: event.step === "review" ? event.sessionId : null,
+      cameraError: event.step === "live" ? null : state.cameraError,
+    });
   if (event.type === "CAMERA_DENIED" && state.step === "live")
     return update(state, event, { cameraError: "permission-denied" });
   if (event.type === "VOICE_DISCONNECTED") return update(state, event, { modes: { ...state.modes, voice: false } });

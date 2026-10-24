@@ -31,6 +31,15 @@ describe("session lifecycle", () => {
     expect(state).toMatchObject({ step: "home", reviewSessionId: null });
   });
 
+  it("restores browser history destinations from any lifecycle step", () => {
+    const live = transition(createSessionState(), { type: "START_SESSION" });
+    const home = transition(live, { type: "NAVIGATE", step: "home", sessionId: null });
+    const review = transition(home, { type: "NAVIGATE", step: "review", sessionId: "past-session" });
+
+    expect(home).toMatchObject({ step: "home", reviewSessionId: null });
+    expect(review).toMatchObject({ step: "review", reviewSessionId: "past-session" });
+  });
+
   it("rejects invalid transitions and audits them", () => {
     const state = transition(createSessionState(), { type: "END_SESSION" });
     expect(state.step).toBe("home");

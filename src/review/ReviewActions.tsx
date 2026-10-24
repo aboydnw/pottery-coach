@@ -60,23 +60,37 @@ export function ReviewActions({
           </div>
         </div>
       )}
-      {receipt && (
-        <div className="deletion-status" role="status">
-          <div>
-            <h2>Session deleted</h2>
-            <ul className="deletion-stores">
-              {receipt.stores.map((store) => (
-                <li key={store.name}>
-                  {store.name}: {store.status}
-                </li>
-              ))}
-            </ul>
-          </div>
-          <button type="button" className="text-button" onClick={downloadReceipt}>
-            Download deletion receipt
-          </button>
-        </div>
-      )}
+      {receipt && <DeletionReceiptStatus receipt={receipt} onDownload={downloadReceipt} />}
     </section>
+  );
+}
+
+export function DeletionReceiptStatus({ receipt, onDownload }: { receipt: DeletionReceipt; onDownload?: () => void }) {
+  function download(): void {
+    if (onDownload) return onDownload();
+    const url = URL.createObjectURL(new Blob([JSON.stringify(receipt, null, 2)], { type: "application/json" }));
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.download = `pottery-coach-deletion-${receipt.sessionId}.json`;
+    anchor.click();
+    URL.revokeObjectURL(url);
+  }
+
+  return (
+    <div className="deletion-status" role="status">
+      <div>
+        <h2>Session deleted</h2>
+        <ul className="deletion-stores">
+          {receipt.stores.map((store) => (
+            <li key={store.name}>
+              {store.name}: {store.status}
+            </li>
+          ))}
+        </ul>
+      </div>
+      <button type="button" className="text-button" onClick={download}>
+        Download deletion receipt
+      </button>
+    </div>
   );
 }

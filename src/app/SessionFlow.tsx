@@ -6,10 +6,10 @@ import { BrowserCacheDeletion, LocalStorageSyncQueueDeletion } from "../privacy/
 import { releaseManifest } from "../release/manifest";
 import { buildSummary } from "../review/buildSummary";
 import { SessionReview } from "../review/SessionReview";
-import { ReviewActions } from "../review/ReviewActions";
+import { DeletionReceiptStatus, ReviewActions } from "../review/ReviewActions";
 import { resolveRecordedSizes, sizesUnavailable } from "../session/recordedSizes";
 import { SessionRepository } from "../session/SessionRepository";
-import type { SessionBundle } from "../session/types";
+import type { DeletionReceipt, SessionBundle } from "../session/types";
 import { SetupStore } from "../setup/SetupStore";
 import { loadTemplates } from "../targets/loadTemplates";
 import { browserTransportDependencies, OpenAIWebRtcTransport } from "../voice/OpenAIWebRtcTransport";
@@ -47,6 +47,7 @@ export function SessionFlow() {
   const [bundle, setBundle] = useState<SessionBundle | null>(null);
   const [history, setHistory] = useState<SessionHistoryItem[]>([]);
   const [homeStatus, setHomeStatus] = useState<string | null>(null);
+  const [deletionReceipt, setDeletionReceipt] = useState<DeletionReceipt | null>(null);
   const [demoMode] = useState(() => isDemoMode());
   const [cameraOnly] = useState(() => isCameraOnlyMode());
   const [setup, setSetup] = useState(() => new SetupStore());
@@ -171,10 +172,15 @@ export function SessionFlow() {
   useEffect(() => {
     const navigateFromHistory = () => {
       const path = window.location.pathname;
-      if (path === "/about") dispatch({ type: "SHOW_ABOUT" });
+      if (path === "/about") dispatch({ type: "NAVIGATE", step: "about", sessionId: null });
       else if (path.startsWith("/session/review/"))
-        dispatch({ type: "OPEN_REVIEW", sessionId: decodeURIComponent(path.slice("/session/review/".length)) });
-      else if (path === "/") dispatch({ type: "GO_HOME" });
+        dispatch({
+          type: "NAVIGATE",
+          step: "review",
+          sessionId: decodeURIComponent(path.slice("/session/review/".length)),
+        });
+      else if (path === "/session/live") dispatch({ type: "NAVIGATE", step: "live", sessionId: null });
+      else if (path === "/") dispatch({ type: "NAVIGATE", step: "home", sessionId: null });
     };
     window.addEventListener("popstate", navigateFromHistory);
     return () => window.removeEventListener("popstate", navigateFromHistory);
@@ -249,11 +255,15 @@ export function SessionFlow() {
     }).deleteSession(sessionId);
     await throwLog.deleteSession(sessionId).catch(() => undefined);
     sessionStorage.removeItem(SHELL_KEY);
-    setHomeStatus("Session deleted.");
+    setDeletionReceipt(receipt);
+    bundleRef.current = null;
+    setBundle(null);
+    dispatch({ type: "GO_HOME" });
     return receipt;
   }
 
   function startAnotherSession(): void {
+    setDeletionReceipt(null);
     void voice.stop();
     recording.reset();
     pieces.reset();
@@ -280,25 +290,27 @@ export function SessionFlow() {
 
   function openReview(sessionId: string): void {
     setHomeStatus(null);
+    setDeletionReceipt(null);
     dispatch({ type: "OPEN_REVIEW", sessionId });
   }
 
   if (state.step === "home") {
     return (
-      <>
+      <div className="home-container">
         {updateBanner}
         {homeStatus && (
           <p className="home-status" role="status">
             {homeStatus}
           </p>
         )}
+        {deletionReceipt && <DeletionReceiptStatus receipt={deletionReceipt} />}
         <HomeScreen
           sessions={history}
           onStart={startSession}
           onAbout={() => dispatch({ type: "SHOW_ABOUT" })}
           onOpenSession={openReview}
         />
-      </>
+      </div>
     );
   }
 

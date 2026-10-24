@@ -102,6 +102,16 @@ button:focus-visible {
   box-shadow: 0 1rem 3rem rgb(73 53 39 / 10%);
 }
 
+.home-container {
+  display: grid;
+  width: min(100%, 52rem);
+  gap: 1rem;
+}
+
+.home-container .home-screen {
+  width: 100%;
+}
+
 .home-screen {
   display: grid;
   gap: 2rem;

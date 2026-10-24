@@ -28,3 +28,14 @@ it("opens the explanatory About page and returns home", () => {
   expect(screen.getByRole("heading", { name: /ready at the wheel/i })).toBeInTheDocument();
   expect(window.location.pathname).toBe("/");
 });
+
+it("honors browser navigation back to Home from a live session", () => {
+  render(<SessionFlow />);
+  fireEvent.click(screen.getByRole("button", { name: /start session/i }));
+  expect(screen.getByText("live session")).toBeInTheDocument();
+
+  window.history.replaceState(null, "", "/");
+  fireEvent(window, new PopStateEvent("popstate"));
+
+  expect(screen.getByRole("heading", { name: /ready at the wheel/i })).toBeInTheDocument();
+});
