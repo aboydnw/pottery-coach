@@ -29,19 +29,27 @@ export function canonicalWheelEllipse(input: WheelEllipse): WheelEllipse {
   };
 }
 
-/** Finds complete, dark circular surfaces projected as ellipses in the lower part of a frame. */
+/** Finds complete circular surfaces projected as ellipses in the lower part of a frame. */
 export function detectWheelEllipses(image: GrayImage): WheelEllipseCandidate[] {
   const { gray, width, height } = image;
   if (gray.length !== width * height || width < 8 || height < 8) return [];
   const mean = gray.reduce((sum, value) => sum + value, 0) / gray.length;
   const variance = gray.reduce((sum, value) => sum + (value - mean) ** 2, 0) / gray.length;
-  const threshold = mean - Math.sqrt(variance) * 0.6;
-  const dark = Uint8Array.from(gray, (value) => (value < threshold ? 1 : 0));
-  const labels = new Uint8Array(dark.length);
-  const queue = new Int32Array(dark.length);
+  const deviation = Math.sqrt(variance) * 0.6;
+  const masks = [
+    Uint8Array.from(gray, (value) => (value < mean - deviation ? 1 : 0)),
+    Uint8Array.from(gray, (value) => (value > mean + deviation ? 1 : 0)),
+  ];
   const candidates: WheelEllipseCandidate[] = [];
-  for (let start = Math.floor(height * 0.3) * width; start < dark.length; start += 1) {
-    if (!dark[start] || labels[start]) continue;
+  for (const mask of masks) findCandidates(mask, width, height, candidates);
+  return candidates.sort((left, right) => right.score - left.score).slice(0, 3);
+}
+
+function findCandidates(mask: Uint8Array, width: number, height: number, candidates: WheelEllipseCandidate[]): void {
+  const labels = new Uint8Array(mask.length);
+  const queue = new Int32Array(mask.length);
+  for (let start = Math.floor(height * 0.3) * width; start < mask.length; start += 1) {
+    if (!mask[start] || labels[start]) continue;
     let head = 0;
     let tail = 0;
     let touchesFrame = false;
@@ -57,7 +65,7 @@ export function detectWheelEllipses(image: GrayImage): WheelEllipseCandidate[] {
       sumY += y;
       touchesFrame ||= x === 0 || y === 0 || x === width - 1 || y === height - 1;
       for (const neighbor of [index - 1, index + 1, index - width, index + width]) {
-        if (neighbor < 0 || neighbor >= dark.length || labels[neighbor] || !dark[neighbor]) continue;
+        if (neighbor < 0 || neighbor >= mask.length || labels[neighbor] || !mask[neighbor]) continue;
         const nx = neighbor % width;
         if (Math.abs(nx - x) > 1) continue;
         labels[neighbor] = 1;
@@ -89,7 +97,7 @@ export function detectWheelEllipses(image: GrayImage): WheelEllipseCandidate[] {
     const rotationRad = 0.5 * Math.atan2(2 * xy, xx - yy);
     const radiusMajor = 2 * Math.sqrt(lambdaMajor);
     const radiusMinor = 2 * Math.sqrt(lambdaMinor);
-    const boundary = boundaryFit(dark, queue, tail, width, centerX, centerY, radiusMajor, radiusMinor, rotationRad);
+    const boundary = boundaryFit(mask, queue, tail, width, centerX, centerY, radiusMajor, radiusMinor, rotationRad);
     const confidence = clamp(Math.exp(-boundary.residualPx95 / 4) * boundary.arcFraction, 0, 1);
     const ellipse = canonicalWheelEllipse({
       centerX,
@@ -103,7 +111,6 @@ export function detectWheelEllipses(image: GrayImage): WheelEllipseCandidate[] {
     });
     candidates.push({ ...ellipse, score: confidence * tail });
   }
-  return candidates.sort((left, right) => right.score - left.score).slice(0, 3);
 }
 
 function boundaryFit(

@@ -34,6 +34,8 @@ export type LiveWheelDetection = {
   retry(): Promise<{ found: boolean; confidence: number }>;
   switchCandidate(toward: "inner" | "outer"): boolean;
   adjustEllipse(ellipse: WheelEllipse): void;
+  currentEllipse(): WheelEllipse | null;
+  wasAdjusted(): boolean;
 };
 
 export function useLiveWheelDetection(options: Options): LiveWheelDetection {
@@ -257,6 +259,8 @@ export function useLiveWheelDetection(options: Options): LiveWheelDetection {
     retry: () => start(diameterRef.current),
     switchCandidate,
     adjustEllipse,
+    currentEllipse: () => ellipseRef.current,
+    wasAdjusted: () => adjustedRef.current,
   };
 }
 

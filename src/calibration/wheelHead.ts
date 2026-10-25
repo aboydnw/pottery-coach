@@ -233,7 +233,10 @@ export function wheelEllipseCalibration(input: {
   frameHeight: number;
   adjustedByUser: boolean;
 }): CalibrationResult {
-  const pose = deriveWheelViewPose(input.ellipse, input.diameterMm, {
+  const ellipse = input.adjustedByUser
+    ? { ...input.ellipse, fitResidualPx95: EDGE_UNCERTAINTY_PX, visibleArcFraction: 1, confidence: 1 }
+    : input.ellipse;
+  const pose = deriveWheelViewPose(ellipse, input.diameterMm, {
     width: input.frameWidth,
     height: input.frameHeight,
   });
@@ -254,29 +257,29 @@ export function wheelEllipseCalibration(input: {
     markerPlaneOffsetToleranceMm: BOARD_V1.calibration.markerPlaneOffsetToleranceMm,
     quality: {
       tagCount: 0,
-      reprojectionErrorPx95: input.ellipse.fitResidualPx95,
+      reprojectionErrorPx95: ellipse.fitResidualPx95,
       scaleVariationFraction: 0,
       estimatedErrorMm95: pose.estimatedErrorMm95,
       poseYawDeg: null,
       posePitchDeg: (pose.downwardAngleRad * 180) / Math.PI,
       blurScore: 1,
       contrastScore: 1,
-      ellipseFitResidualPx95: input.ellipse.fitResidualPx95,
-      visibleArcFraction: input.ellipse.visibleArcFraction,
+      ellipseFitResidualPx95: ellipse.fitResidualPx95,
+      visibleArcFraction: ellipse.visibleArcFraction,
     },
     reasons: [...pose.reasons],
     provenance: input.adjustedByUser ? "manual-assisted" : "automatic",
     boardRevision: BOARD_V1.revision,
     supportedBoardRevision: BOARD_V1.revision,
     roiClipped: false,
-    imageCenterlineX: input.ellipse.centerX,
+    imageCenterlineX: ellipse.centerX,
     wheelHead: {
-      leftX: input.ellipse.centerX - input.ellipse.radiusMajor,
-      rightX: input.ellipse.centerX + input.ellipse.radiusMajor,
-      row: input.ellipse.centerY,
+      leftX: ellipse.centerX - ellipse.radiusMajor,
+      rightX: ellipse.centerX + ellipse.radiusMajor,
+      row: ellipse.centerY,
       diameterMm: input.diameterMm,
     },
-    wheelEllipse: input.ellipse,
+    wheelEllipse: ellipse,
     wheelViewPose: pose,
   };
   result.reasons = [...new Set([...result.reasons, ...validateCalibration(result)])];

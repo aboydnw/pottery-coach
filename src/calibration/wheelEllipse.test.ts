@@ -54,6 +54,27 @@ it("detects a complete dark wheel ellipse against a light background", () => {
   expect(candidate!.confidence).toBeGreaterThan(0.8);
 });
 
+it("detects a complete light wheel ellipse against a dark background", () => {
+  const width = 320;
+  const height = 240;
+  const gray = new Float32Array(width * height).fill(65);
+  for (let y = 0; y < height; y += 1) {
+    for (let x = 0; x < width; x += 1) {
+      const dx = (x - 165) / 100;
+      const dy = (y - 175) / 45;
+      if (dx * dx + dy * dy <= 1) gray[y * width + x] = 155;
+    }
+  }
+
+  const [candidate] = detectWheelEllipses({ gray, width, height });
+
+  expect(candidate).toBeDefined();
+  expect(candidate!.centerX).toBeCloseTo(165, 0);
+  expect(candidate!.centerY).toBeCloseTo(175, 0);
+  expect(candidate!.radiusMajor).toBeCloseTo(100, 0);
+  expect(candidate!.radiusMinor).toBeCloseTo(45, 0);
+});
+
 it("does not claim a complete rim when the ellipse is clipped", () => {
   const width = 200;
   const height = 160;
