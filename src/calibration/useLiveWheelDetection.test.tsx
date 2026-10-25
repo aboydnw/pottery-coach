@@ -45,7 +45,7 @@ function videoRef() {
   return { current: { videoWidth: 640, videoHeight: 480 } as HTMLVideoElement };
 }
 
-it("captures successive current frames and discards prior geometry on a new request", async () => {
+it("ignores a one-frame jump to an unrelated object and discards prior geometry on a new request", async () => {
   vi.useFakeTimers();
   const capture = vi.fn().mockReturnValueOnce(image(1)).mockReturnValueOnce(image(2)).mockReturnValue(image(3));
   const detect = vi.fn().mockReturnValueOnce(found(125)).mockReturnValueOnce(found(195)).mockReturnValue(found(160));
@@ -57,7 +57,7 @@ it("captures successive current frames and discards prior geometry on a new requ
   expect(result.current.ellipse?.centerX).toBe(251);
   await act(async () => vi.advanceTimersByTimeAsync(200));
   expect(capture).toHaveBeenCalledTimes(2);
-  expect(result.current.ellipse?.centerX).toBe(391);
+  expect(result.current.ellipse?.centerX).toBe(251);
 
   act(() => result.current.stop());
   await act(async () => vi.advanceTimersByTimeAsync(1_000));

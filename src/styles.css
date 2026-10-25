@@ -785,6 +785,19 @@ button.link-button {
   pointer-events: auto;
 }
 
+.wheel-live-controls.at-top {
+  top: max(5.5rem, calc(env(safe-area-inset-top) + 4.75rem));
+  bottom: auto;
+}
+
+.wheel-live-controls.at-bottom {
+  top: auto;
+}
+
+.move-wheel-controls {
+  justify-self: end;
+}
+
 .wheel-live-controls p {
   margin: 0;
   font-weight: 700;

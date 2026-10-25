@@ -104,7 +104,10 @@ export function detectWheelHead(image: GrayImage): WheelHeadCandidates {
     if (lastSurface !== null && Math.abs(surface - lastSurface) < SAME_SURFACE_DIFFERENCE) continue;
     lastSurface = surface;
     const ellipse = ellipses.find(
-      (candidate) => Math.abs(candidate.centerX - (detection.leftX + detection.rightX) / 2) < width * 0.08,
+      (candidate) =>
+        Math.abs(candidate.centerX - (detection.leftX + detection.rightX) / 2) < width * 0.08 &&
+        Math.abs(candidate.centerY - detection.row) < height * 0.1 &&
+        Math.abs(candidate.radiusMajor * 2 - (detection.rightX - detection.leftX)) < width * 0.15,
     );
     candidates.push(ellipse ? { ...detection, ellipse } : detection);
   }
@@ -121,7 +124,7 @@ type Search = { band: Float32Array; width: number; height: number; top: number; 
 type Pair = { leftX: number; rightX: number; row: number; raw: number };
 
 function widestPair(
-  { band, width, top, bottom, meanAbs }: Search,
+  { band, width, height, top, bottom, meanAbs }: Search,
   bounds: { left: number; right: number },
 ): Pair | null {
   const minHalfWidth = Math.max(3, Math.floor(width * MIN_HALF_WIDTH_FRACTION));
@@ -136,7 +139,11 @@ function widestPair(
         // Entering the disc and leaving it change brightness in opposite directions.
         const raw = leftEdge > 0 ? Math.min(leftEdge, -rightEdge) : Math.min(-leftEdge, rightEdge);
         if (raw <= 0) continue;
-        const score = raw * (0.5 + (right - left) / width);
+        // A wheel head should be the dominant round surface nearest the bottom of a correctly
+        // framed setup view. Weighting vertical position prevents similarly wide foreground
+        // objects (hands, clothing, shelves) higher in the picture from winning on contrast alone.
+        const lowerFrameWeight = (0.4 + y / height) ** 3;
+        const score = raw * (0.5 + (right - left) / width) * lowerFrameWeight;
         if (!best || score > best.score) best = { leftX: left, rightX: right, row: y, raw, score };
       }
     }

@@ -55,6 +55,7 @@ export function useLiveWheelDetection(options: Options): LiveWheelDetection {
   const candidateIndexRef = useRef(0);
   const candidatesRef = useRef<WheelHeadDetection[]>([]);
   const ellipseRef = useRef<WheelEllipse | null>(null);
+  const pendingJumpRef = useRef<WheelEllipse | null>(null);
   const stableAnchorRef = useRef<WheelEllipse | null>(null);
   const stableSinceRef = useRef<number | null>(null);
   const acceptedRef = useRef(false);
@@ -80,6 +81,7 @@ export function useLiveWheelDetection(options: Options): LiveWheelDetection {
     candidatesRef.current = [];
     setEllipse(null);
     ellipseRef.current = null;
+    pendingJumpRef.current = null;
     stableSinceRef.current = null;
     stableAnchorRef.current = null;
     acceptedRef.current = false;
@@ -123,6 +125,18 @@ export function useLiveWheelDetection(options: Options): LiveWheelDetection {
       }
       const next = selected.ellipse ?? fallbackEllipse(selected);
       const previous = ellipseRef.current;
+      if (previous && !similar(previous, next, image.width, image.height)) {
+        const pending = pendingJumpRef.current;
+        if (!pending || !similar(pending, next, image.width, image.height)) {
+          pendingJumpRef.current = next;
+          stableSinceRef.current = null;
+          stableAnchorRef.current = null;
+          setStatus("finding");
+          setError(null);
+          return { found: selected.confidence >= 0.5, confidence: Math.round(selected.confidence * 100) / 100 };
+        }
+      }
+      pendingJumpRef.current = null;
       setEllipse(next);
       ellipseRef.current = next;
       const supported =
@@ -159,6 +173,7 @@ export function useLiveWheelDetection(options: Options): LiveWheelDetection {
       clearTimer();
       candidatesRef.current = [];
       ellipseRef.current = null;
+      pendingJumpRef.current = null;
       stableAnchorRef.current = null;
       stableSinceRef.current = null;
       setCandidates([]);
@@ -178,6 +193,7 @@ export function useLiveWheelDetection(options: Options): LiveWheelDetection {
       adjustedRef.current = false;
       candidateIndexRef.current = 0;
       ellipseRef.current = null;
+      pendingJumpRef.current = null;
       stableSinceRef.current = null;
       stableAnchorRef.current = null;
       acceptedRef.current = false;
@@ -208,6 +224,7 @@ export function useLiveWheelDetection(options: Options): LiveWheelDetection {
     setCandidateIndex(index);
     const next = selected.ellipse ?? fallbackEllipse(selected);
     ellipseRef.current = next;
+    pendingJumpRef.current = null;
     setEllipse(next);
     stableSinceRef.current = null;
     stableAnchorRef.current = null;
@@ -220,6 +237,7 @@ export function useLiveWheelDetection(options: Options): LiveWheelDetection {
     stableSinceRef.current = null;
     stableAnchorRef.current = null;
     ellipseRef.current = next;
+    pendingJumpRef.current = null;
     setEllipse(next);
   }, []);
 

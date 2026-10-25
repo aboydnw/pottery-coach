@@ -82,6 +82,10 @@ it("keeps manual controls compact and confirms the adjusted live outline", () =>
     />,
   );
   expect(screen.getByRole("slider", { name: /wheel width/i })).toBeVisible();
+  const controls = screen.getByRole("group", { name: /manual outline controls/i });
+  expect(controls).toHaveClass("at-top");
+  fireEvent.click(screen.getByRole("button", { name: /move controls to bottom/i }));
+  expect(controls).toHaveClass("at-bottom");
   fireEvent.click(screen.getByRole("button", { name: /use this outline/i }));
   expect(onConfirm).toHaveBeenCalledWith(ellipse);
 });
