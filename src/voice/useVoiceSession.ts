@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { CaptionPacer } from "./captionPacer";
 import { ConversationController, type ConversationFailure } from "./ConversationController";
+import { COACH_INSTRUCTIONS_REVISION } from "./instructions";
 import { NOTICES, primeSpokenNotices, speakNotice } from "./spokenNotice";
 import type { ConversationState, ProviderUsage, RealtimeCoachTransport, RealtimeSessionConfig } from "./types";
 
@@ -26,7 +27,7 @@ const SESSION_CONFIG: RealtimeSessionConfig = {
   model: "server-owned",
   voice: "server-owned",
   language: "en",
-  instructionsRevision: "voice-first-v1",
+  instructionsRevision: COACH_INSTRUCTIONS_REVISION,
   toolsRevision: "voice-first-v1",
 };
 

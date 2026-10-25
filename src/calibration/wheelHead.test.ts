@@ -203,3 +203,25 @@ it("does not let manual ellipse adjustment bypass a clipped working region", () 
   expect(result.reasons).toContain("WORKING_REGION_CLIPPED");
   expect(result.provenance).toBe("manual-assisted");
 });
+
+it("accepts a manually confirmed outline when automatic rim evidence was unavailable", () => {
+  const result = wheelEllipseCalibration({
+    ellipse: {
+      centerX: 640,
+      centerY: 600,
+      radiusMajor: 400,
+      radiusMinor: 200,
+      rotationRad: 0,
+      fitResidualPx95: 400,
+      visibleArcFraction: 0,
+      confidence: 0,
+    },
+    diameterMm: 356,
+    frameWidth: 1280,
+    frameHeight: 720,
+    adjustedByUser: true,
+  });
+
+  expect(result.status).toBe("accepted");
+  expect(result.provenance).toBe("manual-assisted");
+});

@@ -328,21 +328,22 @@ export function LiveSession(props: LiveSessionProps) {
   }
 
   function adjustWheel(side: "left" | "right", direction: "in" | "out", size: "small" | "large"): void {
-    if (!liveWheel.ellipse || !liveWheel.frameSize) return;
+    const ellipse = liveWheel.currentEllipse();
+    if (!ellipse || !liveWheel.frameSize) return;
     const currentEdges: WheelEdges = {
-      left: liveWheel.ellipse.centerX - liveWheel.ellipse.radiusMajor,
-      right: liveWheel.ellipse.centerX + liveWheel.ellipse.radiusMajor,
+      left: ellipse.centerX - ellipse.radiusMajor,
+      right: ellipse.centerX + ellipse.radiusMajor,
     };
     const edges = nudgeMarker(currentEdges, side, direction, size, liveWheel.frameSize.width);
     liveWheel.adjustEllipse({
-      ...liveWheel.ellipse,
+      ...ellipse,
       centerX: (edges.left + edges.right) / 2,
       radiusMajor: (edges.right - edges.left) / 2,
     });
   }
 
   function confirmWheel(ellipseOverride?: WheelEllipse): { accepted: boolean; problems: string[] } {
-    const ellipse = ellipseOverride ?? liveWheel.ellipse;
+    const ellipse = ellipseOverride ?? liveWheel.currentEllipse();
     const diameter = setup.getSnapshot().wheelHeadDiameterMm;
     const frame = liveWheel.frameSize;
     if (!ellipse || !frame || !diameter?.confirmed)
@@ -352,7 +353,7 @@ export function LiveSession(props: LiveSessionProps) {
       diameterMm: diameter.value,
       frameWidth: frame.width,
       frameHeight: frame.height,
-      adjustedByUser: liveWheel.adjusted,
+      adjustedByUser: liveWheel.wasAdjusted(),
     });
     if (result.status !== "accepted") {
       const problems = result.reasons.map(describeCalibrationReason);

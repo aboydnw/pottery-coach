@@ -5,9 +5,10 @@ import { SetupStore } from "../setup/SetupStore";
 import type { ToolDependencies } from "../voice/tools/types";
 import { LiveSession, type LiveSessionProps } from "./LiveSession";
 
-const { captureFrame, cameraState } = vi.hoisted(() => ({
+const { captureFrame, cameraState, wheelEllipseCalibration } = vi.hoisted(() => ({
   captureFrame: vi.fn(() => ({ width: 10, height: 10, data: new Uint8ClampedArray(400) }) as ImageData),
   cameraState: { interrupted: false },
+  wheelEllipseCalibration: vi.fn(() => ({ status: "rejected", reasons: [] })),
 }));
 
 vi.mock("../camera/captureFrame", () => ({ captureFrame }));
@@ -18,7 +19,7 @@ vi.mock("../calibration/wheelHead", async (importOriginal) => ({
   detectWheelHead: () => ({
     candidates: [{ leftX: 1, rightX: 8, row: 5, confidence: 0.9 }],
   }),
-  wheelEllipseCalibration: vi.fn(),
+  wheelEllipseCalibration,
 }));
 
 vi.mock("../camera/useCamera", () => ({
@@ -57,6 +58,7 @@ afterEach(() => {
   cleanup();
   vi.useRealTimers();
   captureFrame.mockClear();
+  wheelEllipseCalibration.mockClear();
   cameraState.interrupted = false;
 });
 
@@ -175,6 +177,22 @@ it("uses the same current-frame loop when voice starts the wheel-head check", as
   await act(async () => vi.advanceTimersByTimeAsync(400));
   expect(captureFrame).toHaveBeenCalledTimes(3);
   expect(screen.getByRole("region", { name: /live wheel-head calibration/i })).not.toBeNull();
+});
+
+it("confirms the latest voice-adjusted outline without waiting for a React render", async () => {
+  const session = props();
+  session.setup.apply({ wheelHeadDiameter: { value: 355.6, unit: "mm" } });
+  render(<LiveSession {...session} />);
+  deliverCameraFrame();
+  await act(async () => Promise.resolve());
+  await act(async () => session.toolBridge.current.wheel!.check());
+
+  session.toolBridge.current.wheel!.adjust("left", "out", "small");
+  session.toolBridge.current.wheel!.confirm();
+
+  expect(wheelEllipseCalibration).toHaveBeenLastCalledWith(
+    expect.objectContaining({ adjustedByUser: true, ellipse: expect.objectContaining({ radiusMajor: 3.75 }) }),
+  );
 });
 
 it("hides live captions by default and offers an explicit Settings toggle", () => {
