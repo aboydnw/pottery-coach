@@ -67,6 +67,26 @@ it("finds an off-centre wheel head with no pot on it", () => {
   expect(Math.abs(detection.rightX - 220)).toBeLessThanOrEqual(2);
 });
 
+it("prefers the round wheel head near the bottom over a larger foreground object", () => {
+  const width = 320;
+  const height = 240;
+  const gray = new Float32Array(width * height).fill(185);
+  for (let y = 0; y < height; y += 1) {
+    for (let x = 0; x < width; x += 1) {
+      const foreground = ((x - 150) / 125) ** 2 + ((y - 115) / 36) ** 2 <= 1;
+      const wheel = ((x - 165) / 100) ** 2 + ((y - 205) / 24) ** 2 <= 1;
+      if (foreground) gray[y * width + x] = 65;
+      if (wheel) gray[y * width + x] = 118;
+    }
+  }
+
+  const detection = detectWheelHead({ gray, width, height });
+
+  expect(detection.ellipse?.centerX).toBeCloseTo(165, 0);
+  expect(detection.ellipse?.centerY).toBeCloseTo(205, 0);
+  expect(detection.ellipse?.radiusMajor).toBeCloseTo(100, 0);
+});
+
 it("reports low confidence when there is no wheel head to find", () => {
   let state = 9;
   const random = () => (state = (1664525 * state + 1013904223) >>> 0) / 2 ** 32;

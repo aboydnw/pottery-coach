@@ -1,3 +1,5 @@
+import { useState } from "react";
+
 import { describeCalibrationReason } from "./CalibrationFlow";
 import type { LiveWheelStatus } from "./useLiveWheelDetection";
 import type { WheelEllipse } from "./wheelEllipse";
@@ -19,6 +21,8 @@ type Props = {
 };
 
 export function WheelLiveOverlay(props: Props) {
+  const [controlPlacement, setControlPlacement] = useState<"top" | "bottom" | null>(null);
+  const controlsAtTop = controlPlacement !== "bottom";
   const { ellipse, frameSize } = props;
   const pose = deriveWheelViewPose(ellipse, props.diameterMm, frameSize);
   const rotationDeg = (ellipse.rotationRad * 180) / Math.PI;
@@ -69,10 +73,21 @@ export function WheelLiveOverlay(props: Props) {
           r={Math.max(4, frameSize.width * 0.01)}
         />
       </svg>
-      <div className="wheel-live-controls">
+      <div
+        className={`wheel-live-controls ${props.adjusted ? (controlsAtTop ? "at-top" : "at-bottom") : ""}`}
+        role={props.adjusted ? "group" : undefined}
+        aria-label={props.adjusted ? "Manual outline controls" : undefined}
+      >
         <p role="status">{message}</p>
         {props.adjusted ? (
           <div className="wheel-ellipse-controls">
+            <button
+              type="button"
+              className="secondary move-wheel-controls"
+              onClick={() => setControlPlacement(controlsAtTop ? "bottom" : "top")}
+            >
+              Move controls to {controlsAtTop ? "bottom" : "top"}
+            </button>
             <EllipseSlider
               label="Wheel center horizontal"
               value={ellipse.centerX}
