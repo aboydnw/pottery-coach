@@ -23,6 +23,7 @@
 ### Task 1: Marker-centered calibration geometry and stability
 
 **Files:**
+
 - Create: `src/calibration/boardCalibration.ts`
 - Test: `src/calibration/boardCalibration.test.ts`
 - Modify: `src/calibration/types.ts`
@@ -30,6 +31,7 @@
 - Modify: `src/measurement/scale.ts`
 
 **Interfaces:**
+
 - Consumes: `CalibrationResult`, `Point2`, `BOARD_V1`, and the existing image-to-board homography.
 - Produces: `BoardPose`, `CalibrationObservation`, `BoardCalibrationAccumulator`, `validateWheelDiameterCrossCheck(result, diameterMm)`, and board center information carried by `SessionScale`.
 
@@ -43,8 +45,7 @@ it("maps the board center back to the wheel center in image pixels", () => {
 
 it("accepts five consistent observations spanning 500 ms", () => {
   const accumulator = new BoardCalibrationAccumulator();
-  for (let index = 0; index < 5; index += 1)
-    accumulator.add(observation(index * 125, 100 + index * 0.1, 80));
+  for (let index = 0; index < 5; index += 1) accumulator.add(observation(index * 125, 100 + index * 0.1, 80));
   expect(accumulator.result()?.status).toBe("accepted");
 });
 
@@ -75,6 +76,7 @@ git commit -m "feat: derive stable marker calibration pose"
 ### Task 2: Printable page and marker-first setup experience
 
 **Files:**
+
 - Create: `src/calibration/PrintedMarkerStep.tsx`
 - Test: `src/calibration/PrintedMarkerStep.test.tsx`
 - Modify: `src/calibration/boardV1.ts`
@@ -87,6 +89,7 @@ git commit -m "feat: derive stable marker calibration pose"
 - Modify: `src/styles.css`
 
 **Interfaces:**
+
 - Consumes: remembered diameter utilities, `CalibrationResult`, `runBoardCalibration`, and `skipWheel`.
 - Produces: `PrintedMarkerStep` callbacks `onDiameter(diameterMm)`, `onCalibrate()`, `onUseWheelHead()`, and `onSkip()`.
 
@@ -94,10 +97,22 @@ git commit -m "feat: derive stable marker calibration pose"
 
 ```tsx
 it("makes the printed page the primary setup path", () => {
-  render(<PrintedMarkerStep initialDiameterMm={355.6} busy={false} onDiameter={vi.fn()} onCalibrate={vi.fn()} onUseWheelHead={vi.fn()} onSkip={vi.fn()} />);
+  render(
+    <PrintedMarkerStep
+      initialDiameterMm={355.6}
+      busy={false}
+      onDiameter={vi.fn()}
+      onCalibrate={vi.fn()}
+      onUseWheelHead={vi.fn()}
+      onSkip={vi.fn()}
+    />,
+  );
   expect(screen.getByRole("heading", { name: /calibrate with the printed page/i })).toBeVisible();
   expect(screen.getByText(/place it flat on the wheel head/i)).toBeVisible();
-  expect(screen.getByRole("link", { name: /open printable page/i })).toHaveAttribute("href", "/calibration/board-v1.svg");
+  expect(screen.getByRole("link", { name: /open printable page/i })).toHaveAttribute(
+    "href",
+    "/calibration/board-v1.svg",
+  );
 });
 ```
 
@@ -129,6 +144,7 @@ git commit -m "feat: make printed marker the primary calibration"
 ### Task 3: Clay segmentation provider and deterministic baseline
 
 **Files:**
+
 - Create: `src/vision/ClaySegmenter.ts`
 - Create: `src/vision/BackgroundClaySegmenter.ts`
 - Test: `src/vision/BackgroundClaySegmenter.test.ts`
@@ -139,6 +155,7 @@ git commit -m "feat: make printed marker the primary calibration"
 - Modify: `src/vision/workerProtocol.ts`
 
 **Interfaces:**
+
 - Consumes: `LabImage`, `BackgroundModel`, calibrated ROI, and exclusion regions.
 - Produces: `ClaySegmentationOutput`, `ClaySegmenter`, `BackgroundClaySegmenter`, and `cleanClayProbability(output, context): SegmentationResult`.
 
@@ -182,6 +199,7 @@ git commit -m "feat: add a model-ready clay segmentation boundary"
 ### Task 4: Local labeled-example format and explicit export
 
 **Files:**
+
 - Create: `src/vision/dataset/types.ts`
 - Create: `src/vision/dataset/example.ts`
 - Test: `src/vision/dataset/example.test.ts`
@@ -191,6 +209,7 @@ git commit -m "feat: add a model-ready clay segmentation boundary"
 - Test: `src/vision/dataset/DatasetControls.test.tsx`
 
 **Interfaces:**
+
 - Consumes: downscaled frame bytes, automatic probability mask, corrected binary mask or no-clay/unusable verdict, calibration geometry, condition tags, and consent/license metadata.
 - Produces: `ClayDatasetExampleV1`, `validateDatasetExample`, `exportDataset(examples): Blob`, and opt-in controls that never upload.
 
@@ -234,6 +253,7 @@ git commit -m "feat: define private clay dataset export"
 ### Task 5: Evaluation gates and model promotion manifest
 
 **Files:**
+
 - Create: `src/vision/modelManifest.ts`
 - Test: `src/vision/modelManifest.test.ts`
 - Create: `benchmarks/clay-segmentation/metrics.ts`
@@ -244,6 +264,7 @@ git commit -m "feat: define private clay dataset export"
 - Modify: `README.md`
 
 **Interfaces:**
+
 - Consumes: reviewed dataset examples, baseline/model masks, physical millimetres-per-pixel evidence, latency samples, and immutable model metadata.
 - Produces: `ClayModelManifest`, `summarizeClaySegmentation`, `passesClayModelGate`, and `pnpm benchmark:clay-segmentation`.
 
@@ -291,6 +312,7 @@ git commit -m "test: gate learned clay segmentation models"
 ### Task 6: Cross-feature verification and documentation reconciliation
 
 **Files:**
+
 - Modify: `docs/specs/camera-calibration-spec.md`
 - Modify: `docs/specs/measurement-engine-spec.md`
 - Modify: `docs/device-test-protocol.md`
@@ -298,6 +320,7 @@ git commit -m "test: gate learned clay segmentation models"
 - Modify: `docs/release-checklist.md`
 
 **Interfaces:**
+
 - Consumes: the completed marker flow, provider contract, dataset schema, and promotion gates.
 - Produces: consistent operator documentation and release requirements.
 

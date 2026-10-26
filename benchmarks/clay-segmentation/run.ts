@@ -18,4 +18,6 @@ if (lines[0]?.schemaVersion !== CLAY_DATASET_SCHEMA || lines[0]?.kind !== "manif
 const examples = lines.slice(1);
 if (examples.some((example) => example.schemaVersion !== CLAY_DATASET_SCHEMA || !example.sessionGroupId))
   throw new Error("Every dataset example must be versioned and grouped by session");
-console.log(`Validated ${examples.length} reviewed examples across ${new Set(examples.map((item) => item.sessionGroupId)).size} sessions.`);
+console.log(
+  `Validated ${examples.length} reviewed examples across ${new Set(examples.map((item) => item.sessionGroupId)).size} sessions.`,
+);

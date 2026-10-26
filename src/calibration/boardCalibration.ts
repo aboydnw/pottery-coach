@@ -1,6 +1,7 @@
 import { BOARD_V1 } from "./boardV1";
 import { applyHomography } from "./homography";
 import type { BoardPose, CalibrationResult, Point2 } from "./types";
+import type { WheelViewPose } from "./wheelViewPose";
 
 export type CalibrationObservation = { capturedAtMs: number; result: CalibrationResult };
 
@@ -28,6 +29,49 @@ export function boardPoseFromCalibration(
     wheelDiameterMm,
     ...(detectedWheelDiameterMm === undefined ? {} : { detectedWheelDiameterMm }),
     estimatedErrorMm95: result.quality.estimatedErrorMm95,
+  };
+}
+
+/**
+ * Uses the two known board axes as the projected axes of the horizontal wheel plane. This is a
+ * weak-perspective pose, not full camera-intrinsic recovery, so the physical device gate remains
+ * authoritative for the error bound.
+ */
+export function wheelViewPoseFromBoardCalibration(result: CalibrationResult): WheelViewPose {
+  const imageFromBoard = invert(result.homographyImageToMm);
+  const centerBoard = { x: BOARD_V1.widthMm / 2, y: BOARD_V1.heightMm / 2 };
+  const center = applyHomography(imageFromBoard, centerBoard);
+  const alongX = applyHomography(imageFromBoard, { x: centerBoard.x + 20, y: centerBoard.y });
+  const alongY = applyHomography(imageFromBoard, { x: centerBoard.x, y: centerBoard.y + 20 });
+  const xVector = { x: alongX.x - center.x, y: alongX.y - center.y };
+  const yVector = { x: alongY.x - center.x, y: alongY.y - center.y };
+  const xLength = Math.hypot(xVector.x, xVector.y);
+  const yLength = Math.hypot(yVector.x, yVector.y);
+  if (xLength < 1e-6 || yLength < 1e-6) throw new Error("Board axes are too small to derive camera pose");
+  const majorAxisImage = { x: xVector.x / xLength, y: xVector.y / xLength };
+  const minorAxisImage = { x: yVector.x / yLength, y: yVector.y / yLength };
+  const projectedVerticalImage =
+    minorAxisImage.y >= 0 ? { x: -minorAxisImage.x, y: -minorAxisImage.y } : minorAxisImage;
+  const downwardAngleRad = Math.acos(clamp(yLength / xLength, 0, 1));
+  const reasons: string[] = [];
+  if (downwardAngleRad < (15 * Math.PI) / 180) reasons.push("VIEW_TOO_SHALLOW");
+  if (downwardAngleRad > (75 * Math.PI) / 180) reasons.push("VIEW_TOO_STEEP");
+  return {
+    wheelCenterImage: center,
+    majorAxisImage,
+    minorAxisImage,
+    projectedVerticalImage,
+    downwardAngleRad,
+    wheelPlaneMmPerMajorPixel: 20 / xLength,
+    supportedRegionImage: {
+      x: result.roiImage.x,
+      y: result.roiImage.y,
+      width: result.roiImage.width,
+      height: Math.max(0, center.y - result.roiImage.y),
+    },
+    estimatedErrorMm95: result.quality.estimatedErrorMm95,
+    confidence: reasons.length === 0 ? 0.9 : 0.5,
+    reasons,
   };
 }
 
@@ -76,6 +120,10 @@ function boardCenter(result: CalibrationResult): Point2 {
 
 function meanScale(matrix: CalibrationResult["homographyImageToMm"]): number {
   return (Math.hypot(matrix[0], matrix[3]) + Math.hypot(matrix[1], matrix[4])) / 2;
+}
+
+function clamp(value: number, minimum: number, maximum: number): number {
+  return Math.min(maximum, Math.max(minimum, value));
 }
 
 function invert(matrix: CalibrationResult["homographyImageToMm"]): CalibrationResult["homographyImageToMm"] {

@@ -5,6 +5,7 @@ import {
   BoardCalibrationAccumulator,
   boardPoseFromCalibration,
   validateWheelDiameterCrossCheck,
+  wheelViewPoseFromBoardCalibration,
 } from "./boardCalibration";
 
 function calibration(overrides: Partial<CalibrationResult> = {}): CalibrationResult {
@@ -76,4 +77,12 @@ it("rejects an entered wheel diameter that differs from an independently detecte
   const result = calibration({ boardPose: boardPoseFromCalibration(calibration(), 350, 350) });
   expect(validateWheelDiameterCrossCheck(result, 250)).toContain("DIAMETER_MISMATCH");
   expect(validateWheelDiameterCrossCheck(result, 340)).toEqual([]);
+});
+
+it("derives a weak-perspective vessel transform from the flat board axes", () => {
+  const result = calibration({ homographyImageToMm: [1, 0, 0, 0, 2, 0, 0, 0, 1] });
+  const pose = wheelViewPoseFromBoardCalibration(result);
+  expect(pose.wheelPlaneMmPerMajorPixel).toBeCloseTo(1);
+  expect(pose.downwardAngleRad).toBeCloseTo(Math.acos(0.5));
+  expect(pose.projectedVerticalImage.y).toBeLessThan(0);
 });

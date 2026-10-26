@@ -271,10 +271,13 @@ export function LiveSession(props: LiveSessionProps) {
   // as the page is visible again; if that fails, say out loud that one tap is needed.
   const resumeTriedRef = useRef(false);
   useEffect(() => {
-    if (!camera.interrupted || !liveWheelActive) return;
-    stopLiveWheel();
+    if (!camera.interrupted) return;
+    if (liveWheelActive) stopLiveWheel();
+    if (scale) applyScale(null);
     setup.setCalibration("none");
-  }, [camera.interrupted, liveWheelActive, setup, stopLiveWheel]);
+    // applyScale only fans out the current state and worker message.
+    // oxlint-disable-next-line react-hooks/exhaustive-deps
+  }, [camera.interrupted, liveWheelActive, scale, setup, stopLiveWheel]);
 
   useEffect(() => {
     if (!camera.interrupted) {
@@ -416,7 +419,7 @@ export function LiveSession(props: LiveSessionProps) {
   function acceptBoard(accepted: CalibrationResult): void {
     setBoardCandidate(null);
     setBoardMode(false);
-    applyScale(scaleFromCalibration(accepted));
+    applyScale(scaleFromCalibration(accepted), accepted.imageCenterlineX);
     setup.setCalibration("confirmed");
   }
 

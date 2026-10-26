@@ -115,7 +115,8 @@ export function describeCalibrationReason(reason: string): string {
     VIEW_OFF_AXIS: "Aim the phone more directly through the center of the wheel.",
     ELLIPSE_UNSTABLE: "Hold the phone still while the wheel outline locks.",
     ELLIPSE_AMBIGUOUS: "Choose the outline that matches your wheel head or bat.",
-    DIAMETER_MISMATCH: "The entered wheel diameter does not match the optional rim check. Recheck the size and page centering.",
+    DIAMETER_MISMATCH:
+      "The entered wheel diameter does not match the optional rim check. Recheck the size and page centering.",
     DIAMETER_IMPLAUSIBLE: "Enter a wheel-head diameter between 15 and 50 cm.",
   };
   return labels[reason] ?? reason.replaceAll("_", " ").toLowerCase();

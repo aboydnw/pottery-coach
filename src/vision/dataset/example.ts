@@ -35,7 +35,7 @@ export function createDatasetExample(input: ClayDatasetExampleInput): ClayDatase
 
 export function encodeMask(mask: Uint8Array): EncodedMask {
   const runs: number[] = [];
-  for (let index = 0; index < mask.length; ) {
+  for (let index = 0; index < mask.length;) {
     const value = mask[index] ? 1 : 0;
     let count = 1;
     while (index + count < mask.length && (mask[index + count] ? 1 : 0) === value) count += 1;

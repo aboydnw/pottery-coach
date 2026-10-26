@@ -1,6 +1,6 @@
 import { captureFrame } from "../camera/captureFrame";
 import { BOARD_V1, tagCornersMm } from "./boardV1";
-import { boardPoseFromCalibration } from "./boardCalibration";
+import { boardPoseFromCalibration, wheelViewPoseFromBoardCalibration } from "./boardCalibration";
 import { solveCalibration } from "./homography";
 import type { TagDetector } from "./TagDetector";
 import type { CalibrationResult, PointCorrespondence } from "./types";
@@ -33,5 +33,10 @@ export async function calibrateFromVideo(
   });
   return wheelDiameterMm === undefined
     ? result
-    : { ...result, boardPose: boardPoseFromCalibration(result, wheelDiameterMm), imageCenterlineX: undefined };
+    : {
+        ...result,
+        boardPose: boardPoseFromCalibration(result, wheelDiameterMm),
+        wheelViewPose: wheelViewPoseFromBoardCalibration(result),
+        imageCenterlineX: boardPoseFromCalibration(result, wheelDiameterMm).wheelCenterImage.x,
+      };
 }

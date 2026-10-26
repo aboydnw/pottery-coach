@@ -2,14 +2,7 @@ export const CLAY_DATASET_SCHEMA = "clay-dataset-v1" as const;
 
 export type ReviewVerdict = "correct" | "corrected" | "no-clay" | "unusable";
 export type CaptureCondition =
-  | "dry-clay"
-  | "wet-clay"
-  | "hands"
-  | "tools"
-  | "bat"
-  | "glare"
-  | "low-light"
-  | "empty-wheel";
+  "dry-clay" | "wet-clay" | "hands" | "tools" | "bat" | "glare" | "low-light" | "empty-wheel";
 export type CaptureRights = "tester-owned" | "licensed-external";
 
 export type EncodedMask = { encoding: "value-runs-v1"; runs: number[] };

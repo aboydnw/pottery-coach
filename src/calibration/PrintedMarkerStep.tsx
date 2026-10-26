@@ -11,14 +11,7 @@ type Props = {
   onSkip(): void;
 };
 
-export function PrintedMarkerStep({
-  initialDiameterMm,
-  busy,
-  onDiameter,
-  onCalibrate,
-  onUseWheelHead,
-  onSkip,
-}: Props) {
+export function PrintedMarkerStep({ initialDiameterMm, busy, onDiameter, onCalibrate, onUseWheelHead, onSkip }: Props) {
   const [diameterIn, setDiameterIn] = useState(
     initialDiameterMm === null ? "14" : String(Number((initialDiameterMm / 25.4).toFixed(1))),
   );
@@ -56,11 +49,7 @@ export function PrintedMarkerStep({
       </label>
       {diameterMm === null && <p role="alert">Enter a wheel size between 8 and 19.5 inches.</p>}
       <label>
-        <input
-          type="checkbox"
-          checked={rulerConfirmed}
-          onChange={(event) => setRulerConfirmed(event.target.checked)}
-        />
+        <input type="checkbox" checked={rulerConfirmed} onChange={(event) => setRulerConfirmed(event.target.checked)} />
         The printed line measures exactly 100 mm
       </label>
       <button type="button" disabled={busy || !rulerConfirmed || diameterMm === null} onClick={calibrate}>
