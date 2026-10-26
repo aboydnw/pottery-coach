@@ -47,7 +47,7 @@ const missing = (guidance?: string) =>
     rightX: 512,
     row: 360,
     confidence: 0,
-    candidates: [],
+    candidates: [{ leftX: 128, rightX: 512, row: 360, confidence: 0 }],
     guidance,
   }) as WheelHeadCandidates & { guidance?: string };
 

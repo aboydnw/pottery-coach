@@ -128,16 +128,19 @@ export function useLiveWheelDetection(options: Options): LiveWheelDetection {
       setFrameSize({ width: image.width, height: image.height });
       setCandidates(mapped);
       setCandidateIndex(index);
-      if (!selected) {
+      const fallbackSelected = Boolean(selected && !selected.ellipse && selected.confidence <= 0);
+      if (!selected || (fallbackSelected && ellipseRef.current)) {
         missedFramesRef.current += 1;
         stableSinceRef.current = null;
         stableAnchorRef.current = null;
         setStatus("finding");
         if (ellipseRef.current && missedFramesRef.current <= 2)
           return { found: false, confidence: ellipseRef.current.confidence };
-        setEllipse(null);
-        ellipseRef.current = null;
-        return { found: false, confidence: 0 };
+        if (!selected) {
+          setEllipse(null);
+          ellipseRef.current = null;
+          return { found: false, confidence: 0 };
+        }
       }
       missedFramesRef.current = 0;
       const next = selected.ellipse ?? fallbackEllipse(selected);
@@ -183,8 +186,6 @@ export function useLiveWheelDetection(options: Options): LiveWheelDetection {
         }
       }
       setError(null);
-      setQuality(null);
-      setGuidance(null);
       missedFramesRef.current = 0;
       return { found: selected.confidence >= 0.5, confidence: Math.round(selected.confidence * 100) / 100 };
     } catch (caught) {
