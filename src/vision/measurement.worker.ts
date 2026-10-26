@@ -106,7 +106,7 @@ function processFrame(request: FrameRequest): void {
     calibrationError95: pose?.estimatedErrorMm95 ?? null,
     segmentationError95: (reliableFraction >= 0.7 ? 1 : 3) * request.scale,
   });
-  const measured = extractDimensions(segmentation.mask, segmentation.rowReliability, {
+  const extracted = extractDimensions(segmentation.mask, segmentation.rowReliability, {
     width: image.width,
     height: image.height,
     unitsPerPixel: request.scale,
@@ -118,6 +118,7 @@ function processFrame(request: FrameRequest): void {
     confidence,
     transform,
   });
+  const measured = { ...extracted, segmentationVersion: segmentation.modelVersion ?? "background-v1" };
   const handsLikely = handsDetector.update(measured);
   const instantaneous = handsLikely ? withHands(measured) : { ...measured, handsLikely };
   // Hands-on frames would drag the steady reading towards the hands, so they don't feed it.
