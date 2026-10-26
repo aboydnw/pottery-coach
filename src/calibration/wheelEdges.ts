@@ -64,7 +64,7 @@ export function extractWheelEdges(image: GrayImage): WheelEdgeMap {
     }
   }
   strengths.sort((a, b) => a - b);
-  const strongThreshold = Math.max(6, strengths[Math.floor(strengths.length * 0.7)] ?? 255);
+  const strongThreshold = Math.max(10, Math.min(24, (strengths[Math.floor(strengths.length * 0.5)] ?? 255) * 0.5));
   const blurScore = Math.min(1, (strengths[Math.floor(strengths.length * 0.9)] ?? 0) / 48);
   const reasons: WheelCaptureReason[] = [];
   if (contrastScore < 0.06) reasons.push("LOW_CONTRAST");

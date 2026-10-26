@@ -1,3 +1,12 @@
+import { fitWheelEllipseProposals, traceWheelArcs } from "./wheelArcs";
+import {
+  extractWheelEdges,
+  type GrayImage,
+  type WheelCaptureQuality,
+  type WheelEdgeMap,
+  type WheelEdgePoint,
+} from "./wheelEdges";
+
 export type WheelEllipse = {
   centerX: number;
   centerY: number;
@@ -9,9 +18,20 @@ export type WheelEllipse = {
   confidence: number;
 };
 
-export type WheelEllipseCandidate = WheelEllipse & { score: number };
+export type WheelEllipseEvidence = {
+  fitResidualPx95: number;
+  visibleArcFraction: number;
+  longestMissingArcFraction: number;
+  supportedSectors: Uint8Array;
+  orientationAgreement: number;
+};
 
-type GrayImage = { gray: Float32Array; width: number; height: number };
+export type WheelEllipseCandidate = WheelEllipse & { score: number; evidence: WheelEllipseEvidence };
+
+export type WheelDetectionResult = {
+  candidates: WheelEllipseCandidate[];
+  quality: WheelCaptureQuality;
+};
 
 /** Normalizes equivalent ellipse representations to one stable form. */
 export function canonicalWheelEllipse(input: WheelEllipse): WheelEllipse {
@@ -29,122 +49,178 @@ export function canonicalWheelEllipse(input: WheelEllipse): WheelEllipse {
   };
 }
 
-/** Finds complete circular surfaces projected as ellipses in the lower part of a frame. */
+/** Finds complete circular rims projected as ellipses in the lower part of a frame. */
 export function detectWheelEllipses(image: GrayImage): WheelEllipseCandidate[] {
-  const { gray, width, height } = image;
-  if (gray.length !== width * height || width < 8 || height < 8) return [];
-  const mean = gray.reduce((sum, value) => sum + value, 0) / gray.length;
-  const variance = gray.reduce((sum, value) => sum + (value - mean) ** 2, 0) / gray.length;
-  const deviation = Math.sqrt(variance) * 0.6;
-  const masks = [
-    Uint8Array.from(gray, (value) => (value < mean - deviation ? 1 : 0)),
-    Uint8Array.from(gray, (value) => (value > mean + deviation ? 1 : 0)),
-  ];
-  const candidates: WheelEllipseCandidate[] = [];
-  for (const mask of masks) findCandidates(mask, width, height, candidates);
-  return candidates.sort((left, right) => right.score - left.score).slice(0, 3);
+  return detectWheelEllipseResult(image).candidates;
 }
 
-function findCandidates(mask: Uint8Array, width: number, height: number, candidates: WheelEllipseCandidate[]): void {
-  const labels = new Uint8Array(mask.length);
-  const queue = new Int32Array(mask.length);
-  for (let start = Math.floor(height * 0.3) * width; start < mask.length; start += 1) {
-    if (!mask[start] || labels[start]) continue;
-    let head = 0;
-    let tail = 0;
-    let touchesFrame = false;
-    queue[tail++] = start;
-    labels[start] = 1;
-    let sumX = 0;
-    let sumY = 0;
-    while (head < tail) {
-      const index = queue[head++]!;
-      const x = index % width;
-      const y = (index - x) / width;
-      sumX += x;
-      sumY += y;
-      touchesFrame ||= x === 0 || y === 0 || x === width - 1 || y === height - 1;
-      for (const neighbor of [index - 1, index + 1, index - width, index + width]) {
-        if (neighbor < 0 || neighbor >= mask.length || labels[neighbor] || !mask[neighbor]) continue;
-        const nx = neighbor % width;
-        if (Math.abs(nx - x) > 1) continue;
-        labels[neighbor] = 1;
-        queue[tail++] = neighbor;
+export function detectWheelEllipseResult(image: GrayImage): WheelDetectionResult {
+  const edgeMap = extractWheelEdges(image);
+  if (edgeMap.quality.reasons.includes("LOW_CONTRAST")) return { candidates: [], quality: edgeMap.quality };
+  const proposals = fitWheelEllipseProposals(traceWheelArcs(edgeMap), image);
+  const candidates = proposals
+    .map((proposal) => scoreCandidate(canonicalWheelEllipse(proposal), edgeMap))
+    .filter((candidate): candidate is WheelEllipseCandidate => candidate !== null)
+    .sort((left, right) => right.score - left.score)
+    .filter((candidate, index, all) => all.findIndex((other) => sameSurface(candidate, other, image)) === index)
+    .slice(0, 3)
+    .sort((left, right) => right.radiusMajor - left.radiusMajor);
+  return { candidates, quality: edgeMap.quality };
+}
+
+export function measureEllipseEvidence(ellipse: WheelEllipse, edgeMap: WheelEdgeMap): WheelEllipseEvidence {
+  const supportedSectors = new Uint8Array(72);
+  let orientationTotal = 0;
+  let orientationCount = 0;
+  const residuals: number[] = [];
+  const cosine = Math.cos(ellipse.rotationRad);
+  const sine = Math.sin(ellipse.rotationRad);
+  const tolerance = Math.max(2.5, ellipse.radiusMinor * 0.08);
+  const buckets = bucketPoints(edgeMap.points);
+  for (let sector = 0; sector < supportedSectors.length; sector += 1) {
+    const angle = ((sector + 0.5) / supportedSectors.length) * Math.PI * 2;
+    const localX = ellipse.radiusMajor * Math.cos(angle);
+    const localY = ellipse.radiusMinor * Math.sin(angle);
+    const x = ellipse.centerX + cosine * localX - sine * localY;
+    const y = ellipse.centerY + sine * localX + cosine * localY;
+    const normalLocalX = Math.cos(angle) / ellipse.radiusMajor;
+    const normalLocalY = Math.sin(angle) / ellipse.radiusMinor;
+    const normalLength = Math.hypot(normalLocalX, normalLocalY);
+    const normalX = (cosine * normalLocalX - sine * normalLocalY) / normalLength;
+    const normalY = (sine * normalLocalX + cosine * normalLocalY) / normalLength;
+    const nearest = nearestPoint(buckets, x, y, tolerance);
+    if (!nearest) continue;
+    const distance = Math.hypot(nearest.x - x, nearest.y - y);
+    const agreement = Math.abs(nearest.normalX * normalX + nearest.normalY * normalY);
+    if (agreement < 0.35) continue;
+    supportedSectors[sector] = 1;
+    residuals.push(distance);
+    orientationTotal += agreement;
+    orientationCount += 1;
+  }
+  const visibleArcFraction = supportedSectors.reduce((sum, value) => sum + value, 0) / supportedSectors.length;
+  return {
+    fitResidualPx95: percentile(residuals, 0.95),
+    visibleArcFraction,
+    longestMissingArcFraction: longestMissingRun(supportedSectors) / supportedSectors.length,
+    supportedSectors,
+    orientationAgreement: orientationCount === 0 ? 0 : orientationTotal / orientationCount,
+  };
+}
+
+function scoreCandidate(ellipse: WheelEllipse, edgeMap: WheelEdgeMap): WheelEllipseCandidate | null {
+  const { width, height } = edgeMap;
+  const evidence = measureEllipseEvidence(ellipse, edgeMap);
+  const ratio = ellipse.radiusMinor / ellipse.radiusMajor;
+  const margin = 2;
+  const extentX = Math.hypot(
+    ellipse.radiusMajor * Math.cos(ellipse.rotationRad),
+    ellipse.radiusMinor * Math.sin(ellipse.rotationRad),
+  );
+  const extentY = Math.hypot(
+    ellipse.radiusMajor * Math.sin(ellipse.rotationRad),
+    ellipse.radiusMinor * Math.cos(ellipse.rotationRad),
+  );
+  const framed =
+    ellipse.centerX - extentX >= margin &&
+    ellipse.centerX + extentX < width - margin &&
+    ellipse.centerY - extentY >= margin &&
+    ellipse.centerY + extentY < height - margin;
+  const quadrants = [0, 18, 36, 54].every((start) =>
+    evidence.supportedSectors.slice(start, start + 18).some((value) => value === 1),
+  );
+  if (
+    !framed ||
+    !quadrants ||
+    ellipse.radiusMajor < width * 0.24 ||
+    ellipse.centerY < height * 0.48 ||
+    ratio < 0.2 ||
+    ratio > 0.9 ||
+    evidence.visibleArcFraction < 0.78 ||
+    evidence.longestMissingArcFraction > 0.14
+  )
+    return null;
+  const residualQuality = Math.exp(-evidence.fitResidualPx95 / Math.max(2, ellipse.radiusMinor * 0.08));
+  const locationQuality = clamp((ellipse.centerY / height - 0.45) / 0.35, 0, 1);
+  const sizeQuality = clamp(ellipse.radiusMajor / (width * 0.4), 0, 1);
+  const confidence = clamp(
+    evidence.visibleArcFraction * 0.45 +
+      evidence.orientationAgreement * 0.2 +
+      residualQuality * 0.2 +
+      locationQuality * 0.1 +
+      sizeQuality * 0.05,
+    0,
+    1,
+  );
+  return {
+    ...ellipse,
+    fitResidualPx95: evidence.fitResidualPx95,
+    visibleArcFraction: evidence.visibleArcFraction,
+    confidence,
+    evidence,
+    score: confidence * (0.7 + 0.3 * sizeQuality),
+  };
+}
+
+function bucketPoints(points: WheelEdgePoint[]): Map<string, WheelEdgePoint[]> {
+  const buckets = new Map<string, WheelEdgePoint[]>();
+  for (const point of points) {
+    const key = `${Math.floor(point.x / 4)},${Math.floor(point.y / 4)}`;
+    const bucket = buckets.get(key) ?? [];
+    bucket.push(point);
+    buckets.set(key, bucket);
+  }
+  return buckets;
+}
+
+function nearestPoint(
+  buckets: Map<string, WheelEdgePoint[]>,
+  x: number,
+  y: number,
+  tolerance: number,
+): WheelEdgePoint | null {
+  let nearest: WheelEdgePoint | null = null;
+  let nearestDistance = tolerance;
+  const radius = Math.ceil(tolerance / 4);
+  const bucketX = Math.floor(x / 4);
+  const bucketY = Math.floor(y / 4);
+  for (let dy = -radius; dy <= radius; dy += 1) {
+    for (let dx = -radius; dx <= radius; dx += 1) {
+      for (const point of buckets.get(`${bucketX + dx},${bucketY + dy}`) ?? []) {
+        const distance = Math.hypot(point.x - x, point.y - y);
+        if (distance <= nearestDistance) {
+          nearest = point;
+          nearestDistance = distance;
+        }
       }
     }
-    if (touchesFrame || tail < width * height * 0.01) continue;
-    const centerX = sumX / tail;
-    const centerY = sumY / tail;
-    let xx = 0;
-    let yy = 0;
-    let xy = 0;
-    for (let i = 0; i < tail; i += 1) {
-      const index = queue[i]!;
-      const x = (index % width) - centerX;
-      const y = (index - (index % width)) / width - centerY;
-      xx += x * x;
-      yy += y * y;
-      xy += x * y;
-    }
-    xx /= tail;
-    yy /= tail;
-    xy /= tail;
-    const trace = xx + yy;
-    const spread = Math.hypot(xx - yy, 2 * xy);
-    const lambdaMajor = (trace + spread) / 2;
-    const lambdaMinor = (trace - spread) / 2;
-    if (lambdaMinor <= 0) continue;
-    const rotationRad = 0.5 * Math.atan2(2 * xy, xx - yy);
-    const radiusMajor = 2 * Math.sqrt(lambdaMajor);
-    const radiusMinor = 2 * Math.sqrt(lambdaMinor);
-    const boundary = boundaryFit(mask, queue, tail, width, centerX, centerY, radiusMajor, radiusMinor, rotationRad);
-    const confidence = clamp(Math.exp(-boundary.residualPx95 / 4) * boundary.arcFraction, 0, 1);
-    const ellipse = canonicalWheelEllipse({
-      centerX,
-      centerY,
-      radiusMajor,
-      radiusMinor,
-      rotationRad,
-      fitResidualPx95: boundary.residualPx95,
-      visibleArcFraction: boundary.arcFraction,
-      confidence,
-    });
-    candidates.push({ ...ellipse, score: confidence * tail });
   }
+  return nearest;
 }
 
-function boundaryFit(
-  mask: Uint8Array,
-  pixels: Int32Array,
-  count: number,
-  width: number,
-  centerX: number,
-  centerY: number,
-  radiusMajor: number,
-  radiusMinor: number,
-  rotation: number,
-): { residualPx95: number; arcFraction: number } {
-  const residuals: number[] = [];
-  const bins = new Uint8Array(36);
-  const cosine = Math.cos(rotation);
-  const sine = Math.sin(rotation);
-  for (let i = 0; i < count; i += 1) {
-    const index = pixels[i]!;
-    if (mask[index - 1] && mask[index + 1] && mask[index - width] && mask[index + width]) continue;
-    const dx = (index % width) - centerX;
-    const dy = (index - (index % width)) / width - centerY;
-    const major = cosine * dx + sine * dy;
-    const minor = -sine * dx + cosine * dy;
-    const normalized = Math.hypot(major / radiusMajor, minor / radiusMinor);
-    residuals.push(Math.abs(normalized - 1) * Math.min(radiusMajor, radiusMinor));
-    const angle = Math.atan2(minor / radiusMinor, major / radiusMajor);
-    bins[Math.min(35, Math.floor(((angle + Math.PI) / (2 * Math.PI)) * 36))] = 1;
+function longestMissingRun(sectors: Uint8Array): number {
+  let longest = 0;
+  let current = 0;
+  for (let index = 0; index < sectors.length * 2; index += 1) {
+    if (sectors[index % sectors.length]) current = 0;
+    else current += 1;
+    longest = Math.max(longest, Math.min(current, sectors.length));
   }
-  residuals.sort((a, b) => a - b);
-  return {
-    residualPx95: residuals[Math.floor(residuals.length * 0.95)] ?? Number.POSITIVE_INFINITY,
-    arcFraction: bins.reduce((sum, value) => sum + value, 0) / bins.length,
-  };
+  return longest;
+}
+
+function sameSurface(left: WheelEllipse, right: WheelEllipse, frame: GrayImage): boolean {
+  return (
+    Math.hypot(left.centerX - right.centerX, left.centerY - right.centerY) <
+      Math.min(frame.width, frame.height) * 0.025 &&
+    Math.abs(left.radiusMajor - right.radiusMajor) < frame.width * 0.025 &&
+    Math.abs(left.radiusMinor - right.radiusMinor) < frame.height * 0.025
+  );
+}
+
+function percentile(values: number[], fraction: number): number {
+  if (values.length === 0) return Number.POSITIVE_INFINITY;
+  return [...values].sort((a, b) => a - b)[Math.min(values.length - 1, Math.floor(values.length * fraction))]!;
 }
 
 function normalizeHalfTurn(angle: number): number {

@@ -46,9 +46,9 @@ function renderWheelScene(options: SceneOptions = {}) {
 
   if (options.clutter) {
     // A face-like filled oval, apron stripe, and box edge should not beat a supported wheel rim.
-    for (let y = 58; y < 150; y += 1) {
+    for (let y = 24; y < 116; y += 1) {
       for (let x = 35; x < 115; x += 1) {
-        if (((x - 75) / 40) ** 2 + ((y - 103) / 46) ** 2 <= 1) gray[y * width + x] = 168;
+        if (((x - 75) / 40) ** 2 + ((y - 70) / 46) ** 2 <= 1) gray[y * width + x] = 168;
       }
     }
     for (let y = 120; y < 220; y += 1) gray[y * width + 250] = 35;
@@ -64,8 +64,8 @@ describe("wheel-rim scenes", () => {
     { background: 190, rim: 65 },
     { background: 112, rim: 142 },
   ])("recovers an outlined complete rim across contrast polarities", ({ background, rim }) => {
-    const [candidate] = detectWheelEllipses(renderWheelScene({ background, rim, clutter: true }));
-
+    const scene = renderWheelScene({ background, rim, clutter: true });
+    const [candidate] = detectWheelEllipses(scene);
     expect(candidate).toBeDefined();
     expect(candidate!.centerX).toBeCloseTo(164, -1);
     expect(candidate!.centerY).toBeCloseTo(174, -1);
@@ -88,7 +88,11 @@ describe("wheel-rim scenes", () => {
   });
 
   it("does not mistake a filled face-like oval for a wheel rim", () => {
-    const scene = renderWheelScene({ rim: 118, clutter: true, missingSectors: Array.from({ length: 72 }, (_, i) => i) });
+    const scene = renderWheelScene({
+      rim: 118,
+      clutter: true,
+      missingSectors: Array.from({ length: 72 }, (_, i) => i),
+    });
 
     expect(detectWheelEllipses(scene).filter((candidate) => candidate.confidence >= 0.8)).toEqual([]);
   });
