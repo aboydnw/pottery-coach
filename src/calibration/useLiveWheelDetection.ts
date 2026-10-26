@@ -3,6 +3,7 @@ import { useCallback, useEffect, useRef, useState, type MutableRefObject } from 
 import { captureFrame } from "../camera/captureFrame";
 import { detectWheelHead, toGray, type WheelHeadCandidates, type WheelHeadDetection } from "./wheelHead";
 import type { WheelEllipse } from "./wheelEllipse";
+import type { WheelCaptureQuality } from "./wheelEdges";
 import { deriveWheelViewPose } from "./wheelViewPose";
 
 const SAMPLE_MS = 200;
@@ -29,6 +30,8 @@ export type LiveWheelDetection = {
   ellipse: WheelEllipse | null;
   adjusted: boolean;
   error: string | null;
+  quality: WheelCaptureQuality | null;
+  guidance: string | null;
   start(diameterMm?: number): Promise<{ found: boolean; confidence: number }>;
   stop(): void;
   retry(): Promise<{ found: boolean; confidence: number }>;
@@ -50,6 +53,8 @@ export function useLiveWheelDetection(options: Options): LiveWheelDetection {
   const [ellipse, setEllipse] = useState<WheelEllipse | null>(null);
   const [adjusted, setAdjusted] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [quality, setQuality] = useState<WheelCaptureQuality | null>(null);
+  const [guidance, setGuidance] = useState<string | null>(null);
   const intervalRef = useRef<number | null>(null);
   const runningRef = useRef(false);
   const activeRef = useRef(false);
@@ -62,6 +67,7 @@ export function useLiveWheelDetection(options: Options): LiveWheelDetection {
   const stableSinceRef = useRef<number | null>(null);
   const acceptedRef = useRef(false);
   const pausedRef = useRef(false);
+  const missedFramesRef = useRef(0);
   const diameterRef = useRef(diameterMm);
   const onStableRef = useRef(options.onStable);
 
@@ -91,6 +97,9 @@ export function useLiveWheelDetection(options: Options): LiveWheelDetection {
     adjustedRef.current = false;
     setAdjusted(false);
     setError(null);
+    setQuality(null);
+    setGuidance(null);
+    missedFramesRef.current = 0;
   }, [clearTimer]);
 
   const sample = useCallback(async (): Promise<{ found: boolean; confidence: number }> => {
@@ -108,6 +117,8 @@ export function useLiveWheelDetection(options: Options): LiveWheelDetection {
       const image = capture(video);
       const gray = toGray(image.data, image.width, image.height);
       const detected = detect(gray) as WheelHeadCandidates;
+      setQuality(detected.quality ?? null);
+      setGuidance(detected.guidance ?? null);
       const toFull = (value: number) => (value + 0.5) * gray.scale;
       const mapped = detected.candidates.map((candidate) => mapCandidate(candidate, toFull, gray.scale));
       candidatesRef.current = mapped;
@@ -117,14 +128,21 @@ export function useLiveWheelDetection(options: Options): LiveWheelDetection {
       setFrameSize({ width: image.width, height: image.height });
       setCandidates(mapped);
       setCandidateIndex(index);
-      if (!selected) {
+      const fallbackSelected = Boolean(selected && !selected.ellipse && selected.confidence <= 0);
+      if (!selected || (fallbackSelected && ellipseRef.current)) {
+        missedFramesRef.current += 1;
         stableSinceRef.current = null;
         stableAnchorRef.current = null;
         setStatus("finding");
-        setEllipse(null);
-        ellipseRef.current = null;
-        return { found: false, confidence: 0 };
+        if (ellipseRef.current && missedFramesRef.current <= 2)
+          return { found: false, confidence: ellipseRef.current.confidence };
+        if (!selected) {
+          setEllipse(null);
+          ellipseRef.current = null;
+          return { found: false, confidence: 0 };
+        }
       }
+      missedFramesRef.current = 0;
       const next = selected.ellipse ?? fallbackEllipse(selected);
       const previous = ellipseRef.current;
       if (previous && !similar(previous, next, image.width, image.height)) {
@@ -168,6 +186,7 @@ export function useLiveWheelDetection(options: Options): LiveWheelDetection {
         }
       }
       setError(null);
+      missedFramesRef.current = 0;
       return { found: selected.confidence >= 0.5, confidence: Math.round(selected.confidence * 100) / 100 };
     } catch (caught) {
       const message = caught instanceof Error ? caught.message : "Wheel detection failed.";
@@ -210,6 +229,9 @@ export function useLiveWheelDetection(options: Options): LiveWheelDetection {
       setEllipse(null);
       setAdjusted(false);
       setError(null);
+      setQuality(null);
+      setGuidance(null);
+      missedFramesRef.current = 0;
       const result = await sample();
       if (activeRef.current && !acceptedRef.current && !pausedRef.current)
         intervalRef.current = window.setInterval(() => void sample(), SAMPLE_MS);
@@ -254,6 +276,8 @@ export function useLiveWheelDetection(options: Options): LiveWheelDetection {
     ellipse,
     adjusted,
     error,
+    quality,
+    guidance,
     start,
     stop,
     retry: () => start(diameterRef.current),

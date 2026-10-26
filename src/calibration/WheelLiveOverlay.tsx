@@ -10,6 +10,7 @@ type Props = {
   ellipse: WheelEllipse;
   diameterMm: number;
   status: LiveWheelStatus;
+  guidance: string | null;
   mirrored: boolean;
   adjusted: boolean;
   canSwitch: { inner: boolean; outer: boolean };
@@ -26,13 +27,15 @@ export function WheelLiveOverlay(props: Props) {
   const { ellipse, frameSize } = props;
   const pose = deriveWheelViewPose(ellipse, props.diameterMm, frameSize);
   const rotationDeg = (ellipse.rotationRad * 180) / Math.PI;
-  const message = pose.reasons[0]
-    ? describeCalibrationReason(pose.reasons[0])
-    : props.status === "found"
-      ? "Wheel found."
-      : props.status === "steady"
-        ? "Hold steady…"
-        : "Finding wheel…";
+  const message = props.guidance
+    ? props.guidance
+    : pose.reasons[0]
+      ? describeCalibrationReason(pose.reasons[0])
+      : props.status === "found"
+        ? "Wheel found."
+        : props.status === "steady"
+          ? "Hold steady…"
+          : "Finding wheel…";
   const update = (patch: Partial<WheelEllipse>) => props.onEllipseChange({ ...ellipse, ...patch });
 
   return (
