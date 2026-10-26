@@ -20,6 +20,7 @@
     "benchmark:tags": "tsx benchmarks/tags/run.ts",
     "benchmark:dimensions": "tsx benchmarks/dimensions/run.ts",
     "benchmark:segmentation": "tsx benchmarks/segmentation/run.ts",
+    "benchmark:clay-segmentation": "tsx benchmarks/clay-segmentation/run.ts",
     "benchmark:profile": "tsx benchmarks/profile/run.ts",
     "benchmark:wobble": "tsx benchmarks/wobble/run.ts",
     "benchmark:voice": "tsx benchmarks/voice/run.ts",
