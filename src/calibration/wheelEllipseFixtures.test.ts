@@ -59,6 +59,27 @@ function renderWheelScene(options: SceneOptions = {}) {
 }
 
 describe("wheel-rim scenes", () => {
+  it("finds the complete rim when a studio floor edge crosses behind its lower half", () => {
+    const width = 320;
+    const height = 180;
+    const gray = new Float32Array(width * height).fill(190);
+    for (let y = 150; y < height; y += 1) {
+      for (let x = 0; x < width; x += 1) gray[y * width + x] = 140;
+    }
+    for (let y = 0; y < height; y += 1) {
+      for (let x = 0; x < width; x += 1) {
+        if (((x - 160) / 96) ** 2 + ((y - 140) / 30) ** 2 <= 1) gray[y * width + x] = 82;
+      }
+    }
+
+    const [candidate] = detectWheelEllipses({ gray, width, height });
+
+    expect(candidate).toBeDefined();
+    expect(candidate!.centerX).toBeCloseTo(160, 0);
+    expect(candidate!.centerY).toBeCloseTo(140, 0);
+    expect(candidate!.radiusMajor).toBeCloseTo(96, 0);
+  });
+
   it.each([
     { background: 70, rim: 190 },
     { background: 190, rim: 65 },

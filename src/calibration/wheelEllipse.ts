@@ -35,7 +35,16 @@ export type WheelDetectionResult = {
 
 /** Normalizes equivalent ellipse representations to one stable form. */
 export function canonicalWheelEllipse(input: WheelEllipse): WheelEllipse {
-  const values = Object.values(input);
+  const values = [
+    input.centerX,
+    input.centerY,
+    input.radiusMajor,
+    input.radiusMinor,
+    input.rotationRad,
+    input.fitResidualPx95,
+    input.visibleArcFraction,
+    input.confidence,
+  ];
   if (!values.every(Number.isFinite)) throw new Error("Ellipse geometry must be finite");
   if (input.radiusMajor <= 0 || input.radiusMinor <= 0) throw new Error("Ellipse radii must be positive");
   const swapped = input.radiusMinor > input.radiusMajor;
