@@ -9,7 +9,14 @@ type Props = {
   onRecalibrate?(): void;
 };
 
-const HARD_FAILURES = new Set(["ROI_CLIPPED", "BOARD_REVISION", "ESTIMATED_ERROR", "SCALE_VARIATION"]);
+const HARD_FAILURES = new Set([
+  "ROI_CLIPPED",
+  "BOARD_REVISION",
+  "ESTIMATED_ERROR",
+  "SCALE_VARIATION",
+  "DIAMETER_MISMATCH",
+  "DIAMETER_IMPLAUSIBLE",
+]);
 
 export function CalibrationFlow({ result, boardMoved = false, onAccepted, onRecalibrate }: Props) {
   const [scaleConfirmed, setScaleConfirmed] = useState(false);
@@ -32,7 +39,7 @@ export function CalibrationFlow({ result, boardMoved = false, onAccepted, onReca
   return (
     <section aria-labelledby="calibration-title">
       <h2 id="calibration-title">Confirm calibration</h2>
-      <p>Keep the printed board within 30 mm of the vessel plane and fully visible.</p>
+      <p>Keep the printed page flat, centered on the wheel axle, and fully visible.</p>
       <label>
         <input type="checkbox" checked={scaleConfirmed} onChange={(event) => setScaleConfirmed(event.target.checked)} />
         The printed 100 mm line measures exactly 100 mm
@@ -108,6 +115,8 @@ export function describeCalibrationReason(reason: string): string {
     VIEW_OFF_AXIS: "Aim the phone more directly through the center of the wheel.",
     ELLIPSE_UNSTABLE: "Hold the phone still while the wheel outline locks.",
     ELLIPSE_AMBIGUOUS: "Choose the outline that matches your wheel head or bat.",
+    DIAMETER_MISMATCH: "The entered wheel diameter does not match the optional rim check. Recheck the size and page centering.",
+    DIAMETER_IMPLAUSIBLE: "Enter a wheel-head diameter between 15 and 50 cm.",
   };
   return labels[reason] ?? reason.replaceAll("_", " ").toLowerCase();
 }

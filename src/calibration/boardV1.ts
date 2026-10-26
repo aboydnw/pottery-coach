@@ -138,11 +138,16 @@ ${tags.join("\n")}
     <line x1="${x1}" y1="${y - 4}" x2="${x1}" y2="${y + 4}"/><line x1="${x2}" y1="${y - 4}" x2="${x2}" y2="${y + 4}"/>
     <line x1="45" y1="120" x2="165" y2="120" stroke-width="0.5" data-wheel-baseline="true"/>
     <line x1="105" y1="42" x2="105" y2="132" stroke-width="0.35" stroke-dasharray="2 2" data-vertical-axis="true"/>
+    <circle cx="105" cy="74" r="5" stroke-width="0.7" data-wheel-center="true"/>
+    <line x1="97" y1="74" x2="113" y2="74" stroke-width="0.5"/><line x1="105" y1="66" x2="105" y2="82" stroke-width="0.5"/>
+    <path d="M105 2v7 M105 139v7 M2 74h7 M201 74h7" stroke-width="0.8" data-centering-guides="true"/>
   </g>
   <g font-family="sans-serif" fill="#111" text-anchor="middle">
-    <text x="105" y="62" font-size="9" font-weight="bold">POTTERY COACH CALIBRATION</text>
-    <text x="105" y="73" font-size="5">Print at 100% — do not fit to page</text>
-    <text x="105" y="83" font-size="4">Verify the line below measures exactly 100 mm</text>
+    <text x="105" y="55" font-size="8" font-weight="bold">POTTERY COACH CALIBRATION</text>
+    <text x="105" y="61" font-size="4.5">Print at 100% — do not fit to page</text>
+    <text x="105" y="87" font-size="3.6">Place flat. Align the center target with the wheel axle.</text>
+    <text x="105" y="92" font-size="3.6">Keep the page visible. Do not move the phone afterward.</text>
+    <text x="105" y="97" font-size="3.6">Verify the line below measures exactly 100 mm</text>
     <text x="105" y="104" font-size="4">100 mm</text>
     <text x="105" y="145" font-size="3.5">${board.revision} · ${board.checksum} · ${board.family}</text>
   </g>

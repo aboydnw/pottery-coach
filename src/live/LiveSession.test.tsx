@@ -153,6 +153,7 @@ it("captures the current camera view when touch starts a wheel-head check", asyn
   captureFrame.mockClear();
 
   fireEvent.click(screen.getByRole("button", { name: "Settings" }));
+  fireEvent.click(screen.getByRole("button", { name: /optional wheel-head detection/i }));
   fireEvent.click(screen.getByRole("button", { name: "14 in" }));
   fireEvent.click(screen.getByRole("button", { name: /find 14 in wheel head/i }));
 

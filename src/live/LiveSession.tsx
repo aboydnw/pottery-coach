@@ -3,6 +3,8 @@ import { useEffect, useMemo, useRef, useState, useSyncExternalStore, type Mutabl
 import { demoCalibration, demoReading } from "../app/demoFixtures";
 import { CalibrationFlow, describeCalibrationReason } from "../calibration/CalibrationFlow";
 import { calibrateFromVideo } from "../calibration/calibrateFromVideo";
+import { BoardCalibrationAccumulator, validateWheelDiameterCrossCheck } from "../calibration/boardCalibration";
+import { PrintedMarkerStep } from "../calibration/PrintedMarkerStep";
 import type { CalibrationResult } from "../calibration/types";
 import { WasmTagDetector } from "../calibration/WasmTagDetector";
 import { wheelEllipseCalibration } from "../calibration/wheelHead";
@@ -49,6 +51,10 @@ const LINES = {
   liftPot: "Lift the pot off and I'll take a fresh look at the empty wheel.",
   wheelSeen: "Got a look at the empty wheel. Put your clay on.",
 } as const;
+
+function waitForCalibrationSample(): Promise<void> {
+  return new Promise((resolve) => window.setTimeout(resolve, 125));
+}
 
 /** Where the empty-wheel snapshot is at: learning it, learned (clay can go on), or waiting for the wheel to clear. */
 type WheelPhase = "learning" | "ready" | "awaiting-empty" | "placed";
@@ -114,7 +120,7 @@ export function LiveSession(props: LiveSessionProps) {
   });
   const slots = useSyncExternalStore(setup.subscribe, setup.getSnapshot);
   const [scale, setScaleState] = useState<SessionScale | null>(null);
-  const [boardMode, setBoardMode] = useState(false);
+  const [boardMode, setBoardMode] = useState(true);
   const [boardCandidate, setBoardCandidate] = useState<CalibrationResult | null>(null);
   const [detector, setDetector] = useState<WasmTagDetector | null>(null);
   const [busy, setBusy] = useState(false);
@@ -374,12 +380,30 @@ export function LiveSession(props: LiveSessionProps) {
   async function runBoardCalibration(): Promise<void> {
     const video = videoRef.current;
     if (!video) return;
+    const diameterMm = setup.getSnapshot().wheelHeadDiameterMm?.value ?? loadRememberedDiameterMm();
+    if (diameterMm === null) {
+      setProblem("Enter the wheel-head diameter before calibrating.");
+      return;
+    }
     setBusy(true);
     setProblem(null);
     try {
       const active = detector ?? new WasmTagDetector();
       if (!detector) setDetector(active);
-      setBoardCandidate(await calibrateFromVideo(video, active));
+      const accumulator = new BoardCalibrationAccumulator();
+      for (let index = 0; index < 5; index += 1) {
+        const result = await calibrateFromVideo(video, active, diameterMm);
+        accumulator.add({ capturedAtMs: performance.now(), result });
+        if (index < 4) await waitForCalibrationSample();
+      }
+      const stable = accumulator.result();
+      if (!stable) throw new Error("Hold the phone and printed page still, then try again.");
+      const diameterProblems = validateWheelDiameterCrossCheck(stable, diameterMm);
+      setBoardCandidate(
+        diameterProblems.length === 0
+          ? stable
+          : { ...stable, status: "rejected", reasons: [...stable.reasons, ...diameterProblems] },
+      );
     } catch (error) {
       setProblem(
         `Calibration failed: ${error instanceof Error ? error.message : "keep all four tags visible and retry."}`,
@@ -449,21 +473,14 @@ export function LiveSession(props: LiveSessionProps) {
         />
       ) : slots.calibration !== "confirmed" && slots.calibration !== "skipped" && camera.active ? (
         boardMode ? (
-          <section className="calibration-actions" aria-label="Printed board calibration">
-            <p>
-              Print the{" "}
-              <a href="/calibration/board-v1.svg" target="_blank" rel="noreferrer">
-                calibration board
-              </a>{" "}
-              at 100% scale, stand it beside the pot facing the camera, then calibrate.
-            </p>
-            <button type="button" disabled={busy} onClick={() => void runBoardCalibration()}>
-              {busy ? "Detecting board…" : "Calibrate printed board"}
-            </button>
-            <button type="button" className="link-button" onClick={() => setBoardMode(false)}>
-              Use the wheel head instead
-            </button>
-          </section>
+          <PrintedMarkerStep
+            initialDiameterMm={slots.wheelHeadDiameterMm?.value ?? loadRememberedDiameterMm()}
+            busy={busy}
+            onDiameter={(diameterMm) => setup.apply({ wheelHeadDiameter: { value: diameterMm, unit: "mm" } })}
+            onCalibrate={() => void runBoardCalibration()}
+            onUseWheelHead={() => setBoardMode(false)}
+            onSkip={skipWheel}
+          />
         ) : (
           <section className="calibration-actions" aria-label="Wheel-head calibration">
             <WheelHeadStep
@@ -475,7 +492,7 @@ export function LiveSession(props: LiveSessionProps) {
               }}
             />
             <button type="button" className="link-button" onClick={() => setBoardMode(true)}>
-              Use a printed board instead
+              Use the recommended printed page instead
             </button>
             <button type="button" className="secondary" onClick={skipWheel}>
               Skip sizes (shape only)
