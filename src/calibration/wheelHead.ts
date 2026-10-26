@@ -1,7 +1,8 @@
 import { validateCalibration } from "./quality";
 import type { CalibrationResult } from "./types";
 import { BOARD_V1 } from "./boardV1";
-import { detectWheelEllipses, type WheelEllipse } from "./wheelEllipse";
+import { detectWheelEllipseResult, type WheelEllipse } from "./wheelEllipse";
+import type { WheelCaptureQuality } from "./wheelEdges";
 import { deriveWheelViewPose } from "./wheelViewPose";
 
 export type GrayImage = { gray: Float32Array; width: number; height: number };
@@ -23,6 +24,8 @@ export type WheelHeadCandidates = WheelHeadDetection & {
    * splash pan or tray around the wheel head shows up as an outer pair with the wheel head inside it.
    */
   candidates: WheelHeadDetection[];
+  quality?: WheelCaptureQuality;
+  guidance?: string | null;
 };
 
 export const CONFIDENT_DETECTION = 0.5;
@@ -60,7 +63,8 @@ export function toGray(
 /** Finds only wheel heads backed by a complete, geometrically supported rim. */
 export function detectWheelHead(image: GrayImage): WheelHeadCandidates {
   const { width, height } = image;
-  const candidates: WheelHeadDetection[] = detectWheelEllipses(image).map((ellipse) => ({
+  const result = detectWheelEllipseResult(image);
+  const candidates: WheelHeadDetection[] = result.candidates.map((ellipse) => ({
     leftX: ellipse.centerX - ellipse.radiusMajor,
     rightX: ellipse.centerX + ellipse.radiusMajor,
     row: ellipse.centerY,
@@ -73,7 +77,19 @@ export function detectWheelHead(image: GrayImage): WheelHeadCandidates {
     row: Math.round(height * 0.75),
     confidence: 0,
   };
-  return { ...outermost, candidates: candidates.length ? candidates : [outermost] };
+  return {
+    ...outermost,
+    candidates: candidates.length ? candidates : [outermost],
+    quality: result.quality,
+    guidance: candidates.length ? null : guidanceFor(result.quality),
+  };
+}
+
+function guidanceFor(quality: WheelCaptureQuality): string {
+  if (quality.reasons.includes("LOW_CONTRAST")) return "Add even light so the wheel rim stands out.";
+  if (quality.reasons.includes("BLURRY")) return "Hold the phone still while the wheel outline locks.";
+  if (quality.reasons.includes("GLARE")) return "Reduce glare so the whole wheel rim is clear.";
+  return "Move the phone until the whole wheel rim is visible.";
 }
 
 /**
@@ -135,10 +151,11 @@ export function wheelEllipseCalibration(input: {
   frameHeight: number;
   adjustedByUser: boolean;
 }): CalibrationResult {
-  const ellipse = input.adjustedByUser
+  const ellipse = input.ellipse;
+  const poseEllipse = input.adjustedByUser
     ? { ...input.ellipse, fitResidualPx95: EDGE_UNCERTAINTY_PX, visibleArcFraction: 1, confidence: 1 }
     : input.ellipse;
-  const pose = deriveWheelViewPose(ellipse, input.diameterMm, {
+  const pose = deriveWheelViewPose(poseEllipse, input.diameterMm, {
     width: input.frameWidth,
     height: input.frameHeight,
   });

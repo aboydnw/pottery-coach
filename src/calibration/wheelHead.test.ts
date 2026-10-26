@@ -166,7 +166,7 @@ it("creates an angled calibration from a complete wheel ellipse", () => {
   const result = wheelEllipseCalibration({
     ellipse: {
       centerX: 640,
-      centerY: 600,
+      centerY: 500,
       radiusMajor: 400,
       radiusMinor: 200,
       rotationRad: 0,
@@ -211,7 +211,7 @@ it("accepts a manually confirmed outline when automatic rim evidence was unavail
   const result = wheelEllipseCalibration({
     ellipse: {
       centerX: 640,
-      centerY: 600,
+      centerY: 500,
       radiusMajor: 400,
       radiusMinor: 200,
       rotationRad: 0,
@@ -227,4 +227,31 @@ it("accepts a manually confirmed outline when automatic rim evidence was unavail
 
   expect(result.status).toBe("accepted");
   expect(result.provenance).toBe("manual-assisted");
+  expect(result.wheelEllipse).toMatchObject({
+    fitResidualPx95: 400,
+    visibleArcFraction: 0,
+    confidence: 0,
+  });
+});
+
+it("rejects a manually placed ellipse whose predicted rim leaves the frame", () => {
+  const result = wheelEllipseCalibration({
+    ellipse: {
+      centerX: 640,
+      centerY: 680,
+      radiusMajor: 400,
+      radiusMinor: 80,
+      rotationRad: 0,
+      fitResidualPx95: 400,
+      visibleArcFraction: 0,
+      confidence: 0,
+    },
+    diameterMm: 356,
+    frameWidth: 1280,
+    frameHeight: 720,
+    adjustedByUser: true,
+  });
+
+  expect(result.status).toBe("rejected");
+  expect(result.reasons).toContain("WHEEL_RIM_INCOMPLETE");
 });
