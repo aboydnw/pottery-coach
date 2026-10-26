@@ -73,7 +73,7 @@ The browser offers a direct Print calibration page action and a downloadable SVG
 7. Ask the user to remove the page without touching the phone, then learn the empty-wheel background.
 8. Lock calibration for the session and monitor camera movement.
 
-The remembered wheel diameter is compared with the board-derived expected wheel geometry. A disagreement greater than 10% requests that the user recheck page centering, print scale, and the entered diameter. It never silently rescales the calibration.
+The remembered wheel diameter is checked for a plausible 150–500 mm range. When the optional rim detector also finds an independent rim, a disagreement greater than 10% requests that the user recheck page centering, print scale, and the entered diameter. Without an independent rim observation, the app does not pretend that the printed page can verify wheel diameter. It never silently rescales the calibration.
 
 ### Camera movement
 

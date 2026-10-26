@@ -33,8 +33,9 @@ export type ClayDatasetExampleV1 = {
 
 export type ClayDatasetExampleInput = Omit<
   ClayDatasetExampleV1,
-  "schemaVersion" | "id" | "automaticMask" | "correctedMask"
+  "schemaVersion" | "id" | "automaticMask" | "correctedMask" | "conditions"
 > & {
   automaticMask: Uint8Array;
   correctedMask: Uint8Array | null;
+  conditions: readonly CaptureCondition[];
 };
