@@ -8,6 +8,8 @@ import { useLatest } from "../shared/useLatest";
 import type { WobbleReading } from "../wobble/types";
 import type { BackgroundModel } from "./backgroundModel";
 import { BoundedWorkerSink, type MeasurementWorkerEvent, type MeasurementWorkerRequest } from "./workerProtocol";
+import type { DatasetFrameCapture } from "./workerProtocol";
+import { DatasetCaptureRequests } from "./datasetCaptureRequests";
 
 export type MeasurementCallbacks = {
   onReading?(reading: StableDimensionReading): void;
@@ -45,9 +47,13 @@ export function useMeasurementPipeline(callbacks: MeasurementCallbacks = {}) {
   const backgroundRef = useRef<BackgroundModel | null>(null);
   const [handsLikely, setHandsLikely] = useState(false);
   const [vesselVisible, setVesselVisible] = useState(false);
+  const [backgroundReady, setBackgroundReady] = useState(false);
+  const captureRequestsRef = useRef(new DatasetCaptureRequests());
 
   function start(video: HTMLVideoElement, { freshBackground = false }: { freshBackground?: boolean } = {}): void {
+    captureRequestsRef.current.rejectPending("Measurement pipeline restarted");
     if (freshBackground) backgroundRef.current = null;
+    setBackgroundReady(backgroundRef.current !== null);
     teardown(pipelineRef.current);
     pipelineRef.current = null;
     diagnostics.reset();
@@ -57,6 +63,7 @@ export function useMeasurementPipeline(callbacks: MeasurementCallbacks = {}) {
       const message = event.data;
       if (message?.type === "background-ready") {
         backgroundRef.current = message.model;
+        setBackgroundReady(true);
         latest.current.onBackgroundReady?.();
       }
       if (message?.type === "reading") {
@@ -73,6 +80,7 @@ export function useMeasurementPipeline(callbacks: MeasurementCallbacks = {}) {
         setWobbleReading(message.reading);
         latest.current.onWobble?.(message.reading);
       }
+      if (message?.type === "dataset-capture") captureRequestsRef.current.resolve(message.capture);
     });
     const sink = new BoundedWorkerSink(worker, (diagnostic) =>
       diagnostics.record("processed", performance.now(), diagnostic.frameId),
@@ -106,16 +114,19 @@ export function useMeasurementPipeline(callbacks: MeasurementCallbacks = {}) {
   /** Forgets the empty-wheel background and learns it again (next piece); the scale is kept. */
   function resetBackground(): void {
     backgroundRef.current = null;
+    setBackgroundReady(false);
     post({ type: "reset", reason: "next-piece" });
     if (scaleRef.current.scale) post({ type: "scale", ...scaleRef.current });
   }
 
   function stop(): void {
+    captureRequestsRef.current.rejectPending("Measurement pipeline stopped");
     teardown(pipelineRef.current);
     pipelineRef.current = null;
     diagnostics.reset();
     pinnedRef.current = false;
     backgroundRef.current = null;
+    setBackgroundReady(false);
     setStableReading(null);
     setWobbleReading(null);
   }
@@ -138,6 +149,13 @@ export function useMeasurementPipeline(callbacks: MeasurementCallbacks = {}) {
     pinnedRef.current = true;
     setStableReading(reading);
     latest.current.onReading?.(reading);
+  }
+
+  function captureDatasetFrame(): Promise<DatasetFrameCapture> {
+    if (!pipelineRef.current) return Promise.reject(new Error("The camera measurement pipeline is not running"));
+    const pending = captureRequestsRef.current.request();
+    post({ type: "request-dataset-capture", captureId: pending.captureId });
+    return pending.promise;
   }
 
   function post(message: MeasurementWorkerRequest): void {
@@ -171,6 +189,9 @@ export function useMeasurementPipeline(callbacks: MeasurementCallbacks = {}) {
     }, 1000);
     return () => {
       window.clearInterval(interval);
+      // This manager is intentionally shared by all pipeline restarts during the hook lifetime.
+      // oxlint-disable-next-line react-hooks/exhaustive-deps
+      captureRequestsRef.current.rejectPending("Measurement pipeline unmounted");
       teardown(pipelineRef.current);
       pipelineRef.current = null;
     };
@@ -182,12 +203,14 @@ export function useMeasurementPipeline(callbacks: MeasurementCallbacks = {}) {
     wobbleReading,
     handsLikely,
     vesselVisible,
+    backgroundReady,
     processingHz,
     start,
     stop,
     setScale,
     injectReading,
     resetBackground,
+    captureDatasetFrame,
   };
 }
 

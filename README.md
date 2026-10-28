@@ -15,7 +15,9 @@ pnpm dev
 
 Open the printed URL. Camera access needs HTTPS except on `localhost`, and the app only asks for it after you tap **Start session**. To walk through the flow without a pot, open `/?mode=demo`. Demo mode adds a fixed calibration and reading, and a scripted stand-in voice you can drive from the browser console (`await window.__potteryVoice.callTool("getSetupStatus")`). It only exists in development builds (or builds made with `VITE_ENABLE_DEMO=true`).
 
-Sizes are optional. The app treats the circular wheel head as a ruler for the practical camera position above and beside the wheel. Tell the coach the wheel head's (or bat's) diameter once; the size is remembered, while every session reacquires the wheel outline because the phone may have moved. The camera view shows the detected ellipse and only accepts a complete, supported rim. This angled-camera calibration is experimental until the real-phone and known-object gate passes. For the best controlled accuracy you can instead print [`public/calibration/board-v1.svg`](public/calibration/board-v1.svg) at 100% scale, or skip metric calibration for a shape-only session.
+Sizes are optional. The primary setup uses [`public/calibration/board-v1.svg`](public/calibration/board-v1.svg): print it at 100%, verify its 100 mm line, place it flat and centered on the wheel axle, and keep the phone still after calibration. The app remembers the entered wheel-head diameter as a plausibility check. Automatic wheel-head detection remains an optional fallback, and users can always choose a shape-only session. Metric measurements remain experimental until known physical forms pass the half-inch (12.7 mm) accuracy gate.
+
+Clay detection currently uses the local `background-v1` baseline behind a versioned segmentation-provider contract. Opt-in reviewed examples can be explicitly exported for offline training; they never upload automatically. A learned model is not promoted until it beats the baseline on held-out recording sessions and passes accuracy, false-positive, occlusion, and slow-device latency gates. Run `pnpm benchmark:clay-segmentation` for the dataset validation entry point.
 
 ## Deployment
 
@@ -49,7 +51,8 @@ camera ──▶ CanvasFrameSource ──▶ measurement worker ──▶ stable
 - `src/setup/` holds the setup slots (wheel size, target, goal, calibration) that the voice coach fills by conversation.
 - `src/voice/` holds the conversation loop (`useVoiceSession`), the realtime transport, the tool registry the coach calls, and a scripted stand-in voice for demo mode and tests.
 - `src/camera/`, `src/vision/`, `src/measurement/` and `src/wobble/` hold the camera, the worker pipeline, dimension extraction and oscillation detection.
-- `src/calibration/` holds wheel-head detection and sizing (`wheelHead.ts`, `wheelSize.ts`), the board definition, the AprilTag worker (vendored WebAssembly in `public/vendor/apriltag`) and the homography.
+- `src/calibration/` holds the primary printed-marker setup, optional wheel-head fallback, AprilTag worker (vendored WebAssembly in `public/vendor/apriltag`), stability checks, and homography geometry.
+- `src/vision/` holds the versioned clay-segmentation provider, deterministic baseline, local reviewed-example format, and model-promotion manifest.
 - `src/session/`, `src/privacy/` and `src/review/` hold local storage, retention and deletion, and the post-session review.
 - `worker/` is the Cloudflare Worker. It serves the built app and exchanges a WebRTC offer with the voice provider at `/api/realtime/session` (503 until its secret is configured) and syncs the throw log at `/api/sync`, both for potters signed in with Cloudflare Access.
 
