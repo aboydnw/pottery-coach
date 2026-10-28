@@ -8,8 +8,10 @@ const SRGB_TO_LINEAR = Float32Array.from({ length: 256 }, (_, value) => {
 let canvas: OffscreenCanvas | null = null;
 let context: OffscreenCanvasRenderingContext2D | null = null;
 
-/** Reads a bitmap's pixels and converts them to CIE L*a*b* (D65), reusing one canvas across frames. */
-export function bitmapToLab(bitmap: ImageBitmap): LabImage {
+export type BitmapPixels = { width: number; height: number; rgba: Uint8ClampedArray; lab: LabImage };
+
+/** Reads a bitmap once and returns both its original RGBA pixels and CIE L*a*b* conversion. */
+export function bitmapToPixels(bitmap: ImageBitmap): BitmapPixels {
   const { width, height } = bitmap;
   if (!canvas || !context || canvas.width !== width || canvas.height !== height) {
     canvas = new OffscreenCanvas(width, height);
@@ -17,7 +19,13 @@ export function bitmapToLab(bitmap: ImageBitmap): LabImage {
     if (!context) throw new Error("OffscreenCanvas 2D context unavailable");
   }
   context.drawImage(bitmap, 0, 0);
-  return rgbaToLab(context.getImageData(0, 0, width, height).data, width, height);
+  const rgba = context.getImageData(0, 0, width, height).data;
+  return { width, height, rgba, lab: rgbaToLab(rgba, width, height) };
+}
+
+/** Compatibility wrapper for callers that do not need exportable source pixels. */
+export function bitmapToLab(bitmap: ImageBitmap): LabImage {
+  return bitmapToPixels(bitmap).lab;
 }
 
 /** Converts packed 8-bit RGBA pixels to a packed L*a*b* float array. */

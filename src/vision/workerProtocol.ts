@@ -23,10 +23,22 @@ export type DiagnosticResponse = {
   error?: string;
 };
 
+export type DatasetFrameCapture = {
+  captureId: string;
+  width: number;
+  height: number;
+  rgba: Uint8ClampedArray;
+  automaticMask: Uint8Array;
+  segmentationVersion: string;
+  calibrationId: string;
+  wheelDiameterMm: number | null;
+};
+
 export type MeasurementWorkerRequest =
   | { type: "scale"; scale: SessionScale | null; imageCenterlineX?: number }
   | FrameRequest
   | { type: "reset"; reason: string }
+  | { type: "request-dataset-capture"; captureId: string }
   /** Restores an empty-wheel background learned before a restart, so a pot already on the wheel isn't mistaken for background. */
   | { type: "background"; model: BackgroundModel };
 
@@ -35,6 +47,7 @@ export type MeasurementWorkerEvent =
   | { type: "wobble"; reading: WobbleReading }
   | DiagnosticResponse
   | { type: "invalidated"; reason: string }
+  | { type: "dataset-capture"; capture: DatasetFrameCapture }
   /** The empty-wheel background is learned; the potter can put their clay on. */
   | { type: "background-ready"; model: BackgroundModel };
 
