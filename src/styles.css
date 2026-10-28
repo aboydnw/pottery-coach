@@ -929,3 +929,64 @@ button.link-button {
   min-height: 3rem;
   padding: 0;
 }
+
+.dataset-workspace {
+  display: grid;
+  gap: 0.75rem;
+  margin-top: 1.5rem;
+  border: 2px dashed #9d721e;
+  border-radius: 1rem;
+  padding: 1rem;
+  background: #fff3cf;
+}
+
+.dataset-workspace h3,
+.dataset-workspace p {
+  margin: 0;
+}
+
+.dataset-workspace ul {
+  display: grid;
+  gap: 0.5rem;
+  margin: 0;
+  padding-left: 1.5rem;
+}
+
+.dataset-workspace li button {
+  margin-left: 0.75rem;
+}
+
+.clay-mask-editor {
+  display: grid;
+  gap: 0.75rem;
+  border-radius: 0.75rem;
+  padding: 0.75rem;
+  background: #27231f;
+  color: #fffaf3;
+}
+
+.clay-mask-editor canvas {
+  width: 100%;
+  max-height: min(55vh, 32rem);
+  border: 1px solid rgb(255 255 255 / 35%);
+  border-radius: 0.5rem;
+  background: #111;
+  image-rendering: auto;
+  touch-action: none;
+}
+
+.clay-mask-editor-tools,
+.clay-mask-editor-decisions,
+.clay-mask-editor fieldset {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.clay-mask-editor fieldset label {
+  min-height: 2.75rem;
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+}

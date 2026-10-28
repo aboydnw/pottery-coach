@@ -6,6 +6,7 @@ export type CaptureCondition =
 export type CaptureRights = "tester-owned" | "licensed-external";
 
 export type EncodedMask = { encoding: "value-runs-v1"; runs: number[] };
+export type DatasetCalibrationGeometry = import("../workerProtocol").DatasetCalibrationGeometry;
 
 export type ClayDatasetExampleV1 = {
   schemaVersion: typeof CLAY_DATASET_SCHEMA;
@@ -18,7 +19,8 @@ export type ClayDatasetExampleV1 = {
   correctedMask: EncodedMask | null;
   verdict: ReviewVerdict;
   calibrationId: string;
-  wheelDiameterMm: number;
+  wheelDiameterMm: number | null;
+  calibrationGeometry: DatasetCalibrationGeometry | null;
   segmentationVersion: string;
   conditions: CaptureCondition[];
   rights: CaptureRights;

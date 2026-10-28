@@ -10,7 +10,9 @@ export function DatasetControls({ testing, count, onExport, onDeleteAll }: Props
   return (
     <section aria-labelledby="dataset-controls-title">
       <h3 id="dataset-controls-title">Local clay detection test data</h3>
-      <p>{count} reviewed examples stored on this device. Nothing uploads automatically.</p>
+      <p>
+        {count} reviewed {count === 1 ? "example" : "examples"} stored on this device. Nothing uploads automatically.
+      </p>
       <button type="button" disabled={count === 0} onClick={onExport}>
         Export test data
       </button>

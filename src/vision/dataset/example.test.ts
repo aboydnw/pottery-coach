@@ -12,6 +12,7 @@ const input = {
   verdict: "corrected" as const,
   calibrationId: "cal-1",
   wheelDiameterMm: 355.6,
+  calibrationGeometry: null,
   segmentationVersion: "background-v1",
   conditions: ["wet-clay"] as const,
   rights: "tester-owned" as const,

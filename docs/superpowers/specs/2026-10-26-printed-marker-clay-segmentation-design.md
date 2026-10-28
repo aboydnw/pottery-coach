@@ -167,6 +167,12 @@ External stills or video frames require an explicit compatible license or docume
 
 The corpus is split by recording session, not by individual frame, to prevent nearly identical neighboring frames from appearing in both training and evaluation sets. The evaluation split is immutable once used for a model comparison.
 
+### Collecting examples in the browser
+
+Append `?dataset=1` to the app URL (or `&dataset=1` when another query option is already present), start a session, and open Settings. After the app has learned the empty wheel, **Capture training example** takes one deliberate processed frame. Review the yellow automatic mask, paint missing clay, erase false positives, add relevant condition tags, and classify the result. Do not collect a burst of nearly identical frames; vary the piece, throwing stage, clay body, lighting, camera position, hands, and tools.
+
+Reviewed examples stay in IndexedDB on that browser and device. The tester can delete individual examples, delete the full local collection, or explicitly export a versioned NDJSON file. Nothing uploads automatically. An exported file is evidence for the offline training pipeline, not automatic permission to train: tester-owned captures and externally licensed material must still be reviewed for consent and rights before inclusion in a frozen dataset version.
+
 ## Training and model promotion
 
 Training runs outside the product. Transfer learning starts from a compact mobile segmentation backbone. Augmentation may vary brightness, contrast, blur, compression, crop, and modest perspective, but must not create physically impossible silhouettes.

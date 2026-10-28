@@ -12,6 +12,7 @@ const capture: DatasetFrameCapture = {
   segmentationVersion: "background-v1",
   calibrationId: "cal-1",
   wheelDiameterMm: 350,
+  calibrationGeometry: null,
 };
 
 it("resolves only the matching one-shot capture", async () => {
@@ -25,18 +26,22 @@ it("resolves only the matching one-shot capture", async () => {
 it("rejects concurrent requests", async () => {
   const requests = new DatasetCaptureRequests(() => "capture-1", 5_000);
   const first = requests.request();
-  const rejected = expect(first.promise).rejects.toThrow(/stopped/i);
+  const rejected = first.promise.catch((error: unknown) => error);
   expect(() => requests.request()).toThrow(/already pending/i);
   requests.rejectPending("stopped");
-  await rejected;
+  const error = await rejected;
+  expect(error).toBeInstanceOf(Error);
+  expect((error as Error).message).toMatch(/stopped/i);
 });
 
 it("times out when no processed frame arrives", async () => {
   vi.useFakeTimers();
   const requests = new DatasetCaptureRequests(() => "capture-1", 5_000);
   const pending = requests.request();
-  const rejected = expect(pending.promise).rejects.toThrow(/timed out/i);
+  const rejected = pending.promise.catch((error: unknown) => error);
   await vi.advanceTimersByTimeAsync(5_000);
-  await rejected;
+  const error = await rejected;
+  expect(error).toBeInstanceOf(Error);
+  expect((error as Error).message).toMatch(/timed out/i);
   vi.useRealTimers();
 });

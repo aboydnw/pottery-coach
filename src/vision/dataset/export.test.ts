@@ -14,6 +14,7 @@ it("exports versioned reviewed examples without identity, voice, or precise time
     verdict: "no-clay",
     calibrationId: "cal-1",
     wheelDiameterMm: 355.6,
+    calibrationGeometry: null,
     segmentationVersion: "background-v1",
     conditions: ["empty-wheel"],
     rights: "tester-owned",

@@ -129,7 +129,7 @@ function processFrame(request: FrameRequest): void {
   const instantaneous = handsLikely ? withHands(measured) : { ...measured, handsLikely };
   // Hands-on frames would drag the steady reading towards the hands, so they don't feed it.
   post({ type: "reading", instantaneous, stable: handsLikely ? null : temporalFilter.push(instantaneous) });
-  emitPendingDatasetCapture(pixels, segmentation);
+  emitPendingDatasetCapture(pixels, segmentation, pose);
   if (handsLikely) return;
   // Wobble thresholds are physical sizes, so oscillation is only tracked once a scale exists.
   const instantaneousMm = toMm(instantaneous, scale);
@@ -150,6 +150,7 @@ function processFrame(request: FrameRequest): void {
 function emitPendingDatasetCapture(
   pixels: BitmapPixels,
   segmentation: ReturnType<typeof segmentVessel>,
+  pose: WheelViewPose | null,
 ): void {
   if (!pendingDatasetCaptureId) return;
   const captureId = pendingDatasetCaptureId;
@@ -163,6 +164,15 @@ function emitPendingDatasetCapture(
     segmentationVersion: segmentation.modelVersion ?? "background-v1",
     calibrationId: scale?.calibrationId ?? "uncalibrated",
     wheelDiameterMm: scale?.boardPose?.wheelDiameterMm ?? null,
+    calibrationGeometry: pose
+      ? {
+          wheelCenterImage: pose.wheelCenterImage,
+          projectedVerticalImage: pose.projectedVerticalImage,
+          supportedRegionImage: pose.supportedRegionImage,
+          wheelPlaneMmPerMajorPixel: pose.wheelPlaneMmPerMajorPixel,
+          estimatedErrorMm95: pose.estimatedErrorMm95,
+        }
+      : null,
   };
   post({ type: "dataset-capture", capture }, [capture.rgba.buffer, capture.automaticMask.buffer]);
 }

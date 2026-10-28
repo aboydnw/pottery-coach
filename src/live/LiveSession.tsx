@@ -27,6 +27,8 @@ import { GoalProgress } from "../targets/GoalProgress";
 import { loadTemplates } from "../targets/loadTemplates";
 import { ProfileOverlay } from "../targets/ProfileOverlay";
 import { useMeasurementPipeline } from "../vision/useMeasurementPipeline";
+import { DatasetWorkspace } from "../vision/dataset/DatasetWorkspace";
+import { createDatasetSessionGroupId, isDatasetTestingMode } from "../vision/dataset/testingMode";
 import type { ToolDependencies } from "../voice/tools/types";
 import type { Caption } from "../voice/useVoiceSession";
 import { NOTICES, speakNotice } from "../voice/spokenNotice";
@@ -134,6 +136,8 @@ export function LiveSession(props: LiveSessionProps) {
   const [wheelPhase, setWheelPhase] = useState<WheelPhase>("learning");
   const [cueToast, setCueToast] = useState<string | null>(null);
   const [historyKey, setHistoryKey] = useState(0);
+  const [datasetSessionGroupId] = useState(createDatasetSessionGroupId);
+  const datasetTesting = isDatasetTestingMode();
   const wheelPhaseRef = useRef<WheelPhase>("learning");
   const announceWheelRef = useRef(false);
   const demoTimerRef = useRef<number | null>(null);
@@ -706,6 +710,13 @@ export function LiveSession(props: LiveSessionProps) {
           <NotesPanel notes={props.lastingNotes} onForget={props.onForgetNote} />
           {/* A new key remounts the panel, which reloads the log after a piece is saved. */}
           <HistoryPanel key={historyKey} throwLog={props.throwLog} />
+          {datasetTesting && (
+            <DatasetWorkspace
+              backgroundReady={pipeline.backgroundReady}
+              captureFrame={pipeline.captureDatasetFrame}
+              sessionGroupId={datasetSessionGroupId}
+            />
+          )}
           {camera.active && <DiagnosticsPanel sample={pipeline.sample} />}
         </section>
       )}

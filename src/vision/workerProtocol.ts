@@ -32,6 +32,15 @@ export type DatasetFrameCapture = {
   segmentationVersion: string;
   calibrationId: string;
   wheelDiameterMm: number | null;
+  calibrationGeometry: DatasetCalibrationGeometry | null;
+};
+
+export type DatasetCalibrationGeometry = {
+  wheelCenterImage: { x: number; y: number };
+  projectedVerticalImage: { x: number; y: number };
+  supportedRegionImage: { x: number; y: number; width: number; height: number };
+  wheelPlaneMmPerMajorPixel: number;
+  estimatedErrorMm95: number;
 };
 
 export type MeasurementWorkerRequest =

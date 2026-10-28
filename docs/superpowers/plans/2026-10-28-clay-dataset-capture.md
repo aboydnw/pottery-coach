@@ -24,6 +24,7 @@
 ### Task 1: One-shot worker capture
 
 **Files:**
+
 - Modify: `src/vision/lab.ts`
 - Test: `src/vision/lab.test.ts`
 - Modify: `src/vision/workerProtocol.ts`
@@ -33,6 +34,7 @@
 - Test: `src/vision/useMeasurementPipeline.test.tsx`
 
 **Interfaces:**
+
 - Consumes: the existing processed `ImageBitmap`, calibrated scale, and `segmentVessel` result.
 - Produces: `DatasetFrameCapture`, worker request `{ type: "request-dataset-capture"; captureId: string }`, event `{ type: "dataset-capture"; capture: DatasetFrameCapture }`, and `captureDatasetFrame(): Promise<DatasetFrameCapture>`.
 
@@ -78,6 +80,7 @@ git commit -m "feat: capture exact clay segmentation frames"
 ### Task 2: Local dataset repository and image encoding
 
 **Files:**
+
 - Create: `src/vision/dataset/DatasetRepository.ts`
 - Test: `src/vision/dataset/DatasetRepository.test.ts`
 - Create: `src/vision/dataset/frameImage.ts`
@@ -85,6 +88,7 @@ git commit -m "feat: capture exact clay segmentation frames"
 - Modify: `src/vision/dataset/types.ts`
 
 **Interfaces:**
+
 - Consumes: `ClayDatasetExampleV1` and captured RGBA.
 - Produces: `DatasetRepository.list/add/delete/clear/count`, `rgbaToWebpDataUrl(capture)`, and stable local insertion ordering.
 
@@ -127,6 +131,7 @@ git commit -m "feat: persist reviewed clay examples locally"
 ### Task 3: Clay mask correction editor
 
 **Files:**
+
 - Create: `src/vision/dataset/maskEditing.ts`
 - Test: `src/vision/dataset/maskEditing.test.ts`
 - Create: `src/vision/dataset/ClayMaskEditor.tsx`
@@ -134,6 +139,7 @@ git commit -m "feat: persist reviewed clay examples locally"
 - Modify: `src/styles.css`
 
 **Interfaces:**
+
 - Consumes: `DatasetFrameCapture`, initial automatic mask, review verdict, and condition tags.
 - Produces: `paintMask(mask, point, radius, value)`, `ClayMaskEditor` callbacks `onSave({ verdict, correctedMask, conditions })` and `onCancel()`.
 
@@ -184,6 +190,7 @@ git commit -m "feat: add clay outline correction editor"
 ### Task 4: Opt-in dataset workspace in the live session
 
 **Files:**
+
 - Create: `src/vision/dataset/testingMode.ts`
 - Test: `src/vision/dataset/testingMode.test.ts`
 - Create: `src/vision/dataset/DatasetWorkspace.tsx`
@@ -194,6 +201,7 @@ git commit -m "feat: add clay outline correction editor"
 - Modify: `src/live/LiveSession.test.tsx`
 
 **Interfaces:**
+
 - Consumes: `pipeline.captureDatasetFrame`, confirmed calibration/diameter, `DatasetRepository`, and existing JSONL exporter.
 - Produces: `isDatasetTestingMode(search)`, session-grouped reviewed examples, local count, capture/editor flow, download, individual deletion, and clear-all confirmation.
 
@@ -241,6 +249,7 @@ git commit -m "feat: wire local clay dataset capture into testing mode"
 ### Task 5: End-to-end journey, documentation, and PR verification
 
 **Files:**
+
 - Create: `tests/e2e/clay-dataset.spec.ts`
 - Modify: `README.md`
 - Modify: `docs/privacy-notice.md`
@@ -248,6 +257,7 @@ git commit -m "feat: wire local clay dataset capture into testing mode"
 - Modify: `docs/superpowers/specs/2026-10-26-printed-marker-clay-segmentation-design.md`
 
 **Interfaces:**
+
 - Consumes: the completed opt-in workspace.
 - Produces: a browser journey proving normal-mode absence and dataset-mode capture/review/count behavior, plus tester instructions.
 

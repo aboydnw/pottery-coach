@@ -27,6 +27,7 @@ export function createDatasetExample(input: ClayDatasetExampleInput): ClayDatase
     verdict: input.verdict,
     calibrationId: input.calibrationId,
     wheelDiameterMm: input.wheelDiameterMm,
+    calibrationGeometry: input.calibrationGeometry ? structuredClone(input.calibrationGeometry) : null,
     segmentationVersion: input.segmentationVersion,
     conditions: [...input.conditions],
     rights: input.rights,
