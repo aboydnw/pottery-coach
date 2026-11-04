@@ -24,7 +24,12 @@ export function mmPerPixelOf(calibration: CalibrationResult): number {
 
 /** The session scale an accepted calibration provides, or null when it carries no real-world size. */
 export function scaleFromCalibration(calibration: CalibrationResult, confirmedAtMs = Date.now()): SessionScale | null {
-  if (calibration.method === "none" || calibration.status !== "accepted") return null;
+  if (
+    calibration.method === "none" ||
+    calibration.status !== "accepted" ||
+    calibration.wheelViewPose?.metricUnsupportedReason
+  )
+    return null;
   return {
     mmPerPixel: mmPerPixelOf(calibration),
     method: calibration.method,

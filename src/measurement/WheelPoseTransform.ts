@@ -27,6 +27,7 @@ export function createWheelPoseTransform(pose: WheelViewPose): MeasurementTransf
   };
   return {
     imageToWheel(point) {
+      if (pose.metricUnsupportedReason) return null;
       if (!inRegion(point)) return null;
       return {
         radialMm: dot(point, pose.majorAxisImage) * pose.wheelPlaneMmPerMajorPixel,
@@ -34,10 +35,12 @@ export function createWheelPoseTransform(pose: WheelViewPose): MeasurementTransf
       };
     },
     radiusAt(left, right) {
+      if (pose.metricUnsupportedReason) return null;
       const span = Math.abs((right.x - left.x) * pose.majorAxisImage.x + (right.y - left.y) * pose.majorAxisImage.y);
       return (span * pose.wheelPlaneMmPerMajorPixel) / 2;
     },
     estimatedErrorMm95At(point) {
+      if (pose.metricUnsupportedReason) return Number.POSITIVE_INFINITY;
       const heightMm = Math.abs(dot(point, pose.projectedVerticalImage) * verticalScale);
       return pose.estimatedErrorMm95 + heightMm * (1 - pose.confidence) * 0.1;
     },

@@ -60,6 +60,8 @@ export function useMeasurementPipeline(callbacks: MeasurementCallbacks = {}) {
     if (typeof Worker === "undefined" || typeof createImageBitmap !== "function") return;
     const worker = new Worker(new URL("./measurement.worker.ts", import.meta.url), { type: "module" });
     worker.addEventListener("message", (event: MessageEvent<MeasurementWorkerEvent>) => {
+      // Ignore queued output from a worker replaced or stopped during calibration/background reset.
+      if (pipelineRef.current?.worker !== worker) return;
       const message = event.data;
       if (message?.type === "background-ready") {
         backgroundRef.current = message.model;

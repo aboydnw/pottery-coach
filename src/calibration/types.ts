@@ -35,6 +35,8 @@ export type CalibrationResult = {
   id: string;
   /** How scale was established: printed board, wheel-head diameter, or none (shape-only). */
   method: CalibrationMethod;
+  /** Absent on legacy upright-board records. A flat wheel board expects projective scale variation. */
+  boardPlacement?: "wheel-plane";
   createdAtMs: number;
   status: "accepted" | "manual-review" | "rejected";
   homographyImageToMm: [number, number, number, number, number, number, number, number, number];
@@ -70,6 +72,7 @@ export type CalibrationBoard = {
 };
 
 export type CalibrationFrame = {
+  boardPlacement?: "wheel-plane";
   width: number;
   height: number;
   roi: { x: number; y: number; width: number; height: number };

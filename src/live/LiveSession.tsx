@@ -59,7 +59,7 @@ function waitForCalibrationSample(): Promise<void> {
 }
 
 /** Where the empty-wheel snapshot is at: learning it, learned (clay can go on), or waiting for the wheel to clear. */
-type WheelPhase = "learning" | "ready" | "awaiting-empty" | "placed";
+type WheelPhase = "learning" | "ready" | "awaiting-empty" | "removing-page" | "placed";
 
 export type LiveSessionProps = {
   setup: SetupStore;
@@ -124,6 +124,9 @@ export function LiveSession(props: LiveSessionProps) {
   const [scale, setScaleState] = useState<SessionScale | null>(null);
   const [boardMode, setBoardMode] = useState(true);
   const [boardCandidate, setBoardCandidate] = useState<CalibrationResult | null>(null);
+  const [pendingBoard, setPendingBoard] = useState<CalibrationResult | null>(null);
+  const pendingBoardRef = useRef<CalibrationResult | null>(null);
+  const boardAttemptRef = useRef(0);
   const [detector, setDetector] = useState<WasmTagDetector | null>(null);
   const [busy, setBusy] = useState(false);
   const [problem, setProblem] = useState<string | null>(null);
@@ -186,6 +189,13 @@ export function LiveSession(props: LiveSessionProps) {
   }, []);
 
   useEffect(() => () => detector?.dispose(), [detector]);
+
+  useEffect(
+    () => () => {
+      boardAttemptRef.current += 1;
+    },
+    [],
+  );
 
   useEffect(
     () => () => {
@@ -276,6 +286,11 @@ export function LiveSession(props: LiveSessionProps) {
   const resumeTriedRef = useRef(false);
   useEffect(() => {
     if (!camera.interrupted) return;
+    boardAttemptRef.current += 1;
+    pendingBoardRef.current = null;
+    setPendingBoard(null);
+    setBoardCandidate(null);
+    setBusy(false);
     if (liveWheelActive) stopLiveWheel();
     if (scale) applyScale(null);
     setup.setCalibration("none");
@@ -306,11 +321,16 @@ export function LiveSession(props: LiveSessionProps) {
     const settings = await camera.start();
     if (!settings) return false;
     props.onCameraReady();
-    if (!cameraOnly && videoRef.current) pipeline.start(videoRef.current);
+    if (!cameraOnly && videoRef.current && !pendingBoardRef.current) pipeline.start(videoRef.current);
     return true;
   }
 
   async function switchCamera(): Promise<void> {
+    boardAttemptRef.current += 1;
+    pendingBoardRef.current = null;
+    setPendingBoard(null);
+    setBoardCandidate(null);
+    setBusy(false);
     liveWheel.stop();
     const settings = await camera.switchFacing();
     if (!settings) return;
@@ -394,12 +414,14 @@ export function LiveSession(props: LiveSessionProps) {
     }
     setBusy(true);
     setProblem(null);
+    const attempt = ++boardAttemptRef.current;
     try {
       const active = detector ?? new WasmTagDetector();
       if (!detector) setDetector(active);
       const accumulator = new BoardCalibrationAccumulator();
       for (let index = 0; index < 5; index += 1) {
         const result = await calibrateFromVideo(video, active, diameterMm);
+        if (attempt !== boardAttemptRef.current) return;
         accumulator.add({ capturedAtMs: performance.now(), result });
         if (index < 4) await waitForCalibrationSample();
       }
@@ -412,19 +434,44 @@ export function LiveSession(props: LiveSessionProps) {
           : { ...stable, status: "rejected", reasons: [...stable.reasons, ...diameterProblems] },
       );
     } catch (error) {
+      if (attempt !== boardAttemptRef.current) return;
       setProblem(
         `Calibration failed: ${error instanceof Error ? error.message : "keep all four tags visible and retry."}`,
       );
     } finally {
-      setBusy(false);
+      if (attempt === boardAttemptRef.current) setBusy(false);
     }
   }
 
   function acceptBoard(accepted: CalibrationResult): void {
     setBoardCandidate(null);
+    pendingBoardRef.current = accepted;
+    setPendingBoard(accepted);
+    // The previous background contains the printed page. Do not learn or measure until removal
+    // is confirmed; otherwise the removed sheet becomes a persistent false clay silhouette.
+    pipeline.stop();
+    applyScale(null);
+    setup.setCalibration("checking");
+    setPhase("removing-page");
+  }
+
+  function learnAfterPageRemoval(): void {
+    const accepted = pendingBoardRef.current;
+    const video = videoRef.current;
+    if (!accepted || !video || !camera.active || camera.interrupted) return;
+    pendingBoardRef.current = null;
+    setPendingBoard(null);
     setBoardMode(false);
-    applyScale(scaleFromCalibration(accepted), accepted.imageCenterlineX);
-    setup.setCalibration("confirmed");
+    setPhase("learning");
+    announceWheelRef.current = true;
+    if (!cameraOnly) pipeline.start(video, { freshBackground: true });
+    const nextScale = scaleFromCalibration(accepted);
+    applyScale(nextScale, accepted.imageCenterlineX);
+    setup.setCalibration(nextScale ? "confirmed" : "skipped");
+    if (!nextScale)
+      setProblem(
+        "The page was located, but this camera perspective cannot yet support reliable vessel sizes. Continue in shape-only mode, or restart with the phone farther away. Keep the full page visible.",
+      );
   }
 
   function loadDemo(): void {
@@ -471,8 +518,20 @@ export function LiveSession(props: LiveSessionProps) {
 
   const calibrationArea = (
     <div className="calibration-area">
-      {problem && <p role="alert">{problem}</p>}
-      {liveWheel.active ? null : boardCandidate ? (
+      {problem && (
+        <p role="alert" aria-label="Calibration guidance">
+          {problem}
+        </p>
+      )}
+      {pendingBoard ? (
+        <section aria-labelledby="remove-page-title">
+          <h3 id="remove-page-title">Remove the printed page</h3>
+          <p>Keep the phone still. Remove the page, clay, hands, and tools so only the empty wheel remains.</p>
+          <button type="button" onClick={learnAfterPageRemoval}>
+            Page removed, learn empty wheel
+          </button>
+        </section>
+      ) : liveWheel.active ? null : boardCandidate ? (
         <CalibrationFlow
           result={boardCandidate}
           onAccepted={acceptBoard}
@@ -504,14 +563,14 @@ export function LiveSession(props: LiveSessionProps) {
             <button type="button" className="secondary" onClick={skipWheel}>
               Skip sizes (shape only)
             </button>
-            {demoMode && (
-              <button type="button" className="secondary" onClick={loadDemo}>
-                Load deterministic demo calibration
-              </button>
-            )}
           </section>
         )
       ) : null}
+      {demoMode && !pendingBoard && !boardCandidate && !liveWheel.active && slots.calibration !== "confirmed" && (
+        <button type="button" className="secondary" onClick={loadDemo}>
+          Load deterministic demo calibration
+        </button>
+      )}
     </div>
   );
 

@@ -18,9 +18,7 @@ export function boardPoseFromCalibration(
   const imageFromBoard = invert(result.homographyImageToMm);
   const centerBoard = { x: BOARD_V1.widthMm / 2, y: BOARD_V1.heightMm / 2 };
   const center = applyHomography(imageFromBoard, centerBoard);
-  const boardUp = applyHomography(imageFromBoard, { x: centerBoard.x, y: centerBoard.y - 20 });
-  const length = Math.hypot(boardUp.x - center.x, boardUp.y - center.y) || 1;
-  const projectedVerticalImage = { x: (boardUp.x - center.x) / length, y: (boardUp.y - center.y) / length };
+  const { projectedVerticalImage } = wheelViewPoseFromBoardCalibration(result);
   return {
     boardRevision: "board-v1",
     wheelCenterImage: center,
@@ -33,7 +31,8 @@ export function boardPoseFromCalibration(
 }
 
 /**
- * Uses the two known board axes as the projected axes of the horizontal wheel plane. This is a
+ * Uses the principal axes of the local board-to-image Jacobian, not the printed page axes, so
+ * turning the page on the wheel does not change the inferred scale or camera tilt. This is a
  * weak-perspective pose, not full camera-intrinsic recovery, so the physical device gate remains
  * authoritative for the error bound.
  */
@@ -41,28 +40,51 @@ export function wheelViewPoseFromBoardCalibration(result: CalibrationResult): Wh
   const imageFromBoard = invert(result.homographyImageToMm);
   const centerBoard = { x: BOARD_V1.widthMm / 2, y: BOARD_V1.heightMm / 2 };
   const center = applyHomography(imageFromBoard, centerBoard);
-  const alongX = applyHomography(imageFromBoard, { x: centerBoard.x + 20, y: centerBoard.y });
-  const alongY = applyHomography(imageFromBoard, { x: centerBoard.x, y: centerBoard.y + 20 });
-  const xVector = { x: alongX.x - center.x, y: alongX.y - center.y };
-  const yVector = { x: alongY.x - center.x, y: alongY.y - center.y };
-  const xLength = Math.hypot(xVector.x, xVector.y);
-  const yLength = Math.hypot(yVector.x, yVector.y);
-  if (xLength < 1e-6 || yLength < 1e-6) throw new Error("Board axes are too small to derive camera pose");
-  const majorAxisImage = { x: xVector.x / xLength, y: xVector.y / xLength };
-  const minorAxisImage = { x: yVector.x / yLength, y: yVector.y / yLength };
+  const denominator = imageFromBoard[6] * centerBoard.x + imageFromBoard[7] * centerBoard.y + imageFromBoard[8];
+  // Reject a projective horizon crossing the printed page rather than accepting an invalid plane.
+  for (const x of [0, BOARD_V1.widthMm]) {
+    for (const y of [0, BOARD_V1.heightMm]) {
+      const cornerDenominator = imageFromBoard[6] * x + imageFromBoard[7] * y + imageFromBoard[8];
+      if (!Number.isFinite(cornerDenominator) || cornerDenominator * denominator <= 0)
+        throw new Error("The printed page crosses the camera plane");
+    }
+  }
+  const a = (imageFromBoard[0] - center.x * imageFromBoard[6]) / denominator;
+  const b = (imageFromBoard[1] - center.x * imageFromBoard[7]) / denominator;
+  const c = (imageFromBoard[3] - center.y * imageFromBoard[6]) / denominator;
+  const d = (imageFromBoard[4] - center.y * imageFromBoard[7]) / denominator;
+  // Eigenvectors of J Jᵀ give image axes; square-root eigenvalues give pixels per millimetre.
+  const xx = a * a + b * b;
+  const xy = a * c + b * d;
+  const yy = c * c + d * d;
+  const discriminant = Math.hypot(xx - yy, 2 * xy);
+  const majorScale = Math.sqrt((xx + yy + discriminant) / 2);
+  const minorScale = Math.sqrt(Math.max(0, (xx + yy - discriminant) / 2));
+  if (!Number.isFinite(majorScale) || minorScale < 1e-6)
+    throw new Error("Board axes are too small to derive camera pose");
+  const rotation = Math.atan2(2 * xy, xx - yy) / 2;
+  const majorAxisImage = { x: Math.cos(rotation), y: Math.sin(rotation) };
+  const minorAxisImage = { x: -majorAxisImage.y, y: majorAxisImage.x };
   const projectedVerticalImage =
     minorAxisImage.y >= 0 ? { x: -minorAxisImage.x, y: -minorAxisImage.y } : minorAxisImage;
-  const downwardAngleRad = Math.acos(clamp(yLength / xLength, 0, 1));
+  const downwardAngleRad = Math.acos(clamp(minorScale / majorScale, 0, 1));
   const reasons: string[] = [];
   if (downwardAngleRad < (15 * Math.PI) / 180) reasons.push("VIEW_TOO_SHALLOW");
   if (downwardAngleRad > (75 * Math.PI) / 180) reasons.push("VIEW_TOO_STEEP");
+  if (Math.abs(rotation) > (12 * Math.PI) / 180) reasons.push("VIEW_OFF_AXIS");
+  if (center.y - result.roiImage.y < result.roiImage.height * 0.35) reasons.push("WORKING_REGION_CLIPPED");
   return {
     wheelCenterImage: center,
+    // A homography corrects the printed plane, not the vessel above it. Keep the existing
+    // weak-perspective limit for sizes until intrinsics/physical tests support a wider model.
+    ...(result.quality.scaleVariationFraction > 0.02
+      ? { metricUnsupportedReason: "BOARD_PERSPECTIVE_UNSUPPORTED" as const }
+      : {}),
     majorAxisImage,
     minorAxisImage,
     projectedVerticalImage,
     downwardAngleRad,
-    wheelPlaneMmPerMajorPixel: 20 / xLength,
+    wheelPlaneMmPerMajorPixel: 1 / majorScale,
     supportedRegionImage: {
       x: result.roiImage.x,
       y: result.roiImage.y,

@@ -2,6 +2,8 @@ import type { Point2 } from "./types";
 import { canonicalWheelEllipse, type WheelEllipse } from "./wheelEllipse";
 
 export type WheelViewPose = {
+  /** The board plane may be located even when the vessel's off-plane metric model is unsupported. */
+  metricUnsupportedReason?: "BOARD_PERSPECTIVE_UNSUPPORTED";
   wheelCenterImage: Point2;
   majorAxisImage: Point2;
   minorAxisImage: Point2;

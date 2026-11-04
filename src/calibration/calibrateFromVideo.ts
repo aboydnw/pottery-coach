@@ -2,6 +2,7 @@ import { captureFrame } from "../camera/captureFrame";
 import { BOARD_V1, tagCornersMm } from "./boardV1";
 import { boardPoseFromCalibration, wheelViewPoseFromBoardCalibration } from "./boardCalibration";
 import { solveCalibration } from "./homography";
+import { validateCalibration } from "./quality";
 import type { TagDetector } from "./TagDetector";
 import type { CalibrationResult, PointCorrespondence } from "./types";
 
@@ -23,6 +24,7 @@ export async function calibrateFromVideo(
   if (correspondences.length === 0)
     throw new Error("No calibration tags were found. Keep all four tags visible and retry.");
   const result = solveCalibration(correspondences, BOARD_V1.calibration, {
+    ...(wheelDiameterMm === undefined ? {} : { boardPlacement: "wheel-plane" as const }),
     width,
     height,
     roi: { x: 0, y: 0, width, height },
@@ -31,12 +33,11 @@ export async function calibrateFromVideo(
     blurScore: 1,
     contrastScore: 1,
   });
-  return wheelDiameterMm === undefined
-    ? result
-    : {
-        ...result,
-        boardPose: boardPoseFromCalibration(result, wheelDiameterMm),
-        wheelViewPose: wheelViewPoseFromBoardCalibration(result),
-        imageCenterlineX: boardPoseFromCalibration(result, wheelDiameterMm).wheelCenterImage.x,
-      };
+  if (wheelDiameterMm === undefined) return result;
+  result.wheelViewPose = wheelViewPoseFromBoardCalibration(result);
+  result.boardPose = boardPoseFromCalibration(result, wheelDiameterMm);
+  result.imageCenterlineX = result.boardPose.wheelCenterImage.x;
+  result.reasons = validateCalibration(result);
+  result.status = result.reasons.length === 0 ? "accepted" : "rejected";
+  return result;
 }

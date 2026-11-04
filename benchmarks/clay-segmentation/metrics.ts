@@ -21,27 +21,41 @@ export function summarizeClaySegmentation(samples: ClayEvaluationSample[]): Clay
   if (samples.length === 0) throw new Error("At least one clay evaluation sample is required");
   let intersection = 0;
   let union = 0;
+  let foregroundPixels = 0;
   const boundaryErrors: number[] = [];
   const noClay = samples.filter((sample) => sample.noClay);
-  const occluded = samples.filter((sample) => sample.occludedFraction > 0.3);
+  const occluded = samples.filter((sample) => !sample.noClay && sample.occludedFraction > 0.3);
   for (const sample of samples) {
-    if (sample.truth.length !== sample.predicted.length) throw new Error("Truth and predicted masks must match");
+    if (sample.truth.length === 0 || sample.truth.length !== sample.predicted.length)
+      throw new Error("Truth and predicted masks must be nonempty and match");
+    if (!Number.isFinite(sample.latencyMs) || sample.latencyMs < 0)
+      throw new Error("Latency must be finite and nonnegative");
+    if (!Number.isFinite(sample.occludedFraction) || sample.occludedFraction < 0 || sample.occludedFraction > 1)
+      throw new Error("Occluded fraction must be finite and between zero and one");
+    if (sample.boundaryErrorsMm.some((error) => !Number.isFinite(error) || error < 0))
+      throw new Error("Boundary errors must be finite and nonnegative");
+    const hasForeground = sample.truth.some((value) => value !== 0);
+    if (sample.noClay && hasForeground) throw new Error("No-clay samples cannot contain foreground truth");
     for (let index = 0; index < sample.truth.length; index += 1) {
       const truth = sample.truth[index] !== 0;
       const predicted = sample.predicted[index] !== 0;
+      if (truth) foregroundPixels += 1;
       if (truth && predicted) intersection += 1;
       if (truth || predicted) union += 1;
     }
-    boundaryErrors.push(...sample.boundaryErrorsMm);
+    // Empty scenes cannot supply evidence about a clay boundary.
+    if (hasForeground) boundaryErrors.push(...sample.boundaryErrorsMm);
   }
+  if (foregroundPixels === 0 || boundaryErrors.length === 0 || noClay.length === 0 || occluded.length === 0)
+    throw new Error("Evaluation requires foreground, boundary, no-clay, and occlusion evidence");
   const falsePositiveScenes = noClay.filter((sample) => sample.predicted.some((value) => value !== 0)).length;
   const suppressedOcclusions = occluded.filter((sample) => sample.measurementSuppressed).length;
   return {
-    intersectionOverUnion: union === 0 ? 1 : intersection / union,
+    intersectionOverUnion: intersection / union,
     medianBoundaryErrorMm: percentile(boundaryErrors, 0.5),
     p95BoundaryErrorMm: percentile(boundaryErrors, 0.95),
-    noClayFalsePositiveRate: noClay.length === 0 ? 0 : falsePositiveScenes / noClay.length,
-    occlusionSuppressionRecall: occluded.length === 0 ? 1 : suppressedOcclusions / occluded.length,
+    noClayFalsePositiveRate: falsePositiveScenes / noClay.length,
+    occlusionSuppressionRecall: suppressedOcclusions / occluded.length,
     latencyP95Ms: percentile(
       samples.map((sample) => sample.latencyMs),
       0.95,
@@ -51,6 +65,17 @@ export function summarizeClaySegmentation(samples: ClayEvaluationSample[]): Clay
 
 export function passesClayModelGate(metrics: ClaySegmentationMetrics): boolean {
   return (
+    [
+      metrics.intersectionOverUnion,
+      metrics.medianBoundaryErrorMm,
+      metrics.p95BoundaryErrorMm,
+      metrics.noClayFalsePositiveRate,
+      metrics.occlusionSuppressionRecall,
+      metrics.latencyP95Ms,
+    ].every((value) => Number.isFinite(value) && value >= 0) &&
+    metrics.intersectionOverUnion <= 1 &&
+    metrics.occlusionSuppressionRecall <= 1 &&
+    metrics.medianBoundaryErrorMm <= metrics.p95BoundaryErrorMm &&
     metrics.intersectionOverUnion >= 0.85 &&
     metrics.medianBoundaryErrorMm <= 6 &&
     metrics.p95BoundaryErrorMm <= 12.7 &&
@@ -66,7 +91,7 @@ export function assertDisjointSessions(training: string[], evaluation: string[])
 }
 
 function percentile(values: number[], fraction: number): number {
-  if (values.length === 0) return 0;
+  if (values.length === 0) throw new Error("Percentiles require measured values");
   const sorted = [...values].sort((left, right) => left - right);
   return sorted[Math.ceil(fraction * sorted.length) - 1]!;
 }

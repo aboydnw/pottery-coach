@@ -2,13 +2,26 @@ import { act, cleanup, fireEvent, render, screen } from "@testing-library/react"
 import { afterEach, expect, it, vi } from "vitest";
 
 import { SetupStore } from "../setup/SetupStore";
+import { demoCalibration } from "../app/demoFixtures";
+import { wheelViewPoseFromBoardCalibration } from "../calibration/boardCalibration";
 import type { ToolDependencies } from "../voice/tools/types";
 import { LiveSession, type LiveSessionProps } from "./LiveSession";
 
-const { captureFrame, cameraState, wheelEllipseCalibration } = vi.hoisted(() => ({
-  captureFrame: vi.fn(() => ({ width: 10, height: 10, data: new Uint8ClampedArray(400) }) as ImageData),
-  cameraState: { interrupted: false },
-  wheelEllipseCalibration: vi.fn(() => ({ status: "rejected", reasons: [] })),
+const { captureFrame, cameraState, wheelEllipseCalibration, calibrateFromVideo, pipelineStart, pipelineStop } =
+  vi.hoisted(() => ({
+    captureFrame: vi.fn(() => ({ width: 10, height: 10, data: new Uint8ClampedArray(400) }) as ImageData),
+    cameraState: { interrupted: false },
+    wheelEllipseCalibration: vi.fn(() => ({ status: "rejected", reasons: [] })),
+    calibrateFromVideo: vi.fn(),
+    pipelineStart: vi.fn(),
+    pipelineStop: vi.fn(),
+  }));
+
+vi.mock("../calibration/calibrateFromVideo", () => ({ calibrateFromVideo }));
+vi.mock("../calibration/WasmTagDetector", () => ({
+  WasmTagDetector: class {
+    dispose() {}
+  },
 }));
 
 vi.mock("../camera/captureFrame", () => ({ captureFrame }));
@@ -42,7 +55,8 @@ vi.mock("../vision/useMeasurementPipeline", () => ({
     vesselVisible: false,
     handsLikely: false,
     sample: null,
-    start: vi.fn(),
+    start: pipelineStart,
+    stop: pipelineStop,
     resetBackground: vi.fn(),
     setScale: vi.fn(),
     injectReading: vi.fn(),
@@ -60,6 +74,9 @@ afterEach(() => {
   captureFrame.mockClear();
   wheelEllipseCalibration.mockClear();
   cameraState.interrupted = false;
+  calibrateFromVideo.mockReset();
+  pipelineStart.mockClear();
+  pipelineStop.mockClear();
 });
 
 function memoryStorage(): Storage {
@@ -227,4 +244,79 @@ it("discards the live outline and sampling state when the camera is interrupted"
   const captures = captureFrame.mock.calls.length;
   await act(async () => vi.advanceTimersByTimeAsync(600));
   expect(captureFrame).toHaveBeenCalledTimes(captures);
+});
+
+async function confirmPrintedPage(session: LiveSessionProps, calibration = demoCalibration()): Promise<void> {
+  calibrateFromVideo.mockResolvedValue(calibration);
+  fireEvent.click(screen.getByRole("button", { name: "Settings" }));
+  fireEvent.click(screen.getByRole("checkbox", { name: /printed line measures/i }));
+  fireEvent.click(screen.getByRole("button", { name: /detect printed page/i }));
+  await act(async () => vi.advanceTimersByTimeAsync(600));
+  fireEvent.click(screen.getByRole("checkbox", { name: /100 mm line measures/i }));
+  fireEvent.click(screen.getByRole("button", { name: /use calibration/i }));
+  expect(session.setup.getSnapshot().calibration).toBe("checking");
+}
+
+it("waits for page removal before learning a fresh background and enabling calibrated sizes", async () => {
+  vi.useFakeTimers();
+  const session = props();
+  render(<LiveSession {...session} />);
+  deliverCameraFrame();
+  await act(async () => Promise.resolve());
+  await confirmPrintedPage(session);
+  expect(pipelineStop).toHaveBeenCalledOnce();
+  expect(session.onScale).toHaveBeenLastCalledWith(null);
+  pipelineStart.mockClear();
+  await act(async () => vi.advanceTimersByTimeAsync(2_000));
+  expect(pipelineStart).not.toHaveBeenCalled();
+  fireEvent.click(screen.getByRole("button", { name: /page removed, learn empty wheel/i }));
+  expect(pipelineStart).toHaveBeenCalledWith(screen.getByLabelText(/camera preview/i), { freshBackground: true });
+  expect(session.setup.getSnapshot().calibration).toBe("confirmed");
+  expect(session.onScale).toHaveBeenLastCalledWith(expect.objectContaining({ calibrationId: "demo-calibration" }));
+  expect(screen.queryByRole("button", { name: /page removed/i })).toBeNull();
+});
+
+it("discards a pending board calibration when the camera is interrupted before page removal", async () => {
+  vi.useFakeTimers();
+  const session = props();
+  const view = render(<LiveSession {...session} />);
+  deliverCameraFrame();
+  await act(async () => Promise.resolve());
+  await confirmPrintedPage(session);
+  cameraState.interrupted = true;
+  view.rerender(<LiveSession {...session} />);
+  await act(async () => Promise.resolve());
+  expect(screen.queryByRole("button", { name: /page removed/i })).toBeNull();
+  expect(session.setup.getSnapshot().calibration).toBe("none");
+  expect(session.onScale).toHaveBeenLastCalledWith(null);
+});
+
+it("keeps camera-only sessions from starting measurement after page removal", async () => {
+  vi.useFakeTimers();
+  const session = props();
+  session.cameraOnly = true;
+  render(<LiveSession {...session} />);
+  deliverCameraFrame();
+  await act(async () => Promise.resolve());
+  await confirmPrintedPage(session);
+  fireEvent.click(screen.getByRole("button", { name: /page removed, learn empty wheel/i }));
+  expect(pipelineStart).not.toHaveBeenCalled();
+});
+
+it("explains shape-only fallback instead of enabling sizes for unsupported board perspective", async () => {
+  vi.useFakeTimers();
+  const session = props();
+  render(<LiveSession {...session} />);
+  deliverCameraFrame();
+  await act(async () => Promise.resolve());
+  const calibration = demoCalibration();
+  calibration.wheelViewPose = {
+    ...wheelViewPoseFromBoardCalibration(calibration),
+    metricUnsupportedReason: "BOARD_PERSPECTIVE_UNSUPPORTED",
+  };
+  await confirmPrintedPage(session, calibration);
+  fireEvent.click(screen.getByRole("button", { name: /page removed, learn empty wheel/i }));
+  expect(session.onScale).toHaveBeenLastCalledWith(null);
+  expect(session.setup.getSnapshot().calibration).toBe("skipped");
+  expect(screen.getByRole("alert", { name: "Calibration guidance" })).not.toBeNull();
 });

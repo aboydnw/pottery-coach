@@ -11,13 +11,19 @@ test("calibrates from the printed board with the real AprilTag detector and keep
 }) => {
   await startSession(page);
   await openSetup(page);
-  await page.getByRole("button", { name: /use a printed board instead/i }).click();
-  await page.getByRole("button", { name: /calibrate printed board/i }).click();
+  await expect(page.getByRole("heading", { name: /calibrate with the printed page/i })).toBeVisible();
+  await page.getByRole("checkbox", { name: /printed line measures/i }).check();
+  await page.getByRole("button", { name: /detect printed page/i }).click();
 
   await expect(page.getByRole("heading", { name: /confirm calibration/i })).toBeVisible({ timeout: 20_000 });
   await expect(page.getByRole("list", { name: /calibration problems/i })).toHaveCount(0);
   await page.getByLabel(/100 mm line/i).check();
   await page.getByRole("button", { name: /use calibration/i }).click();
+  await expect(page.getByRole("heading", { name: /remove the printed page/i })).toBeVisible();
+  await expect(page.locator(".setup-summary")).not.toContainText(/sizes are in centimetres/i);
+  // The camera fixture is static; unit coverage separately proves that only post-removal frames
+  // enter the fresh background. This journey exercises the explicit user confirmation boundary.
+  await page.getByRole("button", { name: /page removed, learn empty wheel/i }).click();
   await expect(page.locator(".setup-summary")).toContainText(/sizes are in centimetres/i);
 
   await page.locator("details.diagnostics summary").click();
