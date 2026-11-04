@@ -24,6 +24,7 @@ it("draws wheel geometry over the live feed without a copied image surface", () 
       ellipse={ellipse}
       diameterMm={355.6}
       status="steady"
+      guidance={null}
       mirrored={false}
       adjusted={false}
       canSwitch={{ inner: true, outer: false }}
@@ -52,6 +53,7 @@ it("keeps manual controls compact and confirms the adjusted live outline", () =>
       ellipse={ellipse}
       diameterMm={355.6}
       status="steady"
+      guidance={null}
       mirrored={false}
       adjusted={false}
       canSwitch={{ inner: false, outer: false }}
@@ -71,6 +73,7 @@ it("keeps manual controls compact and confirms the adjusted live outline", () =>
       ellipse={ellipse}
       diameterMm={355.6}
       status="steady"
+      guidance={null}
       mirrored={false}
       adjusted
       canSwitch={{ inner: false, outer: false }}
@@ -88,4 +91,26 @@ it("keeps manual controls compact and confirms the adjusted live outline", () =>
   expect(controls).toHaveClass("at-bottom");
   fireEvent.click(screen.getByRole("button", { name: /use this outline/i }));
   expect(onConfirm).toHaveBeenCalledWith(ellipse);
+});
+
+it("shows capture guidance ahead of generic detection status", () => {
+  render(
+    <WheelLiveOverlay
+      frameSize={{ width: 640, height: 480 }}
+      ellipse={ellipse}
+      diameterMm={355.6}
+      status="finding"
+      guidance="Move back until the whole wheel rim is visible."
+      mirrored={false}
+      adjusted={false}
+      canSwitch={{ inner: false, outer: false }}
+      onEllipseChange={vi.fn()}
+      onAdjustStart={vi.fn()}
+      onSwitch={vi.fn()}
+      onConfirm={vi.fn()}
+      onRetry={vi.fn()}
+    />,
+  );
+
+  expect(screen.getByRole("status")).toHaveTextContent(/move back until the whole wheel rim is visible/i);
 });

@@ -17,6 +17,7 @@
     "deploy:dry-run": "pnpm build && wrangler deploy --dry-run",
     "preview:worker": "pnpm build && wrangler dev",
     "benchmark:camera": "tsx benchmarks/camera/run.ts",
+    "benchmark:wheel-detection": "tsx benchmarks/camera/wheelEllipse.ts",
     "benchmark:tags": "tsx benchmarks/tags/run.ts",
     "benchmark:dimensions": "tsx benchmarks/dimensions/run.ts",
     "benchmark:segmentation": "tsx benchmarks/segmentation/run.ts",

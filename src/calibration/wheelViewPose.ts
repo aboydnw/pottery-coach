@@ -36,6 +36,16 @@ export function deriveWheelViewPose(
   const wheelTop = Math.max(0, ellipse.centerY - ellipse.radiusMinor);
   const region = { x: 0, y: 0, width: frame.width, height: wheelTop };
   const reasons: string[] = [];
+  const cosine = Math.cos(ellipse.rotationRad);
+  const sine = Math.sin(ellipse.rotationRad);
+  const extentX = Math.hypot(ellipse.radiusMajor * cosine, ellipse.radiusMinor * sine);
+  const extentY = Math.hypot(ellipse.radiusMajor * sine, ellipse.radiusMinor * cosine);
+  const rimInsideFrame =
+    ellipse.centerX - extentX >= 0 &&
+    ellipse.centerX + extentX <= frame.width &&
+    ellipse.centerY - extentY >= 0 &&
+    ellipse.centerY + extentY <= frame.height;
+  if (!rimInsideFrame) reasons.push("WHEEL_RIM_INCOMPLETE");
   if (ellipse.visibleArcFraction < MIN_VISIBLE_ARC) reasons.push("WHEEL_RIM_INCOMPLETE");
   if (region.height < frame.height * MIN_WORKING_HEIGHT_FRACTION) reasons.push("WORKING_REGION_CLIPPED");
   if (angle < MIN_DOWNWARD_ANGLE_RAD) reasons.push("VIEW_TOO_SHALLOW");
