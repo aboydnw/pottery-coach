@@ -58,7 +58,45 @@ function renderWheelScene(options: SceneOptions = {}) {
   return { gray, width, height };
 }
 
+function addDenseTexture(scene: ReturnType<typeof renderWheelScene>, axis: "rows" | "columns") {
+  for (let y = Math.floor(scene.height * 0.3); y < scene.height; y += 1) {
+    for (let x = 0; x < scene.width; x += 1) {
+      const textured = axis === "rows" ? x < 48 || x > 282 : y < 260;
+      if (textured) scene.gray[y * scene.width + x] = (Math.floor(x / 2) + Math.floor(y / 2)) % 2 ? 40 : 220;
+    }
+  }
+}
+
 describe("wheel-rim scenes", () => {
+  it.each(
+    (["rows", "columns"] as const).flatMap((axis) =>
+      [
+        { background: 70, rim: 190 },
+        { background: 190, rim: 65 },
+        { background: 112, rim: 142 },
+      ].map((contrast) => ({ axis, ...contrast })),
+    ),
+  )(
+    "preserves rim evidence beside dense texture sharing its $axis at contrast $background/$rim",
+    ({ axis, background, rim }) => {
+      const scene = renderWheelScene({ ...(axis === "columns" ? { height: 400, centerY: 330 } : {}), background, rim });
+      addDenseTexture(scene, axis);
+      const [candidate] = detectWheelEllipses(scene);
+      expect(candidate).toBeDefined();
+      expect(candidate!.centerX).toBeCloseTo(164, -1);
+      expect(candidate!.centerY).toBeCloseTo(axis === "columns" ? 330 : 174, -1);
+      expect(candidate!.radiusMajor).toBeCloseTo(104, -1);
+      expect(candidate!.radiusMinor).toBeCloseTo(43, -1);
+      expect(candidate!.visibleArcFraction).toBeGreaterThanOrEqual(0.8);
+    },
+  );
+
+  it.each([0, 18])("does not infer a complete rim from dense texture with %s visible sectors", (visible) => {
+    const scene = renderWheelScene({ missingSectors: Array.from({ length: 72 - visible }, (_, i) => i) });
+    addDenseTexture(scene, "rows");
+    expect(detectWheelEllipses(scene)).toEqual([]);
+  });
+
   it("finds the complete rim when a studio floor edge crosses behind its lower half", () => {
     const width = 320;
     const height = 180;

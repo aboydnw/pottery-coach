@@ -12,18 +12,38 @@ export type WheelArc = {
 
 /** Groups connected curved edge evidence and rejects texture specks and straight furniture edges. */
 export function traceWheelArcs(edgeMap: WheelEdgeMap): WheelArc[] {
-  const rowCounts = new Map<number, number>();
-  const columnCounts = new Map<number, number>();
-  for (const point of edgeMap.points) {
-    rowCounts.set(point.y, (rowCounts.get(point.y) ?? 0) + 1);
-    columnCounts.set(point.x, (columnCounts.get(point.x) ?? 0) + 1);
+  // Reject only points on a locally connected straight run. Texture elsewhere on a
+  // scanline must not erase a disconnected portion of the wheel circumference.
+  const straightPoints = new Set<string>();
+  for (const axis of ["x", "y"] as const) {
+    const scanlines = new Map<number, WheelEdgePoint[]>();
+    const perpendicular = axis === "x" ? "y" : "x";
+    const limit = axis === "x" ? Math.max(40, edgeMap.width * 0.18) : Math.max(40, edgeMap.height * 0.3);
+    for (const point of edgeMap.points) {
+      const line = scanlines.get(point[perpendicular]) ?? [];
+      line.push(point);
+      scanlines.set(point[perpendicular], line);
+    }
+    for (const line of scanlines.values()) {
+      line.sort((left, right) => left[axis] - right[axis]);
+      let start = 0;
+      for (let end = 1; end <= line.length; end += 1) {
+        // Bridge small interruptions where another edge crosses the straight line.
+        if (end < line.length && line[end]![axis] - line[end - 1]![axis] <= 6) continue;
+        if (end - start > limit) {
+          for (let index = start; index < end; index += 1) {
+            const point = line[index]!;
+            straightPoints.add(`${point.x},${point.y}`);
+          }
+        }
+        start = end;
+      }
+    }
   }
-  const rowLimit = Math.max(40, edgeMap.width * 0.18);
-  const columnLimit = Math.max(40, edgeMap.height * 0.3);
   const unique = new Map<string, WheelEdgePoint>();
   for (const point of edgeMap.points) {
-    if ((rowCounts.get(point.y) ?? 0) > rowLimit || (columnCounts.get(point.x) ?? 0) > columnLimit) continue;
-    unique.set(`${point.x},${point.y}`, point);
+    const key = `${point.x},${point.y}`;
+    if (!straightPoints.has(key)) unique.set(key, point);
   }
   const visited = new Set<string>();
   const arcs: WheelArc[] = [];
