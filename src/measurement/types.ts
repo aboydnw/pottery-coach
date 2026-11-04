@@ -33,6 +33,8 @@ export type DimensionReading = {
   leanOffset?: number | null;
   /** True when hands are probably on the pot, so the outline isn't the pot alone. */
   handsLikely?: boolean;
+  /** Versioned provider that supplied the clay mask for this reading. */
+  segmentationVersion?: string;
   confidence: MeasurementConfidence;
 };
 export type StableDimensionReading = DimensionReading & {

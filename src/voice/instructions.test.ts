@@ -22,5 +22,7 @@ it("starts with the calibration foundation before inviting clay onto the wheel",
   expect(keepEmpty).toBeGreaterThan(setupCheck);
   expect(inviteClay).toBeGreaterThan(keepEmpty);
   expect(COACH_INSTRUCTIONS).not.toContain("you've had a look at the empty wheel");
-  expect(COACH_INSTRUCTIONS_REVISION).toBe("foundation-first-v2");
+  expect(COACH_INSTRUCTIONS).toContain("printed calibration page");
+  expect(COACH_INSTRUCTIONS).toContain("optional fallback");
+  expect(COACH_INSTRUCTIONS_REVISION).toBe("marker-foundation-v3");
 });

@@ -19,7 +19,7 @@ import { fitOscillation } from "../wobble/fitOscillation";
 import { classifyWobble } from "../wobble/classifyWobble";
 import { WobbleService } from "../wobble/WobbleService";
 import { epochNow } from "../platform/clock";
-import { bitmapToLab } from "./lab";
+import { bitmapToPixels, type BitmapPixels } from "./lab";
 import { HandsDetector } from "./handsDetector";
 import { createWheelPoseTransform } from "../measurement/WheelPoseTransform";
 import type { WheelViewPose } from "../calibration/wheelViewPose";
@@ -36,6 +36,7 @@ const temporalFilter = new TemporalFilter();
 const contourBuffer = new TemporalContourBuffer();
 const wobbleService = new WobbleService();
 const handsDetector = new HandsDetector();
+let pendingDatasetCaptureId: string | null = null;
 
 worker.addEventListener("message", (event: MessageEvent<MeasurementWorkerRequest>) => {
   const request = event.data;
@@ -54,6 +55,10 @@ worker.addEventListener("message", (event: MessageEvent<MeasurementWorkerRequest
   if (request?.type === "reset") {
     resetEvidence(request.reason);
     post({ type: "invalidated", reason: request.reason });
+    return;
+  }
+  if (request?.type === "request-dataset-capture") {
+    pendingDatasetCaptureId = request.captureId;
     return;
   }
   if (request?.type !== "frame") return;
@@ -77,7 +82,8 @@ worker.addEventListener("message", (event: MessageEvent<MeasurementWorkerRequest
 });
 
 function processFrame(request: FrameRequest): void {
-  const image = bitmapToLab(request.bitmap);
+  const pixels = bitmapToPixels(request.bitmap);
+  const image = pixels.lab;
   const reference = background ?? backgroundFrames[0];
   if (reference && (reference.width !== image.width || reference.height !== image.height)) {
     resetEvidence("frame-size-change");
@@ -106,7 +112,7 @@ function processFrame(request: FrameRequest): void {
     calibrationError95: pose?.estimatedErrorMm95 ?? null,
     segmentationError95: (reliableFraction >= 0.7 ? 1 : 3) * request.scale,
   });
-  const measured = extractDimensions(segmentation.mask, segmentation.rowReliability, {
+  const extracted = extractDimensions(segmentation.mask, segmentation.rowReliability, {
     width: image.width,
     height: image.height,
     unitsPerPixel: request.scale,
@@ -118,10 +124,12 @@ function processFrame(request: FrameRequest): void {
     confidence,
     transform,
   });
+  const measured = { ...extracted, segmentationVersion: segmentation.modelVersion ?? "background-v1" };
   const handsLikely = handsDetector.update(measured);
   const instantaneous = handsLikely ? withHands(measured) : { ...measured, handsLikely };
   // Hands-on frames would drag the steady reading towards the hands, so they don't feed it.
   post({ type: "reading", instantaneous, stable: handsLikely ? null : temporalFilter.push(instantaneous) });
+  emitPendingDatasetCapture(pixels, segmentation, pose);
   if (handsLikely) return;
   // Wobble thresholds are physical sizes, so oscillation is only tracked once a scale exists.
   const instantaneousMm = toMm(instantaneous, scale);
@@ -137,6 +145,36 @@ function processFrame(request: FrameRequest): void {
     wobbleService.update(classifyWobble(window, fit, { periodMs: period.periodMs, cameraMotionRmsMm: null }));
     post({ type: "wobble", reading: wobbleService.getLatest(request.capturedAtMs) });
   }
+}
+
+function emitPendingDatasetCapture(
+  pixels: BitmapPixels,
+  segmentation: ReturnType<typeof segmentVessel>,
+  pose: WheelViewPose | null,
+): void {
+  if (!pendingDatasetCaptureId) return;
+  const captureId = pendingDatasetCaptureId;
+  pendingDatasetCaptureId = null;
+  const capture = {
+    captureId,
+    width: pixels.width,
+    height: pixels.height,
+    rgba: pixels.rgba,
+    automaticMask: segmentation.mask,
+    segmentationVersion: segmentation.modelVersion ?? "background-v1",
+    calibrationId: scale?.calibrationId ?? "uncalibrated",
+    wheelDiameterMm: scale?.boardPose?.wheelDiameterMm ?? null,
+    calibrationGeometry: pose
+      ? {
+          wheelCenterImage: pose.wheelCenterImage,
+          projectedVerticalImage: pose.projectedVerticalImage,
+          supportedRegionImage: pose.supportedRegionImage,
+          wheelPlaneMmPerMajorPixel: pose.wheelPlaneMmPerMajorPixel,
+          estimatedErrorMm95: pose.estimatedErrorMm95,
+        }
+      : null,
+  };
+  post({ type: "dataset-capture", capture }, [capture.rgba.buffer, capture.automaticMask.buffer]);
 }
 
 function poseForProcessedFrame(pose: WheelViewPose, sourcePixelsPerBitmapPixel: number): WheelViewPose {
@@ -175,6 +213,6 @@ function withHands(reading: DimensionReading): DimensionReading {
   };
 }
 
-function post(message: MeasurementWorkerEvent): void {
-  worker.postMessage(message);
+function post(message: MeasurementWorkerEvent, transfer: Transferable[] = []): void {
+  worker.postMessage(message, transfer);
 }

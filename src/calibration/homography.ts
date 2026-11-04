@@ -32,6 +32,7 @@ export function solveCalibration(
     createdAtMs: Date.now(),
     status: "accepted",
     method: "board",
+    ...(frame.boardPlacement ? { boardPlacement: frame.boardPlacement } : {}),
     homographyImageToMm: homography,
     wheelBaseline: board.wheelBaseline,
     wheelCenterlineXmm: board.wheelCenterlineXmm,

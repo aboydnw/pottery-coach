@@ -20,14 +20,19 @@ const MIN_WHEEL_SPAN_FRACTION = 0.25;
 /** Returns stable reason codes for every quality gate the calibration fails; empty means acceptable. */
 export function validateCalibration(result: CalibrationResult): string[] {
   if (result.method === "wheel-head") return validateWheelHead(result);
-  const reasons: string[] = [];
+  const reasons: string[] = [...(result.wheelViewPose?.reasons ?? [])];
   const quality = result.quality;
   if (quality.tagCount < 3) reasons.push(CALIBRATION_REASON.tagCount);
   if (quality.reprojectionErrorPx95 > 1.5) reasons.push(CALIBRATION_REASON.reprojection);
-  if (quality.scaleVariationFraction > 0.02) reasons.push(CALIBRATION_REASON.scaleVariation);
+  // A homography removes the expected perspective of a flat wheel-plane board. The old 2%
+  // uniform-scale/near-frontal gates belong only to the upright vessel-plane calibration.
+  if (result.boardPlacement !== "wheel-plane" && quality.scaleVariationFraction > 0.02)
+    reasons.push(CALIBRATION_REASON.scaleVariation);
   if (quality.estimatedErrorMm95 > 10) reasons.push(CALIBRATION_REASON.estimatedError);
-  if (quality.poseYawDeg !== null && Math.abs(quality.poseYawDeg) > 8) reasons.push(CALIBRATION_REASON.poseYaw);
-  if (quality.posePitchDeg !== null && Math.abs(quality.posePitchDeg) > 8) reasons.push(CALIBRATION_REASON.posePitch);
+  if (result.boardPlacement !== "wheel-plane") {
+    if (quality.poseYawDeg !== null && Math.abs(quality.poseYawDeg) > 8) reasons.push(CALIBRATION_REASON.poseYaw);
+    if (quality.posePitchDeg !== null && Math.abs(quality.posePitchDeg) > 8) reasons.push(CALIBRATION_REASON.posePitch);
+  }
   if (result.roiClipped) reasons.push(CALIBRATION_REASON.roiClipped);
   if (result.boardRevision !== result.supportedBoardRevision) reasons.push(CALIBRATION_REASON.boardRevision);
   if (quality.blurScore < 0.25) reasons.push(CALIBRATION_REASON.blur);

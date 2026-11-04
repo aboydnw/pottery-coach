@@ -9,6 +9,7 @@ async function sliderValue(page: Page, name: RegExp): Promise<number> {
 test("calibrates from the wheel head by touch: size, ellipse, confirm", async ({ page }) => {
   await startSession(page);
   await openSetup(page);
+  await page.getByRole("button", { name: /optional wheel-head detection/i }).click();
   await page.getByRole("button", { name: "14 in", exact: true }).click();
   await page.getByRole("button", { name: /find 14 in wheel head/i }).click();
 
@@ -47,5 +48,6 @@ test("remembers the wheel size on this device", async ({ page }) => {
   await page.evaluate(() => localStorage.setItem("pottery-coach-wheel-head-mm", "330.2"));
   await startSession(page);
   await openSetup(page);
-  await expect(page.getByRole("button", { name: "13 in", exact: true })).toHaveAttribute("aria-pressed", "true");
+  await expect(page.getByRole("heading", { name: /calibrate with the printed page/i })).toBeVisible();
+  await expect(page.getByRole("textbox", { name: /wheel-head diameter in inches/i })).toHaveValue("13");
 });

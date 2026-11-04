@@ -2,6 +2,10 @@
 
 Gate 1 remains closed until all required physical runs are linked from `docs/research/10-benchmark-results.md`.
 
+## Printed marker and clay measurement gate
+
+For each supported phone/browser combination, run five independent setups with the page printed at 100%, flat and centered on the wheel axle. Include at least two wheel diameters, three lighting conditions, dry and wet clay, a bat, hands, and a tool crossing the silhouette. Compare height and maximum width against independently measured stepped forms. Record median, p95, bias, rejection rate, false measurements during >30% occlusion, calibration time, inference latency, and camera-movement invalidation. Metric release requires p95 dimensional error <=12.7 mm and the clay-model gates documented in `benchmarks/clay-segmentation/README.md`.
+
 ## Setup
 
 1. Use a recent iPhone/Safari, recent Android/Chrome, or desktop Chrome. Record exact hardware, OS, browser version, delivered camera settings, and build identifier.

@@ -35,20 +35,30 @@ export function extractDimensions(
   }
   const top = rows[0]?.y;
   const bottom = rows.at(-1)?.y;
-  const widthOf = (row: (typeof rows)[number]) =>
-    context.transform?.radiusAt({ x: row.left, y: row.y }, { x: row.right, y: row.y }, 0) !== undefined
-      ? (context.transform?.radiusAt({ x: row.left, y: row.y }, { x: row.right, y: row.y }, 0) ?? 0) * 2
-      : row.width * context.unitsPerPixel;
-  const widths = rows.map(widthOf);
+  const widthOf = (row: (typeof rows)[number]): number | null => {
+    if (!context.transform) return row.width * context.unitsPerPixel;
+    const vertical = context.transform.imageToWheel({ x: context.centerlineX, y: row.y });
+    if (!vertical) return null;
+    const radius = context.transform.radiusAt(
+      { x: row.left, y: row.y },
+      { x: row.right, y: row.y },
+      vertical.verticalMm,
+    );
+    return radius === null ? null : radius * 2;
+  };
+  const rowWidths = rows.map(widthOf);
+  // A partial supported slice is not a maximum/rim/base width for the whole vessel.
+  const widths = rowWidths.every((width) => width !== null) ? rowWidths : [];
   const bandSize = Math.max(1, Math.ceil(rows.length * 0.1));
   const profile: ProfileSample[] = Array.from({ length: 64 }, (_, index) => {
     if (top === undefined || bottom === undefined) return { heightRatio: index / 63, radius: null, confidence: 0 };
     const y = Math.round(bottom - (index / 63) * (bottom - top));
     const row = rows.find((candidate) => candidate.y === y);
+    const width = row ? widthOf(row) : null;
     return {
       heightRatio: index / 63,
-      radius: row ? widthOf(row) / 2 : null,
-      confidence: row ? 1 : 0,
+      radius: width === null ? null : width / 2,
+      confidence: width === null ? 0 : 1,
     };
   });
   const offsets = rows.map((row) => Math.abs(row.center - context.centerlineX) * context.unitsPerPixel);

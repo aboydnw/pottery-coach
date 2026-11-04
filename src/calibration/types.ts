@@ -17,6 +17,17 @@ export type CalibrationQuality = {
 
 export type CalibrationMethod = "board" | "wheel-head" | "none";
 
+export type BoardPose = {
+  boardRevision: "board-v1";
+  wheelCenterImage: Point2;
+  projectedVerticalImage: Point2;
+  supportedRegionImage: { x: number; y: number; width: number; height: number };
+  wheelDiameterMm: number;
+  /** Present only when the optional rim detector supplied an independent cross-check. */
+  detectedWheelDiameterMm?: number;
+  estimatedErrorMm95: number;
+};
+
 /** Where the wheel head's edges were found, in full-resolution image pixels. */
 export type WheelHeadMeasurement = { leftX: number; rightX: number; row: number; diameterMm: number };
 
@@ -24,6 +35,8 @@ export type CalibrationResult = {
   id: string;
   /** How scale was established: printed board, wheel-head diameter, or none (shape-only). */
   method: CalibrationMethod;
+  /** Absent on legacy upright-board records. A flat wheel board expects projective scale variation. */
+  boardPlacement?: "wheel-plane";
   createdAtMs: number;
   status: "accepted" | "manual-review" | "rejected";
   homographyImageToMm: [number, number, number, number, number, number, number, number, number];
@@ -44,6 +57,8 @@ export type CalibrationResult = {
   wheelEllipse?: import("./wheelEllipse").WheelEllipse;
   /** Weak-perspective pose estimate; authoritative for new wheel-head metric sessions. */
   wheelViewPose?: import("./wheelViewPose").WheelViewPose;
+  /** Marker-derived wheel center and supported measurement region. */
+  boardPose?: BoardPose;
 };
 
 export type PointCorrespondence = { tagId: number; image: Point2; boardMm: Point2 };
@@ -57,6 +72,7 @@ export type CalibrationBoard = {
 };
 
 export type CalibrationFrame = {
+  boardPlacement?: "wheel-plane";
   width: number;
   height: number;
   roi: { x: number; y: number; width: number; height: number };

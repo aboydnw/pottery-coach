@@ -2,6 +2,12 @@
 
 Plan-to-evidence detail is maintained in [`implementation-audit.md`](implementation-audit.md).
 
+- [x] Printed marker is the primary metric setup; wheel-head detection is labeled optional.
+- [x] The 100 mm print line, centered placement, stability hold, and phone-movement warning are visible.
+- [ ] Physical testing verifies that supported phone movement is detected before stale metric readings are released.
+- [x] Learned clay models require a checksum, frozen session-level evaluation split, and passing accuracy/latency gates.
+- [x] Test-data examples remain opt-in, local, explicitly exported, and deletable.
+
 - [x] Unit tests cover camera, calibration, measurement, targets, wobble, voice, coaching, recording, review, and lifecycle.
 - [x] Raw media is absent from session storage and default network paths.
 - [x] Numeric, wobble, provider voice, storage, and mobile support can be disabled independently.

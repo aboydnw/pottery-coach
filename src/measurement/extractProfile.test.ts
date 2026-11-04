@@ -79,3 +79,28 @@ it("measures how far the top leans from the base", () => {
   });
   expect(reading.leanOffset).toBe(4);
 });
+
+it("preserves unsupported transformed widths as missing instead of inventing zero", () => {
+  const mask = new Uint8Array(20 * 20);
+  for (let y = 10; y <= 19; y += 1) for (let x = 5; x <= 14; x += 1) mask[y * 20 + x] = 1;
+  const result = extractDimensions(mask, new Uint8Array(20).fill(1), {
+    width: 20,
+    height: 20,
+    unitsPerPixel: 1,
+    unit: "mm",
+    centerlineX: 10,
+    calibrationId: "unsupported",
+    frameId: 1,
+    timestampMs: 1,
+    transform: {
+      imageToWheel: () => null,
+      radiusAt: () => null,
+      estimatedErrorMm95At: () => Number.POSITIVE_INFINITY,
+    },
+  });
+  expect(result.height).toBeNull();
+  expect(result.maximumWidth).toBeNull();
+  expect(result.rimWidth).toBeNull();
+  expect(result.baseWidth).toBeNull();
+  expect(result.profile.every((sample) => sample.radius === null)).toBe(true);
+});

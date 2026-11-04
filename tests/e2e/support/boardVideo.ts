@@ -30,8 +30,9 @@ export async function writeBoardVideo(): Promise<void> {
         context.fillStyle = "#b8b0a4";
         context.fillRect(0, 0, width, height);
         const boardWidth = 1000;
-        const boardHeight = boardWidth * (148 / 210);
-        context.drawImage(image, (width - boardWidth) / 2, (height - boardHeight) / 2, boardWidth, boardHeight);
+        // A flat board on the wheel viewed from above and beside it, not an upright front-on page.
+        const boardHeight = boardWidth * (148 / 210) * 0.5;
+        context.drawImage(image, (width - boardWidth) / 2, 480 - boardHeight / 2, boardWidth, boardHeight);
         return Array.from(context.getImageData(0, 0, width, height).data);
       },
       { markup: svg, width: WIDTH, height: HEIGHT },

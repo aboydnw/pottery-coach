@@ -3,6 +3,8 @@ import { useEffect, useMemo, useRef, useState, useSyncExternalStore, type Mutabl
 import { demoCalibration, demoReading } from "../app/demoFixtures";
 import { CalibrationFlow, describeCalibrationReason } from "../calibration/CalibrationFlow";
 import { calibrateFromVideo } from "../calibration/calibrateFromVideo";
+import { BoardCalibrationAccumulator, validateWheelDiameterCrossCheck } from "../calibration/boardCalibration";
+import { PrintedMarkerStep } from "../calibration/PrintedMarkerStep";
 import type { CalibrationResult } from "../calibration/types";
 import { WasmTagDetector } from "../calibration/WasmTagDetector";
 import { wheelEllipseCalibration } from "../calibration/wheelHead";
@@ -25,6 +27,8 @@ import { GoalProgress } from "../targets/GoalProgress";
 import { loadTemplates } from "../targets/loadTemplates";
 import { ProfileOverlay } from "../targets/ProfileOverlay";
 import { useMeasurementPipeline } from "../vision/useMeasurementPipeline";
+import { DatasetWorkspace } from "../vision/dataset/DatasetWorkspace";
+import { createDatasetSessionGroupId, isDatasetTestingMode } from "../vision/dataset/testingMode";
 import type { ToolDependencies } from "../voice/tools/types";
 import type { Caption } from "../voice/useVoiceSession";
 import { NOTICES, speakNotice } from "../voice/spokenNotice";
@@ -50,8 +54,12 @@ const LINES = {
   wheelSeen: "Got a look at the empty wheel. Put your clay on.",
 } as const;
 
+function waitForCalibrationSample(): Promise<void> {
+  return new Promise((resolve) => window.setTimeout(resolve, 125));
+}
+
 /** Where the empty-wheel snapshot is at: learning it, learned (clay can go on), or waiting for the wheel to clear. */
-type WheelPhase = "learning" | "ready" | "awaiting-empty" | "placed";
+type WheelPhase = "learning" | "ready" | "awaiting-empty" | "removing-page" | "placed";
 
 export type LiveSessionProps = {
   setup: SetupStore;
@@ -114,8 +122,11 @@ export function LiveSession(props: LiveSessionProps) {
   });
   const slots = useSyncExternalStore(setup.subscribe, setup.getSnapshot);
   const [scale, setScaleState] = useState<SessionScale | null>(null);
-  const [boardMode, setBoardMode] = useState(false);
+  const [boardMode, setBoardMode] = useState(true);
   const [boardCandidate, setBoardCandidate] = useState<CalibrationResult | null>(null);
+  const [pendingBoard, setPendingBoard] = useState<CalibrationResult | null>(null);
+  const pendingBoardRef = useRef<CalibrationResult | null>(null);
+  const boardAttemptRef = useRef(0);
   const [detector, setDetector] = useState<WasmTagDetector | null>(null);
   const [busy, setBusy] = useState(false);
   const [problem, setProblem] = useState<string | null>(null);
@@ -128,6 +139,8 @@ export function LiveSession(props: LiveSessionProps) {
   const [wheelPhase, setWheelPhase] = useState<WheelPhase>("learning");
   const [cueToast, setCueToast] = useState<string | null>(null);
   const [historyKey, setHistoryKey] = useState(0);
+  const [datasetSessionGroupId] = useState(createDatasetSessionGroupId);
+  const datasetTesting = isDatasetTestingMode();
   const wheelPhaseRef = useRef<WheelPhase>("learning");
   const announceWheelRef = useRef(false);
   const demoTimerRef = useRef<number | null>(null);
@@ -176,6 +189,13 @@ export function LiveSession(props: LiveSessionProps) {
   }, []);
 
   useEffect(() => () => detector?.dispose(), [detector]);
+
+  useEffect(
+    () => () => {
+      boardAttemptRef.current += 1;
+    },
+    [],
+  );
 
   useEffect(
     () => () => {
@@ -265,10 +285,18 @@ export function LiveSession(props: LiveSessionProps) {
   // as the page is visible again; if that fails, say out loud that one tap is needed.
   const resumeTriedRef = useRef(false);
   useEffect(() => {
-    if (!camera.interrupted || !liveWheelActive) return;
-    stopLiveWheel();
+    if (!camera.interrupted) return;
+    boardAttemptRef.current += 1;
+    pendingBoardRef.current = null;
+    setPendingBoard(null);
+    setBoardCandidate(null);
+    setBusy(false);
+    if (liveWheelActive) stopLiveWheel();
+    if (scale) applyScale(null);
     setup.setCalibration("none");
-  }, [camera.interrupted, liveWheelActive, setup, stopLiveWheel]);
+    // applyScale only fans out the current state and worker message.
+    // oxlint-disable-next-line react-hooks/exhaustive-deps
+  }, [camera.interrupted, liveWheelActive, scale, setup, stopLiveWheel]);
 
   useEffect(() => {
     if (!camera.interrupted) {
@@ -293,11 +321,16 @@ export function LiveSession(props: LiveSessionProps) {
     const settings = await camera.start();
     if (!settings) return false;
     props.onCameraReady();
-    if (!cameraOnly && videoRef.current) pipeline.start(videoRef.current);
+    if (!cameraOnly && videoRef.current && !pendingBoardRef.current) pipeline.start(videoRef.current);
     return true;
   }
 
   async function switchCamera(): Promise<void> {
+    boardAttemptRef.current += 1;
+    pendingBoardRef.current = null;
+    setPendingBoard(null);
+    setBoardCandidate(null);
+    setBusy(false);
     liveWheel.stop();
     const settings = await camera.switchFacing();
     if (!settings) return;
@@ -374,26 +407,71 @@ export function LiveSession(props: LiveSessionProps) {
   async function runBoardCalibration(): Promise<void> {
     const video = videoRef.current;
     if (!video) return;
+    const diameterMm = setup.getSnapshot().wheelHeadDiameterMm?.value ?? loadRememberedDiameterMm();
+    if (diameterMm === null) {
+      setProblem("Enter the wheel-head diameter before calibrating.");
+      return;
+    }
     setBusy(true);
     setProblem(null);
+    const attempt = ++boardAttemptRef.current;
     try {
       const active = detector ?? new WasmTagDetector();
       if (!detector) setDetector(active);
-      setBoardCandidate(await calibrateFromVideo(video, active));
+      const accumulator = new BoardCalibrationAccumulator();
+      for (let index = 0; index < 5; index += 1) {
+        const result = await calibrateFromVideo(video, active, diameterMm);
+        if (attempt !== boardAttemptRef.current) return;
+        accumulator.add({ capturedAtMs: performance.now(), result });
+        if (index < 4) await waitForCalibrationSample();
+      }
+      const stable = accumulator.result();
+      if (!stable) throw new Error("Hold the phone and printed page still, then try again.");
+      const diameterProblems = validateWheelDiameterCrossCheck(stable, diameterMm);
+      setBoardCandidate(
+        diameterProblems.length === 0
+          ? stable
+          : { ...stable, status: "rejected", reasons: [...stable.reasons, ...diameterProblems] },
+      );
     } catch (error) {
+      if (attempt !== boardAttemptRef.current) return;
       setProblem(
         `Calibration failed: ${error instanceof Error ? error.message : "keep all four tags visible and retry."}`,
       );
     } finally {
-      setBusy(false);
+      if (attempt === boardAttemptRef.current) setBusy(false);
     }
   }
 
   function acceptBoard(accepted: CalibrationResult): void {
     setBoardCandidate(null);
+    pendingBoardRef.current = accepted;
+    setPendingBoard(accepted);
+    // The previous background contains the printed page. Do not learn or measure until removal
+    // is confirmed; otherwise the removed sheet becomes a persistent false clay silhouette.
+    pipeline.stop();
+    applyScale(null);
+    setup.setCalibration("checking");
+    setPhase("removing-page");
+  }
+
+  function learnAfterPageRemoval(): void {
+    const accepted = pendingBoardRef.current;
+    const video = videoRef.current;
+    if (!accepted || !video || !camera.active || camera.interrupted) return;
+    pendingBoardRef.current = null;
+    setPendingBoard(null);
     setBoardMode(false);
-    applyScale(scaleFromCalibration(accepted));
-    setup.setCalibration("confirmed");
+    setPhase("learning");
+    announceWheelRef.current = true;
+    if (!cameraOnly) pipeline.start(video, { freshBackground: true });
+    const nextScale = scaleFromCalibration(accepted);
+    applyScale(nextScale, accepted.imageCenterlineX);
+    setup.setCalibration(nextScale ? "confirmed" : "skipped");
+    if (!nextScale)
+      setProblem(
+        "The page was located, but this camera perspective cannot yet support reliable vessel sizes. Continue in shape-only mode, or restart with the phone farther away. Keep the full page visible.",
+      );
   }
 
   function loadDemo(): void {
@@ -440,8 +518,20 @@ export function LiveSession(props: LiveSessionProps) {
 
   const calibrationArea = (
     <div className="calibration-area">
-      {problem && <p role="alert">{problem}</p>}
-      {liveWheel.active ? null : boardCandidate ? (
+      {problem && (
+        <p role="alert" aria-label="Calibration guidance">
+          {problem}
+        </p>
+      )}
+      {pendingBoard ? (
+        <section aria-labelledby="remove-page-title">
+          <h3 id="remove-page-title">Remove the printed page</h3>
+          <p>Keep the phone still. Remove the page, clay, hands, and tools so only the empty wheel remains.</p>
+          <button type="button" onClick={learnAfterPageRemoval}>
+            Page removed, learn empty wheel
+          </button>
+        </section>
+      ) : liveWheel.active ? null : boardCandidate ? (
         <CalibrationFlow
           result={boardCandidate}
           onAccepted={acceptBoard}
@@ -449,21 +539,14 @@ export function LiveSession(props: LiveSessionProps) {
         />
       ) : slots.calibration !== "confirmed" && slots.calibration !== "skipped" && camera.active ? (
         boardMode ? (
-          <section className="calibration-actions" aria-label="Printed board calibration">
-            <p>
-              Print the{" "}
-              <a href="/calibration/board-v1.svg" target="_blank" rel="noreferrer">
-                calibration board
-              </a>{" "}
-              at 100% scale, stand it beside the pot facing the camera, then calibrate.
-            </p>
-            <button type="button" disabled={busy} onClick={() => void runBoardCalibration()}>
-              {busy ? "Detecting board…" : "Calibrate printed board"}
-            </button>
-            <button type="button" className="link-button" onClick={() => setBoardMode(false)}>
-              Use the wheel head instead
-            </button>
-          </section>
+          <PrintedMarkerStep
+            initialDiameterMm={slots.wheelHeadDiameterMm?.value ?? loadRememberedDiameterMm()}
+            busy={busy}
+            onDiameter={(diameterMm) => setup.apply({ wheelHeadDiameter: { value: diameterMm, unit: "mm" } })}
+            onCalibrate={() => void runBoardCalibration()}
+            onUseWheelHead={() => setBoardMode(false)}
+            onSkip={skipWheel}
+          />
         ) : (
           <section className="calibration-actions" aria-label="Wheel-head calibration">
             <WheelHeadStep
@@ -475,19 +558,19 @@ export function LiveSession(props: LiveSessionProps) {
               }}
             />
             <button type="button" className="link-button" onClick={() => setBoardMode(true)}>
-              Use a printed board instead
+              Use the recommended printed page instead
             </button>
             <button type="button" className="secondary" onClick={skipWheel}>
               Skip sizes (shape only)
             </button>
-            {demoMode && (
-              <button type="button" className="secondary" onClick={loadDemo}>
-                Load deterministic demo calibration
-              </button>
-            )}
           </section>
         )
       ) : null}
+      {demoMode && !pendingBoard && !boardCandidate && !liveWheel.active && slots.calibration !== "confirmed" && (
+        <button type="button" className="secondary" onClick={loadDemo}>
+          Load deterministic demo calibration
+        </button>
+      )}
     </div>
   );
 
@@ -689,6 +772,13 @@ export function LiveSession(props: LiveSessionProps) {
           <NotesPanel notes={props.lastingNotes} onForget={props.onForgetNote} />
           {/* A new key remounts the panel, which reloads the log after a piece is saved. */}
           <HistoryPanel key={historyKey} throwLog={props.throwLog} />
+          {datasetTesting && (
+            <DatasetWorkspace
+              backgroundReady={pipeline.backgroundReady}
+              captureFrame={pipeline.captureDatasetFrame}
+              sessionGroupId={datasetSessionGroupId}
+            />
+          )}
           {camera.active && <DiagnosticsPanel sample={pipeline.sample} />}
         </section>
       )}
