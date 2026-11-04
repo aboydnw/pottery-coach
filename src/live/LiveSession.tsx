@@ -663,6 +663,7 @@ export function LiveSession(props: LiveSessionProps) {
             ellipse={liveWheel.ellipse}
             diameterMm={slots.wheelHeadDiameterMm?.value ?? 0}
             status={liveWheel.status}
+            guidance={liveWheel.guidance}
             mirrored={mirrored}
             adjusted={liveWheel.adjusted}
             canSwitch={{
@@ -680,7 +681,9 @@ export function LiveSession(props: LiveSessionProps) {
           <section className="wheel-live-overlay" aria-label="Live wheel-head calibration">
             <div className="wheel-live-controls">
               <p role={liveWheel.error ? "alert" : "status"}>
-                {liveWheel.error ? `Wheel detection failed: ${liveWheel.error}` : "Finding wheel…"}
+                {liveWheel.error
+                  ? `Wheel detection failed: ${liveWheel.error}`
+                  : (liveWheel.guidance ?? "Finding wheel…")}
               </p>
               {liveWheel.error && (
                 <button type="button" className="secondary" onClick={() => void liveWheel.retry()}>

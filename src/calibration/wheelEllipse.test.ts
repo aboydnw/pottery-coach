@@ -31,6 +31,23 @@ describe("canonicalWheelEllipse", () => {
       }),
     ).toThrow(/positive/i);
   });
+
+  it("accepts ellipse candidates carrying non-numeric scoring metadata", () => {
+    const candidate = {
+      centerX: 160,
+      centerY: 140,
+      radiusMajor: 96,
+      radiusMinor: 30,
+      rotationRad: 0,
+      fitResidualPx95: 1,
+      visibleArcFraction: 1,
+      confidence: 0.9,
+      score: 0.8,
+      evidence: { supportedSectors: new Uint8Array(72) },
+    };
+
+    expect(() => canonicalWheelEllipse(candidate)).not.toThrow();
+  });
 });
 
 it("detects a complete dark wheel ellipse against a light background", () => {

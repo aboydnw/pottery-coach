@@ -41,6 +41,16 @@ const found = (centerX: number): WheelHeadCandidates => ({
   ],
 });
 
+const missing = (guidance?: string) =>
+  ({
+    leftX: 128,
+    rightX: 512,
+    row: 360,
+    confidence: 0,
+    candidates: [{ leftX: 128, rightX: 512, row: 360, confidence: 0 }],
+    guidance,
+  }) as WheelHeadCandidates & { guidance?: string };
+
 function videoRef() {
   return { current: { videoWidth: 640, videoHeight: 480 } as HTMLVideoElement };
 }
@@ -102,6 +112,45 @@ it("suspends detector replacement while the potter adjusts the live outline", as
   await act(async () => vi.advanceTimersByTimeAsync(400));
   expect(result.current.ellipse?.centerX).toBe(280);
   expect(result.current.adjusted).toBe(true);
+});
+
+it("keeps the tracked outline through two short detection misses", async () => {
+  vi.useFakeTimers();
+  const detect = vi.fn().mockReturnValueOnce(found(160)).mockReturnValueOnce(missing()).mockReturnValueOnce(missing());
+  const { result } = renderHook(() =>
+    useLiveWheelDetection({
+      videoRef: videoRef(),
+      diameterMm: 355.6,
+      onStable: vi.fn(),
+      capture: vi.fn(() => image(1)),
+      detect,
+    }),
+  );
+
+  await act(async () => result.current.start());
+  const tracked = result.current.ellipse;
+  await act(async () => vi.advanceTimersByTimeAsync(400));
+
+  expect(result.current.ellipse).toEqual(tracked);
+  expect(result.current.status).toBe("finding");
+});
+
+it("exposes the detector's highest-priority capture guidance", async () => {
+  const { result } = renderHook(() =>
+    useLiveWheelDetection({
+      videoRef: videoRef(),
+      diameterMm: 355.6,
+      onStable: vi.fn(),
+      capture: vi.fn(() => image(1)),
+      detect: vi.fn(() => missing("Reduce glare so the whole wheel rim is clear.")),
+    }),
+  );
+
+  await act(async () => result.current.start());
+
+  expect((result.current as typeof result.current & { guidance?: string }).guidance).toBe(
+    "Reduce glare so the whole wheel rim is clear.",
+  );
 });
 
 it("does not accept gradual drift that leaves the original stability envelope", async () => {
