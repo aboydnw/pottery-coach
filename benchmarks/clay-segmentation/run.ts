@@ -1,23 +1,23 @@
 import { readFile } from "node:fs/promises";
 
-import { CLAY_DATASET_SCHEMA } from "../../src/vision/dataset/types";
+import { validateDatasetSplit, validateReviewedDataset } from "./dataset";
 
-const path = process.argv[2];
+const [path, trainingPath, ...extra] = process.argv.slice(2);
 if (!path || path === "--help") {
-  console.log("Usage: pnpm benchmark:clay-segmentation <reviewed-dataset.jsonl>");
-  console.log("Validates a reviewed local export before offline training or model comparison.");
-  process.exit(0);
+  console.log("Usage: pnpm benchmark:clay-segmentation <evaluation.jsonl> [training.jsonl]");
+  console.log("Checks local reviewed annotations and optional session/ID split isolation. No uploads or training.");
+  process.exit(path === "--help" ? 0 : 1);
 }
-
-const lines = (await readFile(path, "utf8"))
-  .split(/\r?\n/)
-  .filter(Boolean)
-  .map((line) => JSON.parse(line) as { schemaVersion?: string; kind?: string; sessionGroupId?: string });
-if (lines[0]?.schemaVersion !== CLAY_DATASET_SCHEMA || lines[0]?.kind !== "manifest")
-  throw new Error("The first JSONL row must be a clay-dataset-v1 manifest");
-const examples = lines.slice(1);
-if (examples.some((example) => example.schemaVersion !== CLAY_DATASET_SCHEMA || !example.sessionGroupId))
-  throw new Error("Every dataset example must be versioned and grouped by session");
+if (extra.length) throw new Error("Expected an evaluation export and optional training export");
+const evaluation = validateReviewedDataset(await readFile(path, "utf8"));
+if (trainingPath) {
+  const training = validateReviewedDataset(await readFile(trainingPath, "utf8"));
+  validateDatasetSplit(training, evaluation);
+  console.log("Training and evaluation session groups and example IDs are disjoint.");
+}
 console.log(
-  `Validated ${examples.length} reviewed examples across ${new Set(examples.map((item) => item.sessionGroupId)).size} sessions.`,
+  `Validated annotations for ${evaluation.exampleCount} examples across ${evaluation.sessionGroups.length} sessions.`,
+);
+console.log(
+  "Image decoding, license provenance, duplicate-image review, calibration and real-world accuracy remain unverified.",
 );
