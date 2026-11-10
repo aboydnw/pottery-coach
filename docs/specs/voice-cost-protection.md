@@ -12,7 +12,7 @@ Every voice start authenticates the signed Cloudflare Access token and checks Or
 - `limited-preview`: allows the existing, deliberately restricted Cloudflare Access audience to use the start allowances below. This is **not a public-release switch**. Do not open the Access audience to public signup while using this direct WebRTC architecture.
 - `off`: blocks new voice starts for everyone, including admins. Unknown mode values also block everyone.
 
-Admins bypass the IP and application start quotas, but still require verified authentication, allowed Origin, valid bounded requests and an enabled provider. No owner identity is hard-coded, and this change does not configure any live administrator. The stop setting prevents new calls; it cannot terminate an existing direct WebRTC call.
+Admins bypass the IP and personal start quotas, but every admin start still reserves against the site-wide daily and monthly caps. Authentication, allowed Origin, valid bounded requests, a healthy durable ledger and an enabled provider remain required. No owner identity is hard-coded, and this change does not configure any live administrator. The separate stop setting prevents new calls; it cannot terminate an existing direct WebRTC call.
 
 Preview limits are deliberately provisional request counts, not product pricing:
 
@@ -20,7 +20,9 @@ Preview limits are deliberately provisional request counts, not product pricing:
 | --- | ---: | ---: | ---: |
 | Free | 1 | 2 | 3 |
 | Paid entitlement | 3 | 10 | 60 |
-| All non-admin accounts combined | — | 20 | 100 |
+| All accounts combined, including admins | — | 20 | 100 |
+
+The site-wide defaults can be changed only server-side with `VOICE_GLOBAL_DAILY_START_LIMIT` and `VOICE_GLOBAL_MONTHLY_START_LIMIT`. Values must be positive decimal integers from 1 to 1,000,000; empty, malformed or out-of-range values close admission for everyone, including admins. Missing values use the defaults above. These absolute caps are independent of personal tiers and the emergency `off` switch. Raising a cap allows more starts and can increase real spending; a start count is still not a dollar budget.
 
 An account is free unless the D1 `voice_entitlements` table has a `paid` row for its exact verified user ID with an unexpired `expires_at` Unix-millisecond timestamp. Entitlements have no client-write API and are not modified by `/api/sync`. No checkout, subscription, recurring charge, payment webhook, or dollar balance exists in this implementation. The table is a server-side integration point for a later verified billing flow. Do not grant paid status based on browser claims.
 
@@ -32,7 +34,7 @@ The ledger stores request ID, verified account ID, entitlement tier, and timesta
 
 The browser sends audio directly to OpenAI after the SDP exchange. It can issue data-channel messages and does not provide trustworthy usage accounting. The Worker does not own the call lifetime or number of responses. The one-hour browser cleanup timer, 512-token initial reply setting, and history truncation help ordinary sessions but are **not adversarial cost boundaries**. A single admitted call may consume substantial provider usage.
 
-The shared admission limits do not protect against unlimited admin use, compromised owner credentials, an already-running call, other services using the same provider project, or hosting/database charges. Owner exemption and maximum total spend are separate decisions: an unlimited owner can still incur real bills.
+The shared admission limits cover owner starts but do not bound the spending of an admitted or already-running call, other services using the same provider project, or hosting/database charges. Compromised owner credentials still enable calls within the aggregate allowance. Owner exemption from personal quotas and maximum total spend are separate decisions; the aggregate start cap is not a financial cap.
 
 ## Before public access or selling credits
 

@@ -15,12 +15,17 @@ const API_HEADERS = {
  * Secrets, set in the dashboard (deploys never overwrite them). Voice stays off without the OpenAI
  * key; without the Access settings nobody is signed in, except the development user on localhost.
  */
-type WorkerEnv = Omit<Env, "VOICE_ADMISSION_MODE"> & {
+type WorkerEnv = Omit<
+  Env,
+  "VOICE_ADMISSION_MODE" | "VOICE_GLOBAL_DAILY_START_LIMIT" | "VOICE_GLOBAL_MONTHLY_START_LIMIT"
+> & {
   OPENAI_API_KEY?: string;
   ACCESS_TEAM_DOMAIN?: string;
   ACCESS_POLICY_AUD?: string;
   VOICE_ADMIN_USER_IDS?: string;
   VOICE_ADMISSION_MODE?: string;
+  VOICE_GLOBAL_DAILY_START_LIMIT?: string;
+  VOICE_GLOBAL_MONTHLY_START_LIMIT?: string;
 };
 
 /**
@@ -44,7 +49,12 @@ async function realtimeSession(request: Request, env: WorkerEnv): Promise<Respon
   const allowedOrigins = env.REALTIME_ALLOWED_ORIGINS.split(",")
     .map((value) => value.trim())
     .filter(Boolean);
-  const admissionConfig = { mode: env.VOICE_ADMISSION_MODE, adminUserIds: env.VOICE_ADMIN_USER_IDS };
+  const admissionConfig = {
+    mode: env.VOICE_ADMISSION_MODE,
+    adminUserIds: env.VOICE_ADMIN_USER_IDS,
+    globalDailyStarts: env.VOICE_GLOBAL_DAILY_START_LIMIT,
+    globalMonthlyStarts: env.VOICE_GLOBAL_MONTHLY_START_LIMIT,
+  };
   let identity: Identity | null = null;
   return handleRealtimeSession(request, {
     apiKey: env.OPENAI_API_KEY,

@@ -8,3 +8,5 @@ ACCESS_POLICY_AUD=
 # VOICE_ADMIN_USER_IDS=dev@localhost
 # Default owner-only blocks every non-admin. limited-preview is for the existing Access allowlist,
 # not public release: it counts starts but cannot cap direct WebRTC lifetime or dollar spend.
+# Site-wide defaults in wrangler.jsonc include admin starts: 20/day and 100/month.
+# VOICE_GLOBAL_DAILY_START_LIMIT and VOICE_GLOBAL_MONTHLY_START_LIMIT must be positive integers.

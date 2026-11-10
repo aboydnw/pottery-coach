@@ -57,8 +57,9 @@ Plain variables in `wrangler.jsonc`:
 - `VOICE_TRANSCRIPTION_MODEL`: empty by default. Set it (for example `gpt-live-transcribe`) to caption what the potter says as well as what the coach says. It is opt-in because an unsupported model makes the whole session request fail; if voice stops connecting after setting it, clear it again.
 - `REALTIME_ALLOWED_ORIGINS`: extra allowed origins, comma-separated.
 - `VOICE_ADMISSION_MODE`: `owner-only` by default, `off` for an emergency stop on new calls, or `limited-preview` only for the existing restricted Access audience. Unknown values block everyone. The stop does not end calls already connected to OpenAI.
+- `VOICE_GLOBAL_DAILY_START_LIMIT` and `VOICE_GLOBAL_MONTHLY_START_LIMIT`: absolute site-wide start caps including the owner/admin, defaulting to 20/day and 100/month in UTC. Only decimal integers from 1 to 1,000,000 are accepted; invalid values fail closed. These are admission counts, not dollar limits. Raising them can increase spending.
 
-`VOICE_ADMIN_USER_IDS` is a server-only comma-separated exact-email allowlist, configured as a Secret rather than checked into this public repository. Admins have no application start allowance, but authentication, input validation, and the emergency stop still apply. D1 paid entitlements expire and do not represent a working payment integration. See the cost-protection contract before changing these settings.
+`VOICE_ADMIN_USER_IDS` is a server-only comma-separated exact-email allowlist, configured as a Secret rather than checked into this public repository. Admins bypass personal application allowances, but the site-wide caps, healthy-ledger requirement, authentication, input validation, and emergency stop still apply. D1 paid entitlements expire and do not represent a working payment integration. See the cost-protection contract before changing these settings.
 
 For local `wrangler dev`, copy `.dev.vars.example` to `.dev.vars`.
 

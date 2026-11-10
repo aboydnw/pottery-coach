@@ -140,7 +140,7 @@ it("keeps a real ledger reservation after provider failure", async () => {
   expect(provider).toHaveBeenCalledOnce();
 });
 
-it("allows only the cryptographically verified owner to bypass quotas while retaining the stop", async () => {
+it("lets the verified owner bypass personal quotas but not the site-wide cap or stop", async () => {
   const team = `https://test-${crypto.randomUUID()}.cloudflareaccess.com`;
   const audience = "voice-test";
   const pair = await generateKeyPair("RS256");
@@ -163,12 +163,15 @@ it("allows only the cryptographically verified owner to bypass quotas while reta
     ACCESS_POLICY_AUD: audience,
     VOICE_ADMIN_USER_IDS: "owner@example.test",
     VOICE_ADMISSION_MODE: "owner-only",
+    VOICE_GLOBAL_DAILY_START_LIMIT: "5",
     REALTIME_RATE_LIMITER: { limit },
   });
   const request = () => voiceRequest({}, { "cf-access-jwt-assertion": token }, "https://potterycoach.example");
   for (let count = 0; count < 5; count++) expect((await call(request(), bindings)).status).toBe(200);
   expect(limit).not.toHaveBeenCalled();
   const before = provider.mock.calls.length;
+  expect((await call(request(), bindings)).status).toBe(429);
+  expect(provider.mock.calls).toHaveLength(before);
   expect((await call(request(), { ...bindings, VOICE_ADMISSION_MODE: "off" } as typeof bindings)).status).toBe(503);
   expect(provider.mock.calls).toHaveLength(before);
 });

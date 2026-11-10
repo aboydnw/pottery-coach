@@ -10,6 +10,9 @@ export type VoiceAdmissionConfig = {
   mode?: string;
   /** Exact verified account IDs, set server-side only. Never accepted from a request. */
   adminUserIds?: string;
+  /** Site-wide start caps always include admins; positive decimal integers only. */
+  globalDailyStarts?: string;
+  globalMonthlyStarts?: string;
 };
 
 const schemaReady = new WeakMap<D1Database, Promise<unknown>>();
@@ -22,14 +25,14 @@ const SCHEMA = [
   `CREATE TABLE IF NOT EXISTS voice_starts (
     request_id TEXT PRIMARY KEY NOT NULL,
     user_id TEXT NOT NULL,
-    tier TEXT NOT NULL CHECK (tier IN ('free', 'paid')),
+    tier TEXT NOT NULL CHECK (tier IN ('free', 'paid', 'admin')),
     started_at INTEGER NOT NULL
   )`,
   `CREATE INDEX IF NOT EXISTS voice_starts_by_user ON voice_starts (user_id, started_at)`,
   `CREATE INDEX IF NOT EXISTS voice_starts_by_time ON voice_starts (started_at)`,
 ];
 
-/** Only a server-configured, exact authenticated identity can bypass application quotas. */
+/** Only a server-configured, exact authenticated identity can bypass personal application quotas. */
 export function isVoiceAdmin(userId: string, config: VoiceAdmissionConfig): boolean {
   return (config.adminUserIds ?? "")
     .split(",")
@@ -53,18 +56,21 @@ export async function admitVoiceStart(
   const mode = config.mode ?? "owner-only";
   if (mode === "off") return unavailable("VOICE_DISABLED");
   if (!["owner-only", "limited-preview"].includes(mode)) return unavailable("VOICE_BUDGET_UNAVAILABLE");
-  if (isVoiceAdmin(userId, config)) return null;
-  if (mode !== "limited-preview") return unavailable("VOICE_ACCESS_RESTRICTED");
+  const admin = isVoiceAdmin(userId, config);
+  if (!admin && mode !== "limited-preview") return unavailable("VOICE_ACCESS_RESTRICTED");
+  const globalDay = positiveLimit(config.globalDailyStarts, VOICE_START_LIMITS.shared.day);
+  const globalMonth = positiveLimit(config.globalMonthlyStarts, VOICE_START_LIMITS.shared.month);
+  if (globalDay === null || globalMonth === null) return unavailable("VOICE_BUDGET_UNAVAILABLE");
   try {
     await ensureSchema(db);
     const date = new Date(now);
     const day = Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate());
     const month = Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), 1);
-    const { free, paid, shared } = VOICE_START_LIMITS;
+    const { free, paid } = VOICE_START_LIMITS;
     const admission = await db
       .prepare(
         `WITH account AS (
-           SELECT CASE WHEN EXISTS (
+           SELECT CASE WHEN ? = 1 THEN 'admin' WHEN EXISTS (
              SELECT 1 FROM voice_entitlements WHERE user_id = ? AND tier = 'paid' AND expires_at > ?
            ) THEN 'paid' ELSE 'free' END AS tier
          )
@@ -72,24 +78,26 @@ export async function admitVoiceStart(
          SELECT ?, ?, account.tier, ? FROM account
          WHERE (SELECT COUNT(*) FROM voice_starts WHERE started_at >= ?) < ?
            AND (SELECT COUNT(*) FROM voice_starts WHERE started_at >= ?) < ?
-           AND (SELECT COUNT(*) FROM voice_starts WHERE user_id = ? AND started_at > ?)
+           AND (account.tier = 'admin' OR (
+           (SELECT COUNT(*) FROM voice_starts WHERE user_id = ? AND started_at > ?)
              < CASE account.tier WHEN 'paid' THEN ? ELSE ? END
            AND (SELECT COUNT(*) FROM voice_starts WHERE user_id = ? AND started_at >= ?)
              < CASE account.tier WHEN 'paid' THEN ? ELSE ? END
            AND (SELECT COUNT(*) FROM voice_starts WHERE user_id = ? AND started_at >= ?)
-             < CASE account.tier WHEN 'paid' THEN ? ELSE ? END
+             < CASE account.tier WHEN 'paid' THEN ? ELSE ? END))
          RETURNING request_id`,
       )
       .bind(
+        admin ? 1 : 0,
         userId,
         now,
         requestId,
         userId,
         now,
         month,
-        shared.month,
+        globalMonth,
         day,
-        shared.day,
+        globalDay,
         userId,
         now - 60_000,
         paid.minute,
@@ -130,4 +138,11 @@ function ensureSchema(db: D1Database): Promise<unknown> {
 
 function unavailable(error: string): Response {
   return Response.json({ error }, { status: 503, headers: { "cache-control": "no-store, private" } });
+}
+
+function positiveLimit(value: string | undefined, fallback: number): number | null {
+  if (value === undefined) return fallback;
+  if (!/^[1-9]\d*$/.test(value)) return null;
+  const limit = Number(value);
+  return Number.isSafeInteger(limit) && limit <= 1_000_000 ? limit : null;
 }

@@ -19,13 +19,49 @@ it("uses an exact server allowlist and keeps the emergency stop effective for ad
   expect(isVoiceAdmin("not-owner@example.test", config)).toBe(false);
   expect(isVoiceAdmin("owner@example.test.attacker.test", config)).toBe(false);
   expect(isVoiceAdmin("dev@localhost", config)).toBe(false);
-  const db = { batch: vi.fn().mockRejectedValue(new Error("unavailable")) } as unknown as D1Database;
-  for (let count = 0; count < 110; count++) {
+  const db = sqliteD1();
+  for (let count = 0; count < VOICE_START_LIMITS.shared.day; count++) {
     expect(await start(db, "owner@example.test", NOW, config)).toBeNull();
   }
-  expect(db.batch).not.toHaveBeenCalled();
+  expect((await start(db, "owner@example.test", NOW, config))?.status).toBe(429);
   expect((await start(db, "owner@example.test", NOW, { ...config, mode: "off" }))?.status).toBe(503);
   expect((await start(db, "owner@example.test", NOW, { ...config, mode: "typo" }))?.status).toBe(503);
+});
+
+it("counts owner and free starts together against configurable site-wide daily and monthly caps", async () => {
+  const db = sqliteD1();
+  const config = { ...preview, adminUserIds: "owner@example.test", globalDailyStarts: "2", globalMonthlyStarts: "3" };
+  expect(await start(db, "owner@example.test", NOW, config)).toBeNull();
+  expect(await start(db, "free@example.test", NOW, config)).toBeNull();
+  expect((await start(db, "owner@example.test", NOW, config))?.status).toBe(429);
+  expect(await start(db, "owner@example.test", NOW + 86_400_000, config)).toBeNull();
+  expect((await start(db, "owner@example.test", NOW + 2 * 86_400_000, config))?.status).toBe(429);
+  expect(await start(db, "owner@example.test", Date.UTC(2026, 11, 1), config)).toBeNull();
+});
+
+it("fails closed for owners on invalid site-wide limits or an unavailable ledger", async () => {
+  const db = sqliteD1();
+  const config = { mode: "owner-only", adminUserIds: "owner@example.test" };
+  for (const value of ["", "0", "-1", "1.5", "Infinity", "NaN", "1e3", "1000001", " 20 "]) {
+    expect((await start(db, "owner@example.test", NOW, { ...config, globalDailyStarts: value }))?.status).toBe(503);
+    expect((await start(db, "owner@example.test", NOW, { ...config, globalMonthlyStarts: value }))?.status).toBe(503);
+  }
+  const unavailable = {
+    batch: vi.fn().mockRejectedValue(new Error("unavailable")),
+    prepare: vi.fn(),
+  } as unknown as D1Database;
+  expect((await start(unavailable, "owner@example.test", NOW, config))?.status).toBe(503);
+});
+
+it("keeps the global cap atomic when owners and free accounts race for the final slot", async () => {
+  const db = sqliteD1();
+  const config = { ...preview, adminUserIds: "owner@example.test", globalDailyStarts: "1" };
+  const results = await Promise.all([
+    ...Array.from({ length: 10 }, () => start(db, "owner@example.test", NOW, config)),
+    ...Array.from({ length: 10 }, (_, i) => start(db, `free-${i}@example.test`, NOW, config)),
+  ]);
+  expect(results.filter((response) => response === null)).toHaveLength(1);
+  expect(results.filter((response) => response?.status === 429)).toHaveLength(19);
 });
 
 it("enforces rolling account frequency despite changed IPs and boundary bursts", async () => {
