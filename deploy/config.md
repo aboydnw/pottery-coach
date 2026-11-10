@@ -5,7 +5,7 @@ Pottery Coach runs on Cloudflare Workers at **https://potterycoach.anthonynboyd.
 - **Custom domain:** `potterycoach.anthonynboyd.com`. Cloudflare creates the DNS record and TLS certificate on the first deploy, so the `anthonynboyd.com` zone must be in the same account and the hostname must not already have a conflicting DNS record. `workers.dev` and preview URLs are off.
 - **Static assets:** `dist/`, with single-page-application fallback so `/session/*` serves `index.html`. Only `/api/*` runs the Worker first ([`worker/index.ts`](../worker/index.ts)).
 - **Response headers:** [`public/_headers`](../public/_headers) sets the Content Security Policy, permissions policy and cache rules for static files. The policy includes `'wasm-unsafe-eval'` because the AprilTag detector compiles WebAssembly. `_headers` does not apply to Worker responses, so the Worker sets `no-store` on API responses itself.
-- **Rate limiting:** `REALTIME_RATE_LIMITER` allows 10 voice sessions per client address per minute, and `SYNC_RATE_LIMITER` 30 syncs per potter per minute, using Cloudflare's rate limiting API.
+- **Rate limiting:** `REALTIME_RATE_LIMITER` allows 10 non-admin voice attempts per client address per minute, and `SYNC_RATE_LIMITER` 30 syncs per potter per minute. Voice also has atomic D1 account and aggregate start allowances; the edge limiter alone is not a billing limit. See [voice cost protection](../docs/specs/voice-cost-protection.md).
 - **Database:** the `DB` binding is a D1 database (`pottery-coach`) holding each potter's throw log and lasting notes. Wrangler creates it on the first deploy, and the Worker creates its tables on first use, so there are no migrations to run.
 
 ## Workers Builds (continuous deployment)
@@ -47,13 +47,18 @@ Cloud voice stays off (`503 VOICE_DISABLED`) until `OPENAI_API_KEY` exists. Set 
 pnpm exec wrangler secret put OPENAI_API_KEY
 ```
 
-`wrangler secret put` deploys a new version immediately. Only signed-in potters can start a voice session. `.env.production` sets `VITE_CLOUD_VOICE=true`; the release manifest still records the provider gate as pending. Set a monthly budget on the OpenAI project too (**platform.openai.com → Settings → Limits**): the Worker never sees what a session costs, because audio goes straight from the phone to OpenAI.
+`wrangler secret put` deploys a new version immediately. With the default `owner-only` admission mode, a signed-in potter must also be in the server-only `VOICE_ADMIN_USER_IDS` exact-email allowlist. An empty allowlist blocks everybody, including the localhost development user. Provision the intended verified owner before an authorized deployment; do not put identities into public client variables. This source change does not set a live owner or change production. `.env.production` sets `VITE_CLOUD_VOICE=true`; the release manifest still records the provider gate as pending.
+
+The Worker never sees trustworthy session costs because audio goes straight from the phone to OpenAI. Verify the OpenAI project's actual hard-limit, prepaid and autorecharge settings separately; a monthly alert is not the same as enforced spending. Enforcement can be delayed. The app's start quota is not a provider-dollar cap. Keep public voice closed until the [public-launch blockers](../docs/specs/voice-cost-protection.md#before-public-access-or-selling-credits) are resolved.
 
 Plain variables in `wrangler.jsonc`:
 
 - `VOICE_MODEL`: the realtime model.
 - `VOICE_TRANSCRIPTION_MODEL`: empty by default. Set it (for example `gpt-live-transcribe`) to caption what the potter says as well as what the coach says. It is opt-in because an unsupported model makes the whole session request fail; if voice stops connecting after setting it, clear it again.
 - `REALTIME_ALLOWED_ORIGINS`: extra allowed origins, comma-separated.
+- `VOICE_ADMISSION_MODE`: `owner-only` by default, `off` for an emergency stop on new calls, or `limited-preview` only for the existing restricted Access audience. Unknown values block everyone. The stop does not end calls already connected to OpenAI.
+
+`VOICE_ADMIN_USER_IDS` is a server-only comma-separated exact-email allowlist, configured as a Secret rather than checked into this public repository. Admins have no application start allowance, but authentication, input validation, and the emergency stop still apply. D1 paid entitlements expire and do not represent a working payment integration. See the cost-protection contract before changing these settings.
 
 For local `wrangler dev`, copy `.dev.vars.example` to `.dev.vars`.
 

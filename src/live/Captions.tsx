@@ -15,6 +15,7 @@ const STATUS_TEXT: Record<string, string> = {
 const FAILURE_TEXT: Record<string, string> = {
   unauthorized: "The voice coach isn't available for this account. Carry on by touch.",
   disabled: "The voice coach is switched off on the server.",
+  limited: "Voice allowance reached. Carry on by touch and try again later.",
   unavailable: "Voice coach lost.",
   "time-limit": "Voice coach hung up after an hour.",
 };

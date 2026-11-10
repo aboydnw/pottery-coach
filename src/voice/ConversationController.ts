@@ -15,7 +15,7 @@ export function reconnectDelayMs(attempt: number): number | null {
   return attempt >= 5 ? null : [0, 1000, 2000, 4000, 8000][attempt]!;
 }
 
-export type ConversationFailure = "unauthorized" | "disabled" | "unavailable";
+export type ConversationFailure = "unauthorized" | "disabled" | "limited" | "unavailable";
 
 export class ConversationController {
   private state: ConversationState = "idle";
@@ -137,7 +137,7 @@ export class ConversationController {
       if (this.transport !== transport) return;
       const status = (error as { status?: unknown }).status;
       if ((error as { retryable?: unknown }).retryable === false) {
-        this.failure = status === 503 ? "disabled" : "unauthorized";
+        this.failure = status === 429 ? "limited" : status === 503 ? "disabled" : "unauthorized";
         this.setState("failed");
         return;
       }

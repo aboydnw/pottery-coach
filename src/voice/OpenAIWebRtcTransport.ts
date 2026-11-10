@@ -198,12 +198,12 @@ export const MICROPHONE: MediaTrackConstraints & { voiceIsolation?: boolean } = 
   voiceIsolation: true,
 };
 
-/** Thrown when the session endpoint refuses the request; retrying won't help for auth or disabled voice. */
+/** Do not automatically retry authentication, admission limits, or disabled voice. */
 export class RealtimeSessionError extends Error {
   readonly retryable: boolean;
   constructor(readonly status: number) {
     super(`Realtime session failed (${status})`);
-    this.retryable = !(status === 401 || status === 403 || status === 503);
+    this.retryable = !(status === 401 || status === 403 || status === 429 || status === 503);
   }
 }
 

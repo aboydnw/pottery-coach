@@ -4,3 +4,7 @@ OPENAI_API_KEY=
 # Leave these empty locally: on localhost the Worker signs everyone in as dev@localhost.
 ACCESS_TEAM_DOMAIN=
 ACCESS_POLICY_AUD=
+# Explicit local-only owner override. Do not use a client's headers/body to assign admin access.
+# VOICE_ADMIN_USER_IDS=dev@localhost
+# Default owner-only blocks every non-admin. limited-preview is for the existing Access allowlist,
+# not public release: it counts starts but cannot cap direct WebRTC lifetime or dollar spend.

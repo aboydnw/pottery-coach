@@ -25,4 +25,5 @@ export const NOTICES = {
   lostVoice: "I've lost the voice connection. Tap the screen once when your hands are clean.",
   cameraStopped: "The camera stopped. Tap the screen once when your hands are clean.",
   notAllowed: "The voice coach isn't available for this account. You can carry on by touch.",
+  limited: "Voice allowance reached. You can carry on by touch and try again later.",
 } as const;

@@ -18,6 +18,8 @@ export type RealtimeSessionDependencies = {
   authenticate(request: Request): Promise<boolean>;
   verifyOrigin(request: Request): boolean;
   allowRequest(request: Request): boolean | Promise<boolean>;
+  /** Durable, fail-closed admission. Called after validation and before any provider request. */
+  reserveStart(requestId: string): Promise<Response | null>;
   log(event: { requestId: string; status: string }): void;
 };
 
@@ -33,13 +35,19 @@ export async function handleRealtimeSession(
   if (request.method !== "POST") return error("VOICE_PROVIDER_ERROR", 405);
   if (!(await dependencies.authenticate(request))) return error("VOICE_PROVIDER_ERROR", 401);
   if (!dependencies.verifyOrigin(request)) return error("VOICE_PROVIDER_ERROR", 403);
-  if (!(await dependencies.allowRequest(request))) return error("VOICE_RATE_LIMITED", 429);
+  try {
+    if (!(await dependencies.allowRequest(request))) return error("VOICE_RATE_LIMITED", 429);
+  } catch {
+    return error("VOICE_PROVIDER_ERROR", 503);
+  }
   if (!request.headers.get("content-type")?.toLowerCase().startsWith("application/json"))
     return error("VOICE_PROVIDER_ERROR", 415);
   if (Number(request.headers.get("content-length") ?? 0) > MAX_BODY_BYTES) return error("VOICE_PROVIDER_ERROR", 413);
   let parsed: ReturnType<typeof realtimeSessionRequestSchema.safeParse>;
   try {
-    parsed = realtimeSessionRequestSchema.safeParse(await request.json());
+    const body = await boundedBody(request);
+    if (body === null) return error("VOICE_PROVIDER_ERROR", 413);
+    parsed = realtimeSessionRequestSchema.safeParse(JSON.parse(body));
   } catch {
     return error("VOICE_PROVIDER_ERROR", 400);
   }
@@ -50,6 +58,12 @@ export async function handleRealtimeSession(
         : "VOICE_PROVIDER_ERROR",
       400,
     );
+  try {
+    const denied = await dependencies.reserveStart(requestId);
+    if (denied) return denied;
+  } catch {
+    return error("VOICE_PROVIDER_ERROR", 503);
+  }
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 10_000);
   try {
@@ -60,6 +74,8 @@ export async function handleRealtimeSession(
       JSON.stringify({
         type: "realtime",
         model: dependencies.model,
+        // Reduces ordinary per-turn output, but the direct client channel is not a spend boundary.
+        max_output_tokens: 512,
         audio: {
           output: { voice: VOICE },
           input: {
@@ -110,4 +126,27 @@ export async function handleRealtimeSession(
 
 function error(code: RealtimeErrorCode, status: number): Response {
   return Response.json({ error: code }, { status, headers: { "cache-control": "no-store, private" } });
+}
+
+/** Content-Length is optional and untrusted, so enforce the actual streamed byte count too. */
+async function boundedBody(request: Request): Promise<string | null> {
+  if (!request.body) return "";
+  const reader = request.body.getReader();
+  const decoder = new TextDecoder();
+  let bytes = 0;
+  let text = "";
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) return text + decoder.decode();
+      bytes += value.byteLength;
+      if (bytes > MAX_BODY_BYTES) {
+        await reader.cancel();
+        return null;
+      }
+      text += decoder.decode(value, { stream: true });
+    }
+  } finally {
+    reader.releaseLock();
+  }
 }

@@ -159,6 +159,17 @@ it("keeps touch settings reachable when voice needs reconnecting", () => {
   expect(screen.getByRole("region", { name: "Session settings" })).not.toBeNull();
 });
 
+it("explains an exhausted voice allowance and keeps touch settings reachable", () => {
+  const limited = props();
+  limited.voice.available = true;
+  limited.voice.failure = "limited";
+  render(<LiveSession {...limited} />);
+  expect(screen.getByText(/voice allowance reached/i)).not.toBeNull();
+  expect(screen.queryByRole("button", { name: /reconnect voice/i })).toBeNull();
+  fireEvent.click(screen.getByRole("button", { name: "Settings" }));
+  expect(screen.getByRole("region", { name: "Session settings" })).not.toBeNull();
+});
+
 it("captures the current camera view when touch starts a wheel-head check", async () => {
   vi.useFakeTimers();
   render(<LiveSession {...props()} />);

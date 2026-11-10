@@ -9,6 +9,8 @@ type CoachingFunctions = { setGoal(input:ThrowingGoal):Promise<GoalConfirmation>
 
 `POST /api/realtime/session` authenticates the app user/session, rate-limits, injects pinned instructions/tools, and performs the provider's unified exchange or returns a short-lived credential. Standard provider keys never reach the client. WebRTC is the OpenAI path; all data-channel messages validate against schemas and unknown tools fail closed.
 
+The [voice admission contract](voice-cost-protection.md) adds a default owner-only gate and durable start allowances for restricted preview accounts. It is not trusted token metering, enforceable call termination, or a dollar credit system. Client-side timers and event validation cannot secure provider costs against a modified client.
+
 Server VAD is default, with studio-noise tuning. Speech start cancels and clears/truncates unplayed output; the client records cancellation latency. Reconnect uses exponential delays 0/1/2/4/8 s capped at 15 s, at most five attempts, and restores only a compact goal/phase/policy summary—never stale readings. Session expiry at 18 minutes prompts graceful renewal before a 20-minute session if provider limit/config requires it.
 
 Input/output transcripts are diagnostic conversational records, not perception truth. User may disable transcript retention. Offline mode preserves local UI and approved local cues. All measurement questions call tools; instructions prohibit untooled quantitative answers.

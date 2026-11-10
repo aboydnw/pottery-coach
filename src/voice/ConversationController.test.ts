@@ -142,6 +142,7 @@ it("asks the coach to speak first once connected", async () => {
 it("stops retrying when the potter isn't allowed or voice is switched off", async () => {
   for (const [status, failure] of [
     [401, "unauthorized"],
+    [429, "limited"],
     [503, "disabled"],
   ] as const) {
     let attempts = 0;
