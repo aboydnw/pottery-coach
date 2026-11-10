@@ -12,3 +12,6 @@ docs/specs
 research
 worker-configuration.d.ts
 .wrangler
+
+# Native code is checked with Swift/Xcode, not web formatting.
+ios/

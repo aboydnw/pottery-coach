@@ -1,0 +1,30 @@
+name: Verify iOS camera prototype
+
+on:
+  pull_request:
+    paths:
+      - "ios/**"
+      - ".github/workflows/ios-prototype.yml"
+  push:
+    branches: [main]
+    paths:
+      - "ios/**"
+      - ".github/workflows/ios-prototype.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  native-prototype:
+    runs-on: macos-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - name: Test local detector and tracking contracts
+        run: swift test --package-path ios/PotteryCameraCore
+      - name: Compile unsigned iPhone simulator app
+        run: >-
+          xcodebuild -project ios/PotteryCamera.xcodeproj
+          -scheme PotteryCamera -configuration Debug
+          -sdk iphonesimulator -destination 'generic/platform=iOS Simulator'
+          -derivedDataPath ios/DerivedData CODE_SIGNING_ALLOWED=NO build

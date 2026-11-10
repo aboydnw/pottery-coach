@@ -12,3 +12,10 @@ playwright-report/
 .dev.vars*
 !.dev.vars.example
 worker-configuration.d.ts
+
+# Native prototype build output
+ios/**/.build/
+ios/**/.swiftpm/
+ios/DerivedData/
+ios/**/xcuserdata/
+ios/**/*.xcuserstate

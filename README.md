@@ -21,6 +21,12 @@ Automatic wheel-head detection remains an optional fallback. The browser detects
 
 Clay detection currently uses the local `background-v1` baseline behind a versioned segmentation-provider contract. Opt-in reviewed examples can be explicitly exported for offline training; they never upload automatically. A learned model is not promoted until it beats the baseline on held-out recording sessions and passes accuracy, false-positive, occlusion, and slow-device latency gates. Run `pnpm benchmark:clay-segmentation` for the dataset validation entry point.
 
+## iPhone camera and marker prototype
+
+The isolated [native iOS prototype](ios/README.md) starts the mobile migration with an on-device camera preview, printed-marker detection, and interruption diagnostics. It is a development experiment, not the full coach. Marker detection does not establish calibrated vessel dimensions, and this target does not enable metric measurements, cloud voice, or release gates. The web prototype remains unchanged.
+
+See the [mobile validation plan](docs/ios-prototype-validation.md) for the physical-device checks still required before advancing it.
+
 ## Deployment
 
 The app runs on Cloudflare Workers at **https://potterycoach.anthonynboyd.com**, and every push to `main` deploys through Workers Builds. [`deploy/config.md`](deploy/config.md) covers setup, secrets and rollback. `pnpm deploy:dry-run` validates the bundle locally.

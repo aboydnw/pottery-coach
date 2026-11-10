@@ -1,4 +1,4 @@
-import type { SessionHistoryItem } from "./sessionHistory";
+import type { SessionHistoryItem } from "./sessionHistoryData";
 
 export function SessionHistory({
   sessions,
