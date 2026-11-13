@@ -21,6 +21,11 @@
     "VOICE_MODEL": "gpt-realtime-2.1-mini",
     "VOICE_TRANSCRIPTION_MODEL": "",
     "REALTIME_ALLOWED_ORIGINS": "",
+    // Direct WebRTC is not yet server-metered. Keep the public voice gate closed.
+    "VOICE_ADMISSION_MODE": "owner-only",
+    // Absolute site-wide admission caps, including owner/admin starts. These are not dollar caps.
+    "VOICE_GLOBAL_DAILY_START_LIMIT": "20",
+    "VOICE_GLOBAL_MONTHLY_START_LIMIT": "100",
   },
   "ratelimits": [
     {

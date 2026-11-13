@@ -16,6 +16,7 @@ function dependencies(overrides = {}) {
     authenticate: vi.fn().mockResolvedValue(true),
     verifyOrigin: vi.fn(() => true),
     allowRequest: vi.fn(() => true),
+    reserveStart: vi.fn().mockResolvedValue(null),
     log: vi.fn(),
     ...overrides,
   };
@@ -58,6 +59,7 @@ it("keeps authorization server-only and returns only the SDP answer", async () =
   const form = (deps.fetch as ReturnType<typeof vi.fn>).mock.calls[0]![1].body as FormData;
   const injected = JSON.parse(String(form.get("session")));
   expect(injected.model).toBe("gpt-realtime-2.1-mini");
+  expect(injected.max_output_tokens).toBe(512);
   expect(injected.audio.input.noise_reduction).toEqual({ type: "near_field" });
   expect(injected.audio.input.turn_detection).toEqual({ type: "semantic_vad", eagerness: "low" });
   expect(injected.truncation).toMatchObject({ type: "retention_ratio", token_limits: { post_instructions: 8_000 } });
@@ -122,4 +124,53 @@ it("appends what the coach knows about the potter, within a size cap", async () 
   const response = await handleRealtimeSession(requestBody({ ...body, potterContext: "x".repeat(5_000) }), tooLong);
   expect(response.status).toBe(400);
   expect(tooLong.fetch).not.toHaveBeenCalled();
+});
+
+it("does not reserve a start for malformed input", async () => {
+  const deps = dependencies();
+  expect((await handleRealtimeSession(requestBody({ ...body, sdp: "bad" }), deps)).status).toBe(400);
+  expect(deps.reserveStart).not.toHaveBeenCalled();
+});
+
+it("requires durable admission before contacting the provider and fails closed on ledger errors", async () => {
+  for (const reserveStart of [
+    vi.fn().mockResolvedValue(Response.json({ error: "VOICE_QUOTA_EXHAUSTED" }, { status: 429 })),
+    vi.fn().mockRejectedValue(new Error("ledger unavailable")),
+  ]) {
+    const deps = dependencies({ reserveStart });
+    const response = await handleRealtimeSession(requestBody(), deps);
+    expect([429, 503]).toContain(response.status);
+    expect(deps.fetch).not.toHaveBeenCalled();
+  }
+});
+
+it("keeps a reservation when the provider fails or the outcome is uncertain", async () => {
+  const deps = dependencies({ fetch: vi.fn().mockRejectedValue(new Error("timeout")) });
+  expect((await handleRealtimeSession(requestBody(), deps)).status).toBe(502);
+  expect(deps.reserveStart).toHaveBeenCalledOnce();
+  expect(deps.fetch).toHaveBeenCalledOnce();
+  expect(deps.reserveStart.mock.invocationCallOrder[0]).toBeLessThan(deps.fetch.mock.invocationCallOrder[0]!);
+});
+
+it("rejects oversized actual bytes without trusting missing or false content lengths", async () => {
+  for (const contentLength of [undefined, "1"]) {
+    const deps = dependencies();
+    const headers = new Headers({ "content-type": "application/json" });
+    if (contentLength) headers.set("content-length", contentLength);
+    const oversized = new Request("http://local/api/realtime/session", {
+      method: "POST",
+      headers,
+      body: JSON.stringify({ ...body, ignored: "é".repeat(110_000) }),
+    });
+    expect((await handleRealtimeSession(oversized, deps)).status).toBe(413);
+    expect(deps.reserveStart).not.toHaveBeenCalled();
+    expect(deps.fetch).not.toHaveBeenCalled();
+  }
+});
+
+it("fails closed when the edge limiter is unavailable", async () => {
+  const deps = dependencies({ allowRequest: vi.fn().mockRejectedValue(new Error("unavailable")) });
+  expect((await handleRealtimeSession(requestBody(), deps)).status).toBe(503);
+  expect(deps.reserveStart).not.toHaveBeenCalled();
+  expect(deps.fetch).not.toHaveBeenCalled();
 });

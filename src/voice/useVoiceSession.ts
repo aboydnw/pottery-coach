@@ -18,7 +18,7 @@ const MAX_CAPTIONS = 4;
 const CAPTION_TICK_MS = 100;
 /** Hang up anyway if the goodbye never finishes playing. */
 const HANG_UP_TIMEOUT_MS = 20_000;
-/** A call left running (say, picking up studio noise) can't run up the bill past this. */
+/** Best-effort client cleanup for forgotten calls, not an enforceable server spending limit. */
 export const MAX_CALL_MS = 60 * 60_000;
 
 export type VoiceFailure = ConversationFailure | "time-limit";
@@ -95,7 +95,9 @@ export function useVoiceSession(
       if (next === "failed") {
         const reason = controller.getFailure();
         setFailure(reason);
-        speakNotice(reason === "unauthorized" ? NOTICES.notAllowed : NOTICES.lostVoice);
+        speakNotice(
+          reason === "limited" ? NOTICES.limited : reason === "unauthorized" ? NOTICES.notAllowed : NOTICES.lostVoice,
+        );
       }
     });
     controller.onEvent((event) => {

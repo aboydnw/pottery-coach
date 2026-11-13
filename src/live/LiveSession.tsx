@@ -612,7 +612,7 @@ export function LiveSession(props: LiveSessionProps) {
         </div>
         <div className="stage-banners">
           {camera.error && <p role="alert">{camera.error}</p>}
-          {(voice.failure === "unauthorized" || voice.failure === "disabled") && (
+          {(voice.failure === "unauthorized" || voice.failure === "disabled" || voice.failure === "limited") && (
             <p role="alert" className="stale-banner">
               {voiceFailureText(voice.failure)}
             </p>

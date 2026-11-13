@@ -1,6 +1,23 @@
-import { expect, it, vi } from "vitest";
+import { afterEach, expect, it, vi } from "vitest";
+import { exportJWK, generateKeyPair, SignJWT } from "jose";
 import worker from "./index";
 import { sqliteD1 } from "./testing/sqliteD1";
+
+afterEach(() => vi.unstubAllGlobals());
+
+const voiceBody = {
+  sdp: "v=0\r\no=- 1 1 IN IP4 127.0.0.1",
+  sessionId: "550e8400-e29b-41d4-a716-446655440000",
+  clientConfigVersion: "voice-v1",
+};
+
+function voiceRequest(extraBody = {}, extraHeaders = {}, origin = "http://localhost") {
+  return new Request(`${origin}/api/realtime/session`, {
+    method: "POST",
+    headers: { origin, "content-type": "application/json", ...extraHeaders },
+    body: JSON.stringify({ ...voiceBody, ...extraBody }),
+  });
+}
 
 function env(overrides: Record<string, unknown> = {}) {
   return {
@@ -86,4 +103,87 @@ it("syncs the throw log for the signed-in potter", async () => {
   expect(response.status).toBe(200);
   expect(await response.json()).toMatchObject({ pieces: [{ id: "p1" }] });
   expect((await sync({ since: 0, pieces: [], notes: [] }, "https://potterycoach.example/api/sync")).status).toBe(401);
+});
+
+it("rejects a valid non-admin request by default without provider access", async () => {
+  const provider = vi.fn();
+  vi.stubGlobal("fetch", provider);
+  const response = await call(voiceRequest(), env({ OPENAI_API_KEY: "test-key" }));
+  expect(response.status).toBe(503);
+  expect(provider).not.toHaveBeenCalled();
+});
+
+it("ignores forged admin and paid identities from the body and headers", async () => {
+  const provider = vi.fn(async () => new Response("v=0 answer"));
+  vi.stubGlobal("fetch", provider);
+  const bindings = env({
+    OPENAI_API_KEY: "test-key",
+    VOICE_ADMISSION_MODE: "limited-preview",
+    VOICE_ADMIN_USER_IDS: "owner@example.test",
+  });
+  const forged = () =>
+    voiceRequest(
+      { userId: "owner@example.test", tier: "paid", admin: true, credits: 1000000 },
+      { "x-user-id": "owner@example.test", "cf-access-authenticated-user-email": "owner@example.test" },
+    );
+  expect((await call(forged(), bindings)).status).toBe(200);
+  expect((await call(forged(), bindings)).status).toBe(429);
+  expect(provider).toHaveBeenCalledOnce();
+});
+
+it("keeps a real ledger reservation after provider failure", async () => {
+  const provider = vi.fn(async () => new Response("error", { status: 500 }));
+  vi.stubGlobal("fetch", provider);
+  const bindings = env({ OPENAI_API_KEY: "test-key", VOICE_ADMISSION_MODE: "limited-preview" });
+  expect((await call(voiceRequest(), bindings)).status).toBe(502);
+  expect((await call(voiceRequest(), bindings)).status).toBe(429);
+  expect(provider).toHaveBeenCalledOnce();
+});
+
+it("lets the verified owner bypass personal quotas but not the site-wide cap or stop", async () => {
+  const team = `https://test-${crypto.randomUUID()}.cloudflareaccess.com`;
+  const audience = "voice-test";
+  const pair = await generateKeyPair("RS256");
+  const jwk = { ...(await exportJWK(pair.publicKey)), kid: "test", alg: "RS256" };
+  const token = await new SignJWT({ email: "Owner@Example.Test" })
+    .setProtectedHeader({ alg: "RS256", kid: "test" })
+    .setIssuer(team)
+    .setAudience(audience)
+    .setIssuedAt()
+    .setExpirationTime("1h")
+    .sign(pair.privateKey);
+  const provider = vi.fn(async (input: string | URL | Request) =>
+    String(input).startsWith(team) ? Response.json({ keys: [jwk] }) : new Response("v=0 answer"),
+  );
+  vi.stubGlobal("fetch", provider);
+  const limit = vi.fn(async () => ({ success: false }));
+  const bindings = env({
+    OPENAI_API_KEY: "test-key",
+    ACCESS_TEAM_DOMAIN: team,
+    ACCESS_POLICY_AUD: audience,
+    VOICE_ADMIN_USER_IDS: "owner@example.test",
+    VOICE_ADMISSION_MODE: "owner-only",
+    VOICE_GLOBAL_DAILY_START_LIMIT: "5",
+    REALTIME_RATE_LIMITER: { limit },
+  });
+  const request = () => voiceRequest({}, { "cf-access-jwt-assertion": token }, "https://potterycoach.example");
+  for (let count = 0; count < 5; count++) expect((await call(request(), bindings)).status).toBe(200);
+  expect(limit).not.toHaveBeenCalled();
+  const before = provider.mock.calls.length;
+  expect((await call(request(), bindings)).status).toBe(429);
+  expect(provider.mock.calls).toHaveLength(before);
+  expect((await call(request(), { ...bindings, VOICE_ADMISSION_MODE: "off" } as typeof bindings)).status).toBe(503);
+  expect(provider.mock.calls).toHaveLength(before);
+});
+
+it("blocks provider access when the preview ledger is unavailable", async () => {
+  const provider = vi.fn();
+  vi.stubGlobal("fetch", provider);
+  const bindings = env({
+    OPENAI_API_KEY: "test-key",
+    VOICE_ADMISSION_MODE: "limited-preview",
+    DB: { batch: vi.fn().mockRejectedValue(new Error("unavailable")), prepare: vi.fn() },
+  });
+  expect((await call(voiceRequest(), bindings)).status).toBe(503);
+  expect(provider).not.toHaveBeenCalled();
 });

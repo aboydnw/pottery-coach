@@ -254,6 +254,21 @@ it("marks a refused sign-in as not worth retrying", async () => {
   await expect(transport.connect(config)).rejects.toMatchObject({ status: 401, retryable: false });
 });
 
+it("stops automatic retries and releases media when the voice allowance is exhausted", async () => {
+  const { peer, channel } = fakePeer();
+  const { stream, track } = fakeStream();
+  const transport = new OpenAIWebRtcTransport({
+    createPeer: () => peer,
+    getUserMedia: vi.fn().mockResolvedValue(stream),
+    createAudio: audio,
+    fetch: vi.fn().mockResolvedValue(new Response("{}", { status: 429 })),
+  });
+  await expect(transport.connect(config)).rejects.toMatchObject({ status: 429, retryable: false });
+  expect(track.stop).toHaveBeenCalledOnce();
+  expect(peer.close).toHaveBeenCalledOnce();
+  expect(channel.close).toHaveBeenCalledOnce();
+});
+
 it("speaks a cue as a one-off reply that skips the conversation, then notes it", async () => {
   const { peer, channel } = fakePeer();
   const transport = new OpenAIWebRtcTransport({
