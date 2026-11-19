@@ -1,5 +1,5 @@
 import { SessionHistory } from "../history/SessionHistory";
-import type { SessionHistoryItem } from "../history/sessionHistory";
+import type { SessionHistoryItem } from "../history/sessionHistoryData";
 
 export function HomeScreen({
   sessions,

@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { PieceRecord } from "../pieces/types";
 import type { SessionRecord } from "../session/types";
-import { buildSessionHistory } from "./sessionHistory";
+import { buildSessionHistory } from "./sessionHistoryData";
 
 function session(id: string, startedAtMs: number, endedAtMs: number | null): SessionRecord {
   return {

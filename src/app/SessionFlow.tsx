@@ -29,7 +29,7 @@ import { ThrowLog } from "../pieces/ThrowLog";
 import { SyncClient } from "../sync/SyncClient";
 import { AboutScreen } from "./AboutScreen";
 import { HomeScreen } from "./HomeScreen";
-import { buildSessionHistory, type SessionHistoryItem } from "../history/sessionHistory";
+import { buildSessionHistory, type SessionHistoryItem } from "../history/sessionHistoryData";
 
 const SHELL_KEY = "pottery-coach-session-shell";
 const repository = new SessionRepository();

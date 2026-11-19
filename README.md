@@ -17,9 +17,15 @@ Open the printed URL. Camera access needs HTTPS except on `localhost`, and the a
 
 Sizes are optional. The primary setup uses [`public/calibration/board-v1.svg`](public/calibration/board-v1.svg): print it at 100%, verify its 100 mm line, place it flat and centered on the wheel axle, and keep the phone still after calibration. The app remembers the entered wheel-head diameter as a plausibility check. After confirming calibration, remove the page before learning the empty-wheel background. Unsupported perspective falls back to shape-only operation rather than unreliable sizes. Metric measurements remain experimental until the physical accuracy and real-device gates pass.
 
-Automatic wheel-head detection remains an optional fallback. The browser detects locally normalized rim edges and curved arcs, then accepts only an ellipse with evidence around the complete visible circumference. Keep the entire wheel-head or bat rim inside the frame; partial rims remain tentative and cannot auto-confirm. This browser-first geometry is kept separate from camera capture so it can be reused in a future native iPhone app, but no native camera implementation is included yet. Run `pnpm benchmark:wheel-detection` for the synthetic detector benchmark; it does not replace physical validation.
+Automatic wheel-head detection remains an optional fallback. The browser detects locally normalized rim edges and curved arcs, then accepts only an ellipse with evidence around the complete visible circumference. Keep the entire wheel-head or bat rim inside the frame; partial rims remain tentative and cannot auto-confirm. This browser-first geometry is kept separate from camera capture for future native reuse. The separate iPhone camera prototype below detects printed markers only; it does not yet port this wheel geometry. Run `pnpm benchmark:wheel-detection` for the synthetic detector benchmark; it does not replace physical validation.
 
 Clay detection currently uses the local `background-v1` baseline behind a versioned segmentation-provider contract. Opt-in reviewed examples can be explicitly exported for offline training; they never upload automatically. A learned model is not promoted until it beats the baseline on held-out recording sessions and passes accuracy, false-positive, occlusion, and slow-device latency gates. Run `pnpm benchmark:clay-segmentation` for the dataset validation entry point.
+
+## iPhone camera and marker prototype
+
+The isolated [native iOS prototype](ios/README.md) starts the mobile migration with an on-device camera preview, printed-marker detection, and interruption diagnostics. It is a development experiment, not the full coach. Marker detection does not establish calibrated vessel dimensions, and this target does not enable metric measurements, cloud voice, or release gates. The web prototype remains unchanged.
+
+See the [mobile validation plan](docs/ios-prototype-validation.md) for the physical-device checks still required before advancing it.
 
 ## Deployment
 
